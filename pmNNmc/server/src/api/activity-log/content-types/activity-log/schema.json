@@ -1,0 +1,55 @@
+{
+  "kind": "collectionType",
+  "collectionName": "activity_logs",
+  "info": {
+    "singularName": "activity-log",
+    "pluralName": "activity-logs",
+    "displayName": "ActivityLog",
+    "description": "Лог действий пользователей"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "action": {
+      "type": "enumeration",
+      "enum": [
+        "CREATE_PROJECT",
+        "UPDATE_PROJECT",
+        "DELETE_PROJECT",
+        "ARCHIVE_PROJECT",
+        "RESTORE_PROJECT",
+        "CREATE_TASK",
+        "MARK_TASK",
+        "UPDATE_TASK",
+        "DELETE_TASK",
+        "CREATE_MEETING",
+        "CREATE_DOCUMENT",
+        "DELETE_DOCUMENT",
+        "ASSIGN_USER",
+        "UPDATE_MEETING",
+        "DELETE_MEETING",
+        "MOVE_STAGE"
+      ],
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "required": true
+    },
+    "user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "project": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::project.project"
+    },
+    "metadata": {
+      "type": "json"
+    }
+  }
+}

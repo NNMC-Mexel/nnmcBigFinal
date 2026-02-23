@@ -1,0 +1,25 @@
+{
+  "name": "mainapp-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MainAPP Workspace - NNMC IT Board",
+  "scripts": {
+    "dev": "cd pmNNmc && npm run dev",
+    "dev:frontend": "cd pmNNmc && npm run dev:frontend",
+    "dev:server": "cd pmNNmc && npm run dev:server",
+    "dev:kpi": "cd pmNNmc && npm run dev:kpi",
+    "dev:all": "cd pmNNmc && npm run dev:all",
+    "dev:servers": "cd pmNNmc && npm run dev:servers",
+    "build": "cd pmNNmc && npm run build",
+    "build:frontend": "cd pmNNmc && npm run build:frontend",
+    "build:server": "cd pmNNmc && npm run build:server",
+    "build:kpi": "cd pmNNmc && npm run build:kpi",
+    "install:all": "cd pmNNmc && npm run install:all",
+    "start": "cd pmNNmc && npm run start",
+    "start:kpi": "cd pmNNmc && npm run start:kpi"
+  },
+  "engines": {
+    "node": ">=20.0.0 <=24.x.x",
+    "npm": ">=6.0.0"
+  }
+}

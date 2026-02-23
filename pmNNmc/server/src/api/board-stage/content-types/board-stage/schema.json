@@ -1,0 +1,46 @@
+{
+  "kind": "collectionType",
+  "collectionName": "board_stages",
+  "info": {
+    "singularName": "board-stage",
+    "pluralName": "board-stages",
+    "displayName": "BoardStage",
+    "description": "Колонки канбан-доски"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name_ru": {
+      "type": "string",
+      "required": true
+    },
+    "name_kz": {
+      "type": "string",
+      "required": true
+    },
+    "minPercent": {
+      "type": "integer",
+      "required": true,
+      "min": 0,
+      "max": 100,
+      "default": 0
+    },
+    "maxPercent": {
+      "type": "integer",
+      "required": true,
+      "min": 0,
+      "max": 100,
+      "default": 100
+    },
+    "order": {
+      "type": "integer",
+      "default": 0
+    },
+    "color": {
+      "type": "string",
+      "default": "#3B82F6"
+    }
+  }
+}

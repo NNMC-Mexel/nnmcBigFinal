@@ -1,0 +1,481 @@
+export default {
+  // Common
+  common: {
+    loading: 'Жүктелуде...',
+    save: 'Сақтау',
+    cancel: 'Болдырмау',
+    close: 'Жабу',
+    delete: 'Жою',
+    edit: 'Өңдеу',
+    create: 'Құру',
+    search: 'Іздеу',
+    filter: 'Сүзгі',
+    all: 'Барлығы',
+    actions: 'Әрекеттер',
+    status: 'Күй',
+    back: 'Артқа',
+    confirm: 'Растау',
+    yes: 'Иә',
+    no: 'Жоқ',
+  },
+
+  // Navigation
+  nav: {
+    dashboard: 'Аналитика',
+    board: 'Канбан',
+    table: 'Кесте',
+    projects: 'Жобалар',
+    helpdesk: 'Өтінімдер',
+    activity: 'Әрекеттер тарихы',
+    adminPanel: 'Әкімші панелі',
+    settings: 'Баптаулар',
+    logout: 'Шығу',
+  },
+
+
+  // Activity log
+  activityLog: {
+    title: 'Әрекеттер тарихы',
+    subtitle: 'Жүйедегі барлық пайдаланушылардың әрекеттері',
+    empty: 'Әзірге жазбалар жоқ',
+    unknownUser: 'Белгісіз пайдаланушы',
+    actions: {
+      createProject: 'Жоба құрды',
+      updateProject: 'Жобаны жаңартты',
+      deleteProject: 'Жобаны өшірді',
+      moveStage: 'Жобаны жылжытты',
+      createTask: 'Қосымша тапсырма қосты',
+      markTask: 'Қосымша тапсырманы белгіледі',
+      deleteTask: 'Қосымша тапсырманы өшірді',
+      createMeeting: 'Ескертпе қосты',
+      deleteMeeting: 'Ескертпені өшірді',
+      createDocument: 'Құжат қосты',
+      deleteDocument: 'Құжатты өшірді',
+      assignUser: 'Орындаушыны тағайындады',
+      archiveProject: 'Жобаны мұрағаттады',
+      restoreProject: 'Жобаны қалпына келтірді',
+      updateTask: 'Тапсырманы жаңартты',
+      updateMeeting: 'Ескертпені жаңартты',
+    },
+  },
+
+  // Auth
+  auth: {
+    login: 'Кіру',
+    register: 'Тіркелу',
+    email: 'Email',
+    password: 'Құпия сөз',
+    confirmPassword: 'Құпия сөзді растау',
+    firstName: 'Аты',
+    lastName: 'Тегі',
+    forgotPassword: 'Құпия сөзді ұмыттыңыз ба?',
+    resetPassword: 'Құпия сөзді қалпына келтіру',
+    sendResetLink: 'Сілтеме жіберу',
+    verifyEmail: 'Email растау',
+    verifyEmailText: 'Біз сіздің email-ге хат жібердік. Растау үшін сілтемеге өтіңіз.',
+    loginSuccess: 'Сіз жүйеге сәтті кірдіңіз',
+    registerSuccess: 'Тіркелу сәтті! Email-ді тексеріңіз.',
+    invalidCredentials: 'Email немесе құпия сөз қате',
+    noAccount: 'Аккаунтыңыз жоқ па?',
+    hasAccount: 'Аккаунтыңыз бар ма?',
+  },
+
+  // Dashboard
+  dashboard: {
+    title: 'Жобалар аналитикасы',
+    subtitle: 'Жобалардың ағымдағы жағдайына шолу',
+    totalProjects: 'Барлық жобалар',
+    activeProjects: 'Белсенді',
+    archivedProjects: 'Мұрағатта',
+    overdueProjects: 'Мерзімі өткен',
+    dueSoonProjects: 'Мерзімі жақын',
+    byDepartment: 'Бөлімдер бойынша',
+    byPriority: 'Басымдық бойынша',
+    weeklyTrend: '8 апталық динамика',
+    created: 'Құрылды',
+    completed: 'Аяқталды',
+    priorityRed: 'Шұғыл',
+    priorityYellow: 'Орташа',
+    priorityGreen: 'Қалыпты',
+  },
+
+  // Projects
+  project: {
+    title: 'Атауы',
+    description: 'Сипаттама',
+    department: 'Бөлім',
+    startDate: 'Басталу күні',
+    dueDate: 'Мерзімі',
+    priority: 'Басымдық',
+    status: 'Күй',
+    progress: 'Орындалу',
+    responsible: 'Жауаптылар',
+    owner: 'Жоба менеджері',
+    ownerPlaceholder: 'Жоба менеджерін таңдаңыз',
+    ownerRequired: 'Жоба менеджерін көрсетіңіз',
+    ownerNotAssigned: 'Жоба менеджері тағайындалмаған',
+    ownerSection: 'Жоба менеджері',
+    ownerSectionHint: 'Жоба менеджерін тек әкімші немесе жетекші өзгерте алады.',
+    ownerDepartmentMismatch: 'Жоба менеджері жобамен бір бөлімнен болуы керек.',
+    ownerSameDepartment: 'Тағайындау тек жоба бөлімінің пайдаланушыларына рұқсат.',
+    ownerAnyDepartment: 'Супер әкімші менеджерді кез келген бөлімнен тағайындай алады.',
+    supportingSpecialists: 'Қолдау мамандары',
+    supportingSpecialistsHint: 'Бірнеше маманды өз бөліміңізден таңдауға болады',
+    noAssignableUsers: 'Қолжетімді пайдаланушылар жоқ',
+    assignableUsersLoadError: 'Орындаушылар тізімін жүктеу сәтсіз аяқталды',
+    assigneeDepartment: 'Орындаушылар бөлімі',
+    departmentRequired: 'Орындаушылар бөлімін таңдаңыз',
+    startDateRequired: 'Жоба басталу күнін көрсетіңіз',
+    dueDateRequired: 'Жоба аяқталу күнін көрсетіңіз',
+    dueDateBeforeStart: 'Аяқталу күні басталу күнінен ерте болмауы керек',
+    deadlinesRequired: 'Жоба дедлайндары міндетті',
+    stage: 'Кезең',
+    tasks: 'Тапсырмалар',
+    meetings: 'Жиналыстар',
+    createProject: 'Жоба құру',
+    editProject: 'Жобаны өңдеу',
+    archiveProject: 'Мұрағаттау',
+    restoreProject: 'Қалпына келтіру',
+    deleteProject: 'Жобаны жою',
+    deleteProjectConfirm: 'Жобаны жоясыз ба? Ол "Жойылғандарға" ауыстырылады. Тек супер әкімші біржола жоя алады.',
+    deleteProjectPermanently: 'Біржола жою',
+    deleteProjectPermanentlyConfirm: 'Жобаны біржола жою керек пе? Бұл әрекетті қайтару мүмкін емес.',
+    deletedProjects: 'Жойылған жобалар',
+    noProjects: 'Жобалар әлі жоқ',
+    overdue: 'Мерзімі өткен',
+    dueSoon: 'Мерзімі жақын',
+  },
+
+  // Tasks
+  task: {
+    title: 'Тапсырма',
+    addTask: 'Тапсырма қосу',
+    createTask: 'Жаңа тапсырма',
+    editTask: 'Тапсырманы өзгерту',
+    markComplete: 'Орындалды деп белгілеу',
+    markIncomplete: 'Белгісін алып тастау',
+    assignee: 'Орындаушы',
+    assigneePlaceholder: 'Орындаушыны таңдаңыз',
+    todo: 'Орындауға',
+    inProgress: 'Жұмыста',
+    done: 'Орындалды',
+    progress: 'Прогресс',
+    nextStage: 'Келесі кезеңге өткізу',
+    subtasks: 'Қосымша тапсырмалар',
+    addSubtask: 'Қосымша тапсырма қосу',
+    subtaskPlaceholder: 'Қосымша тапсырма атауы',
+    noSubtasks: 'Қосымша тапсырмалар жоқ',
+    subtasksHint: 'Прогресс қосымша тапсырмалар бойынша есептеледі.',
+    progressDerivedFromSubtasks: 'Прогресс қосымша тапсырмалар бойынша есептеледі.',
+    departmentForbidden: 'Тапсырмалар мен орындаушыларды тек өз бөліміңізде тағайындай аласыз.',
+    deadlineExceeded: 'Тапсырма күндері жоба дедлайнынан аспауы керек.',
+    ideas: 'Идеялар / Сұраныстар',
+    preparation: 'Жобаға дайындық',
+    in_progress: 'Жұмыста',
+    testing: 'Тестілеу',
+    production: 'Өндірістік пайдалануда',
+    archived: 'Мұрағатта',
+    noTasks: 'Тапсырмалар жоқ',
+  },
+
+  // Meetings
+  meeting: {
+    title: 'Жиналыс',
+    addNote: 'Жазба қосу',
+    noNotes: 'Жазбалар әлі жоқ',
+    author: 'Автор',
+  },
+
+  // Documents
+  documents: {
+    title: 'Құжаттар',
+    add: 'Қосу',
+    uploading: 'Жүктелуде...',
+    empty: 'Тіркелген құжаттар жоқ',
+    download: 'Жүктеп алу',
+    delete: 'Жою',
+    confirmDelete: 'Құжатты жою?',
+    unknown: 'Белгісіз',
+  },
+
+  // Surveys
+  survey: {
+    title: 'Сауалнамалар',
+    create: 'Сауалнама құру',
+    edit: 'Сауалнаманы өңдеу',
+    delete: 'Жою',
+    duplicate: 'Көшірме жасау',
+    viewResults: 'Жауаптарды көру',
+    results: 'Сауалнама нәтижелері',
+    empty: 'Сауалнамалар әлі құрылмаған',
+    completeToCreate: 'Сауалнама құру үшін жобаны 100%-ға жеткізіңіз',
+    completeProjectFirst: 'Сауалнама құру үшін жобаны аяқтаңыз (100%)',
+    requiresComplete: '100% орындалуы қажет',
+    
+    // Builder
+    titleLabel: 'Сауалнама атауы',
+    titlePlaceholder: 'Атауын енгізіңіз',
+    description: 'Сипаттама (міндетті емес)',
+    descriptionPlaceholder: 'Сауалнама мақсатының қысқаша сипаттамасы',
+    settings: 'Сауалнама баптаулары',
+    anonymous: 'Анонимді сауалнама',
+    anonymousHint: 'Респонденттер АТЖ мен лауазымын көрсетпейді',
+    allowMultiple: 'Қайталама жауаптарға рұқсат беру',
+    showProgress: 'Толтыру барысын көрсету',
+    expiresAt: 'Аяқталу күні (міндетті емес)',
+    thankYou: 'Жіберілгеннен кейінгі хабарлама',
+    nonAnonymousHint: 'Сұрақтардан бұрын респонденттер көрсетеді: АТЖ, Лауазымы, Бөлімі, Email',
+    questions: 'Сұрақтар',
+    addQuestion: 'Сұрақ қосу',
+    questionPlaceholder: 'Сұрақты енгізіңіз',
+    required: 'Міндетті',
+    option: 'Нұсқа',
+    addOption: 'Нұсқа қосу',
+    titleRequired: 'Сауалнама атауын енгізіңіз',
+    questionsRequired: 'Кемінде бір сұрақ қосыңыз',
+    emptyQuestion: 'Барлық сұрақтардың мәтінін толтырыңыз',
+    saveFailed: 'Сауалнаманы сақтау сәтсіз аяқталды',
+    
+    // Status
+    statusDraft: 'Жоба',
+    statusActive: 'Белсенді',
+    statusClosed: 'Жабық',
+    activate: 'Жинауды бастау',
+    deactivate: 'Жинауды тоқтату',
+    
+    // Links
+    link: 'Сілтеме',
+    copyLink: 'Сілтемені көшіру',
+    openLink: 'Сауалнаманы ашу',
+    
+    // Results
+    responses: 'жауап',
+    responsesCount: 'жауап',
+    questionsCount: 'сұрақ',
+    answersCount: 'жауап',
+    summaryView: 'Жиынтық',
+    individualView: 'Респонденттер бойынша',
+    exportCSV: 'CSV экспорттау',
+    noResults: 'Нәтижелерді жүктеу сәтсіз аяқталды',
+    noResponses: 'Әлі жауаптар жоқ',
+    noTextAnswers: 'Мәтіндік жауаптар жоқ',
+    outOf5: '5-тен',
+    anonymousRespondent: 'Анонимді респондент',
+    noName: 'Атсыз',
+    respondentName: 'АТЖ',
+    respondentPosition: 'Лауазымы',
+    respondentDepartment: 'Бөлімі',
+    respondentEmail: 'Email',
+    confirmDelete: 'Сауалнаманы жою? Барлық жауаптар жоғалады.',
+    
+    // Public survey
+    loadError: 'Сауалнаманы жүктеу сәтсіз аяқталды',
+    submitError: 'Жауаптарды жіберу сәтсіз аяқталды',
+    error: 'Қате',
+    thankYouDefault: 'Қатысқаныңыз үшін рахмет!',
+    canClose: 'Енді бұл бетті жабуға болады',
+    aboutYou: 'Сіз туралы',
+    fillInfo: 'Деректеріңізді көрсетіңіз',
+    yourName: 'Сіздің АТЖ',
+    namePlaceholder: 'Иванов Иван Иванович',
+    yourPosition: 'Сіздің лауазымыңыз',
+    positionPlaceholder: 'Жоба менеджері',
+    yourDepartment: 'Сіздің бөліміңіз',
+    departmentPlaceholder: 'IT бөлімі',
+    yourEmail: 'Сіздің Email',
+    enterAnswer: 'Жауабыңызды енгізіңіз...',
+    requiredField: 'Міндетті',
+    questionOf: 'Сұрақ',
+    of: '/',
+    allDone: 'Сіз барлық сұрақтарға жауап бердіңіз!',
+    clickSubmit: 'Аяқтау үшін "Жіберу" батырмасын басыңыз',
+    back: 'Артқа',
+    next: 'Келесі',
+    submit: 'Жіберу',
+    submitting: 'Жіберілуде...',
+    yes: 'Иә',
+    no: 'Жоқ',
+  },
+
+  // Helpdesk
+  helpdesk: {
+    title: 'Өтінімдер',
+    subtitle: 'Өтінімдерді басқару',
+    ticketNumber: '№ өтінім',
+    requesterName: 'Өтініш берушінің АТЖ',
+    requesterPhone: 'Телефон',
+    requesterDepartment: 'Өтініш берушінің бөлімі',
+    comment: 'Мәселе сипаттамасы',
+    staffComment: 'Маман түсініктемесі',
+    staffCommentPlaceholder: 'Түсініктеме қосыңыз...',
+    category: 'Санат',
+    serviceGroup: 'Қызмет',
+    assignee: 'Орындаушы',
+    complexity: 'Күрделілік',
+    status: 'Мәртебе',
+    createdAt: 'Құрылған күні',
+    info: 'Ақпарат',
+    requesterInfo: 'Өтініш беруші туралы ақпарат',
+    reassign: 'Қайта тағайындау',
+    changeAssignee: 'Орындаушыны ауыстыру',
+    notAssigned: 'Тағайындалмаған',
+    noTickets: 'Өтінімдер әлі жоқ',
+    noUsers: 'Пайдаланушылар табылмады',
+    searchUser: 'Аты бойынша іздеу...',
+    applyAssignees: 'Қолдану',
+    publicForm: 'Өтінім формасы',
+
+    // Statuses
+    statusNew: 'Жаңа',
+    statusInProgress: 'Жұмыста',
+    statusDone: 'Орындалды',
+    statusInvalid: 'Дұрыс емес',
+
+    // Filters
+    filterAll: 'Барлығы',
+    filterNew: 'Жаңалар',
+    filterInProgress: 'Жұмыста',
+    filterDone: 'Орындалды',
+    filterInvalid: 'Дұрыс емес',
+    searchPlaceholder: 'АТЖ, нөмір, бөлім бойынша іздеу...',
+    myTickets: 'Менің өтінімдерім',
+    allTickets: 'Барлық өтінімдер',
+    allAssignees: 'Барлық орындаушылар',
+
+    // Public form
+    publicTitle: 'Өтінім беру',
+    publicSubtitle: 'Техникалық қызметке өтінім беру үшін форманы толтырыңыз',
+    selectService: 'Қызметті таңдаңыз',
+    selectCategory: 'Санатты таңдаңыз',
+    selectedService: 'Қызмет',
+    selectedCategory: 'Санат',
+    namePlaceholder: 'Иванов Иван Иванович',
+    departmentPlaceholder: 'АКЦ',
+    commentPlaceholder: 'Мәселеңізді сипаттаңыз...',
+    submit: 'Өтінім жіберу',
+    submitting: 'Жіберілуде...',
+    submitSuccess: 'Өтінім сәтті жіберілді!',
+    yourTicketNumber: 'Өтінім нөміріңіз',
+    submitAnother: 'Тағы бір өтінім жіберу',
+    loadError: 'Санаттарды жүктеу сәтсіз',
+    submitError: 'Өтінімді жіберу сәтсіз',
+  },
+
+  // Departments
+  department: {
+    IT: 'IT бөлімі',
+    DIGITALIZATION: 'Цифрландыру',
+    MEDICAL_EQUIPMENT: 'Медициналық жабдық',
+    ENGINEERING: 'Инженерлік қызмет',
+  },
+
+  // Status
+  status: {
+    ACTIVE: 'Белсенді',
+    ARCHIVED: 'Мұрағатта',
+    DELETED: 'Жойылған',
+  },
+
+  // Priority
+  priority: {
+    RED: 'Шұғыл',
+    YELLOW: 'Орташа',
+    GREEN: 'Қалыпты',
+  },
+
+  // Board
+  board: {
+    title: 'Канбан тақтасы',
+    dragHint: 'Кезеңді өзгерту үшін жобаны сүйреңіз',
+    noProjectsInStage: 'Жобалар жоқ',
+    showArchiveColumn: 'Мұрағатты көрсету',
+  },
+
+  // Table
+  table: {
+    title: 'Жобалар кестесі',
+    showArchived: 'Мұрағатты көрсету',
+    hideArchived: 'Мұрағатты жасыру',
+  },
+
+  // Stages
+  stage: {
+    start: 'Бастау',
+    planning: 'Жоспарлау',
+    inProgress: 'Жұмыста',
+    testing: 'Тестілеу',
+    completion: 'Аяқтау',
+  },
+
+  // Workflow Columns
+  workflow: {
+    descriptionButton: 'Сипаттама',
+    descriptionTitle: 'Баған сипаттамасы',
+    sectionPurpose: 'Мақсаты',
+    sectionContent: 'Мазмұны',
+    sectionRules: 'Ережелер',
+    ideas: {
+      title: 'Идеялар / Сұраныстар',
+      purpose: 'Барлық бастамаларға арналған бірыңғай кіру нүктесі.',
+      content:
+        'Даму идеялары, бизнес пен басшылықтан сұраныстар, автоматтандыру ұсыныстары, бюджеті жоқ бастамалар.',
+      rules:
+        'Тапсырмалар тікелей орындалмайды: олар бағалаудан өтеді, кейін қабылданбайды немесе дайындыққа өтеді.',
+    },
+    preparation: {
+      title: 'Жобаға дайындық (ТТ, талдау)',
+      purpose: 'Идеяны формалды жобаға айналдыру.',
+      content:
+        'Техникалық тапсырма, бизнес талаптар, архитектуралық шешімдер, мерзім мен ресурс бағалары, жауаптыларды келісу.',
+      rules:
+        'Жоба тек ТТ бекітілгеннен кейін дайын деп саналады; қабылдау критерийлерінсіз өтуге болмайды.',
+    },
+    inProgress: {
+      title: 'Жұмыста',
+      purpose: 'Жобаны белсенді іске асыру.',
+      content:
+        'Әзірлеу, интеграциялар, инфрақұрылымды баптау, команданы үйлестіру.',
+      rules:
+        'Параллель жобаларға шектеу бар; әр жобаның жауаптысы бар; мәртебе тұрақты жаңартылып тұрады.',
+    },
+    testing: {
+      title: 'Тестілеу',
+      purpose: 'Сапа мен талаптарға сәйкестігін тексеру.',
+      content:
+        'Функционалдық тестілеу, қабылдау тексерістері, ақауларды табу және түзету, ТТ растау.',
+      rules:
+        'Сындарлы қателер жобаны "Жұмыста" кезеңіне қайтарады; өту тек сәтті тесттен кейін болады.',
+    },
+    production: {
+      title: 'Өнеркәсіптік пайдалануда',
+      purpose: 'Жобаның өндірістік ортада жұмыс істеуі.',
+      content:
+        'Продакшнға енгізу, мониторинг, сүйемелдеу, инциденттерді түзету.',
+      rules:
+        'Өзгерістер тек рәсімдер арқылы жасалады; тұрақтылық пен тиімділік көрсеткіштері тіркеледі.',
+    },
+    archive: {
+      title: 'Мұрағат',
+      purpose: 'Мұрағаттағы жобаларға арналған баған.',
+      content: 'ARCHIVED мәртебесі бар жобалар. Әдепкіде жасырылған.',
+      rules: 'Мұрағатты жасырып, жобаны қайта сүйреуге болады.',
+    },
+  },
+
+  // Errors
+  error: {
+    generic: 'Қате орын алды',
+    notFound: 'Бет табылмады',
+    unauthorized: 'Кіруге тыйым салынған',
+    forbidden: 'Құқықтар жеткіліксіз',
+    networkError: 'Желі қатесі',
+  },
+
+  // Roles
+  role: {
+    superadmin: 'Супер-әкімші',
+    admin: 'Әкімші',
+    lead: 'Жетекші',
+    member: 'Қатысушы',
+  },
+};

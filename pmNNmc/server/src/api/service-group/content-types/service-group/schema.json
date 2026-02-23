@@ -1,0 +1,40 @@
+{
+  "kind": "collectionType",
+  "collectionName": "service_groups",
+  "info": {
+    "singularName": "service-group",
+    "pluralName": "service-groups",
+    "displayName": "Service Group",
+    "description": "Службы для helpdesk заявок"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name_ru": {
+      "type": "string",
+      "required": true
+    },
+    "name_kz": {
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "department": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::department.department"
+    },
+    "categories": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::ticket-category.ticket-category",
+      "mappedBy": "serviceGroup"
+    }
+  }
+}

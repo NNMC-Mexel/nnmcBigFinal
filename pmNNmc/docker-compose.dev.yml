@@ -1,0 +1,49 @@
+# NNMC IT Project Board - Docker Compose for Development
+# Usage: docker-compose -f docker-compose.dev.yml up
+
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: nnmc-backend-dev
+    ports:
+      - "12005:12005"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 12005
+      NODE_ENV: development
+      APP_KEYS: dev-key1,dev-key2,dev-key3,dev-key4
+      API_TOKEN_SALT: dev-api-token-salt
+      ADMIN_JWT_SECRET: dev-admin-jwt-secret
+      TRANSFER_TOKEN_SALT: dev-transfer-token-salt
+      JWT_SECRET: dev-jwt-secret
+      DATABASE_CLIENT: sqlite
+      DATABASE_FILENAME: .tmp/data.db
+      FRONTEND_URL: http://192.168.101.25:13005
+    volumes:
+      - ./server/.tmp:/app/.tmp
+      - ./server/public/uploads:/app/public/uploads
+    networks:
+      - nnmc-dev
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://192.168.101.25:12005
+        VITE_FRONTEND_URL: http://192.168.101.25:13005
+    container_name: nnmc-frontend-dev
+    ports:
+      - "13005:13005"
+    depends_on:
+      - backend
+    networks:
+      - nnmc-dev
+
+networks:
+  nnmc-dev:
+    driver: bridge

@@ -1,0 +1,39 @@
+{
+  "name": "nnmc-it-board-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NNMC IT Project Board - Strapi Backend",
+  "scripts": {
+    "build": "strapi build",
+    "console": "strapi console",
+    "develop": "strapi develop",
+    "dev": "strapi develop",
+    "start": "strapi start",
+    "seed": "strapi console --eval \"require('./scripts/seed').default()\"",
+    "strapi": "strapi",
+    "test": "tsx --test"
+  },
+  "dependencies": {
+    "@strapi/plugin-cloud": "5.33.3",
+    "@strapi/plugin-users-permissions": "5.33.3",
+    "@strapi/provider-email-nodemailer": "^5.0.0",
+    "@strapi/strapi": "5.33.3",
+    "better-sqlite3": "12.4.1",
+    "pg": "^8.18.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "react-router-dom": "^6.0.0",
+    "styled-components": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "tsx": "^4.7.0",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=20.0.0 <=24.x.x",
+    "npm": ">=6.0.0"
+  }
+}

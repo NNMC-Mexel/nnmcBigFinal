@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "project_documents",
+  "info": {
+    "singularName": "project-document",
+    "pluralName": "project-documents",
+    "displayName": "Project Document",
+    "description": "Attached documents for projects"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "file": {
+      "type": "media",
+      "multiple": false,
+      "required": true,
+      "allowedTypes": ["files", "images"]
+    },
+    "project": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::project.project",
+      "inversedBy": "documents"
+    },
+    "uploadedBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "description": {
+      "type": "string"
+    }
+  }
+}

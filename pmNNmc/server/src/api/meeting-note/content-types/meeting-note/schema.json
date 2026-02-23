@@ -1,0 +1,31 @@
+{
+  "kind": "collectionType",
+  "collectionName": "meeting_notes",
+  "info": {
+    "singularName": "meeting-note",
+    "pluralName": "meeting-notes",
+    "displayName": "MeetingNote",
+    "description": "Заметки планёрок"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "text": {
+      "type": "richtext",
+      "required": true
+    },
+    "project": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::project.project",
+      "inversedBy": "meetings"
+    },
+    "author": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "kind": "collectionType",
+  "collectionName": "tickets",
+  "info": {
+    "singularName": "ticket",
+    "pluralName": "tickets",
+    "displayName": "Ticket",
+    "description": "Helpdesk заявки"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "ticketNumber": {
+      "type": "string",
+      "unique": true,
+      "required": true
+    },
+    "requesterName": {
+      "type": "string",
+      "required": true
+    },
+    "requesterPhone": {
+      "type": "string"
+    },
+    "requesterDepartment": {
+      "type": "string",
+      "required": true
+    },
+    "comment": {
+      "type": "text",
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["NEW", "IN_PROGRESS", "DONE", "INVALID"],
+      "default": "NEW",
+      "required": true
+    },
+    "complexity": {
+      "type": "enumeration",
+      "enum": ["A", "B", "C", "D"]
+    },
+    "staffComment": {
+      "type": "text"
+    },
+    "category": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::ticket-category.ticket-category"
+    },
+    "serviceGroup": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::service-group.service-group"
+    },
+    "assignee": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

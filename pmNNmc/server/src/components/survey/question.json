@@ -1,0 +1,32 @@
+{
+  "collectionName": "components_survey_questions",
+  "info": {
+    "displayName": "Survey Question",
+    "icon": "question",
+    "description": "Вопрос анкеты"
+  },
+  "options": {},
+  "attributes": {
+    "text": {
+      "type": "text",
+      "required": true
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": ["text", "single_choice", "multiple_choice", "rating", "yes_no"],
+      "default": "text",
+      "required": true
+    },
+    "options": {
+      "type": "json"
+    },
+    "isRequired": {
+      "type": "boolean",
+      "default": true
+    },
+    "order": {
+      "type": "integer",
+      "default": 0
+    }
+  }
+}

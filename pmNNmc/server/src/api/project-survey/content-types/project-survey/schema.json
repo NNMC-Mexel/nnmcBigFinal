@@ -1,0 +1,73 @@
+{
+  "kind": "collectionType",
+  "collectionName": "project_surveys",
+  "info": {
+    "singularName": "project-survey",
+    "pluralName": "project-surveys",
+    "displayName": "Project Survey",
+    "description": "Анкеты для завершённых проектов"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "text"
+    },
+    "project": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::project.project",
+      "inversedBy": "surveys"
+    },
+    "isAnonymous": {
+      "type": "boolean",
+      "default": false
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["draft", "active", "closed"],
+      "default": "draft",
+      "required": true
+    },
+    "publicToken": {
+      "type": "string",
+      "unique": true
+    },
+    "expiresAt": {
+      "type": "datetime"
+    },
+    "thankYouMessage": {
+      "type": "text",
+      "default": "Спасибо за участие в опросе!"
+    },
+    "questions": {
+      "type": "component",
+      "repeatable": true,
+      "component": "survey.question"
+    },
+    "createdBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "responses": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::survey-response.survey-response",
+      "mappedBy": "survey"
+    },
+    "allowMultipleResponses": {
+      "type": "boolean",
+      "default": false
+    },
+    "showProgressBar": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

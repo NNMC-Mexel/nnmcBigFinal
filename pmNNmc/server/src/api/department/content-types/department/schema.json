@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "departments",
+  "info": {
+    "singularName": "department",
+    "pluralName": "departments",
+    "displayName": "Department",
+    "description": "Отделы организации"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "key": {
+      "type": "enumeration",
+      "enum": ["IT", "DIGITALIZATION", "MEDICAL_EQUIPMENT", "ENGINEERING"],
+      "required": true
+    },
+    "name_ru": {
+      "type": "string",
+      "required": true
+    },
+    "name_kz": {
+      "type": "string",
+      "required": true
+    },
+    "projects": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::project.project",
+      "mappedBy": "department"
+    }
+  }
+}

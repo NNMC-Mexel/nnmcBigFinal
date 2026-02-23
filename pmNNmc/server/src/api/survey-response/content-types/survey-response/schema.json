@@ -1,0 +1,50 @@
+{
+  "kind": "collectionType",
+  "collectionName": "survey_responses",
+  "info": {
+    "singularName": "survey-response",
+    "pluralName": "survey-responses",
+    "displayName": "Survey Response",
+    "description": "Ответы на анкеты"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "survey": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::project-survey.project-survey",
+      "inversedBy": "responses"
+    },
+    "respondentName": {
+      "type": "string"
+    },
+    "respondentPosition": {
+      "type": "string"
+    },
+    "respondentDepartment": {
+      "type": "string"
+    },
+    "respondentEmail": {
+      "type": "email"
+    },
+    "answers": {
+      "type": "json",
+      "required": true
+    },
+    "isAnonymous": {
+      "type": "boolean",
+      "default": false
+    },
+    "ipAddress": {
+      "type": "string"
+    },
+    "userAgent": {
+      "type": "string"
+    },
+    "completionTime": {
+      "type": "integer"
+    }
+  }
+}

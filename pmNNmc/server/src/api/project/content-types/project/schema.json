@@ -1,0 +1,91 @@
+{
+  "kind": "collectionType",
+  "collectionName": "projects",
+  "info": {
+    "singularName": "project",
+    "pluralName": "projects",
+    "displayName": "Project",
+    "description": "Проекты IT Board"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "richtext"
+    },
+    "department": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::department.department",
+      "inversedBy": "projects"
+    },
+    "startDate": {
+      "type": "date"
+    },
+    "dueDate": {
+      "type": "date"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["ACTIVE", "ARCHIVED", "DELETED"],
+      "default": "ACTIVE",
+      "required": true
+    },
+    "priorityLight": {
+      "type": "enumeration",
+      "enum": ["GREEN", "YELLOW", "RED"],
+      "default": "GREEN"
+    },
+    "owner": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user",
+      "required": true
+    },
+    "supportingSpecialists": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user"
+    },
+    "responsibleUsers": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user"
+    },
+    "manualStageOverride": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::board-stage.board-stage"
+    },
+    "tasks": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::task.task",
+      "mappedBy": "project"
+    },
+    "meetings": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::meeting-note.meeting-note",
+      "mappedBy": "project"
+    },
+    "documents": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::project-document.project-document",
+      "mappedBy": "project"
+    },
+    "surveys": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::project-survey.project-survey",
+      "mappedBy": "project"
+    }
+  }
+}

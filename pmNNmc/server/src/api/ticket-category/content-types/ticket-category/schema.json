@@ -1,0 +1,44 @@
+{
+  "kind": "collectionType",
+  "collectionName": "ticket_categories",
+  "info": {
+    "singularName": "ticket-category",
+    "pluralName": "ticket-categories",
+    "displayName": "Ticket Category",
+    "description": "Категории заявок helpdesk"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name_ru": {
+      "type": "string",
+      "required": true
+    },
+    "name_kz": {
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "serviceGroup": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::service-group.service-group",
+      "inversedBy": "categories"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0
+    },
+    "defaultAssignee": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

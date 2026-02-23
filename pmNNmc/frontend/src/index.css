@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #14b8a6;
+  --color-medical: #0ea5e9;
+  --color-success: #22c55e;
+  --color-warning: #eab308;
+  --color-danger: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  @apply bg-slate-50 text-slate-800 font-sans antialiased;
+  min-height: 100vh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-slate-100 rounded;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded hover:bg-slate-400;
+}
+
+/* Card hover effects */
+.card-hover {
+  @apply transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5;
+}
+
+/* Priority light indicators */
+.priority-red {
+  @apply bg-red-500;
+}
+
+.priority-yellow {
+  @apply bg-yellow-400;
+}
+
+.priority-green {
+  @apply bg-green-500;
+}
+
+/* Badge styles */
+.badge {
+  @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+}
+
+.badge-overdue {
+  @apply bg-red-100 text-red-700 border border-red-200;
+}
+
+.badge-due-soon {
+  @apply bg-amber-100 text-amber-700 border border-amber-200;
+}
+
+.badge-department-it {
+  @apply bg-medical-100 text-medical-700;
+}
+
+.badge-department-digital {
+  @apply bg-primary-100 text-primary-700;
+}
+
+/* Progress bar */
+.progress-bar {
+  @apply h-2 bg-slate-200 rounded-full overflow-hidden;
+}
+
+.progress-bar-fill {
+  @apply h-full bg-gradient-to-r from-primary-500 to-medical-500 rounded-full transition-all duration-500;
+}
+
+/* Kanban column */
+.kanban-column {
+  @apply bg-slate-100 rounded-xl p-4 min-h-[500px];
+}
+
+/* Form inputs */
+input, textarea, select {
+  @apply w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all;
+}
+
+/* Buttons */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-primary {
+  @apply bg-primary-500 text-white hover:bg-primary-600 active:bg-primary-700;
+}
+
+.btn-secondary {
+  @apply bg-slate-200 text-slate-700 hover:bg-slate-300;
+}
+
+.btn-danger {
+  @apply bg-red-500 text-white hover:bg-red-600;
+}
+
+.btn-ghost {
+  @apply bg-transparent text-slate-600 hover:bg-slate-100;
+}
+
+/* Animate pulse for alerts */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}

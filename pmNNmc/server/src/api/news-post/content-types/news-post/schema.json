@@ -1,0 +1,56 @@
+{
+  "kind": "collectionType",
+  "collectionName": "news_posts",
+  "info": {
+    "singularName": "news-post",
+    "pluralName": "news-posts",
+    "displayName": "Новость",
+    "description": "Новостная лента NNMC IT Board"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "content": {
+      "type": "richtext"
+    },
+    "excerpt": {
+      "type": "text"
+    },
+    "coverImage": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"]
+    },
+    "attachments": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": ["images", "files", "videos", "audios"]
+    },
+    "category": {
+      "type": "enumeration",
+      "enum": ["NEWS", "ANNOUNCEMENT", "EVENT", "UPDATE"],
+      "default": "NEWS"
+    },
+    "pinned": {
+      "type": "boolean",
+      "default": false
+    },
+    "published": {
+      "type": "boolean",
+      "default": false
+    },
+    "author": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

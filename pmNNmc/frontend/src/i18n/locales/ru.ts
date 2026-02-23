@@ -1,0 +1,486 @@
+export default {
+  // Common
+  common: {
+    loading: 'Загрузка...',
+    save: 'Сохранить',
+    cancel: 'Отмена',
+    close: 'Закрыть',
+    delete: 'Удалить',
+    edit: 'Редактировать',
+    create: 'Создать',
+    search: 'Поиск',
+    filter: 'Фильтр',
+    all: 'Все',
+    actions: 'Действия',
+    status: 'Статус',
+    back: 'Назад',
+    confirm: 'Подтвердить',
+    yes: 'Да',
+    no: 'Нет',
+  },
+
+  // Navigation
+  nav: {
+    dashboard: 'Аналитика',
+    board: 'Канбан',
+    table: 'Таблица',
+    projects: 'Проекты',
+    helpdesk: 'Заявки',
+    activity: 'История действий',
+    adminPanel: 'Админ-панель',
+    settings: 'Настройки',
+    logout: 'Выход',
+  },
+
+
+  // Activity log
+  activityLog: {
+    title: 'История действий',
+    subtitle: 'Все действия пользователей в системе',
+    empty: 'Пока нет записей',
+    unknownUser: 'Неизвестный пользователь',
+    actions: {
+      createProject: 'Создал проект',
+      updateProject: 'Обновил проект',
+      deleteProject: 'Удалил проект',
+      moveStage: 'Переместил проект',
+      createTask: 'Добавил подзадачу',
+      markTask: 'Отметил подзадачу',
+      deleteTask: 'Удалил подзадачу',
+      createMeeting: 'Добавил заметку',
+      deleteMeeting: 'Удалил заметку',
+      createDocument: 'Добавил документ',
+      deleteDocument: 'Удалил документ',
+      assignUser: 'Назначил исполнителя',
+      archiveProject: 'Архивировал проект',
+      restoreProject: 'Восстановил проект',
+      updateTask: 'Обновил задачу',
+      updateMeeting: 'Обновил заметку',
+    },
+  },
+
+  // Auth
+  auth: {
+    login: 'Вход',
+    register: 'Регистрация',
+    email: 'Email',
+    password: 'Пароль',
+    confirmPassword: 'Подтвердите пароль',
+    firstName: 'Имя',
+    lastName: 'Фамилия',
+    forgotPassword: 'Забыли пароль?',
+    resetPassword: 'Сброс пароля',
+    sendResetLink: 'Отправить ссылку',
+    verifyEmail: 'Подтверждение email',
+    verifyEmailText: 'Мы отправили письмо на ваш email. Перейдите по ссылке для подтверждения.',
+    loginSuccess: 'Вы успешно вошли в систему',
+    registerSuccess: 'Регистрация успешна! Проверьте email.',
+    invalidCredentials: 'Неверный email или пароль',
+    noAccount: 'Нет аккаунта?',
+    hasAccount: 'Уже есть аккаунт?',
+  },
+
+  // Dashboard
+  dashboard: {
+    title: 'Аналитика проектов',
+    subtitle: 'Обзор текущего состояния проектов',
+    totalProjects: 'Всего проектов',
+    activeProjects: 'Активных',
+    archivedProjects: 'В архиве',
+    overdueProjects: 'Просрочено',
+    dueSoonProjects: 'Скоро дедлайн',
+    byDepartment: 'По отделам',
+    byPriority: 'По приоритету',
+    weeklyTrend: 'Динамика за 8 недель',
+    created: 'Создано',
+    completed: 'Завершено',
+    priorityRed: 'Срочные',
+    priorityYellow: 'Средние',
+    priorityGreen: 'Обычные',
+  },
+
+  // Projects
+  project: {
+    title: 'Название',
+    description: 'Описание',
+    department: 'Отдел',
+    startDate: 'Дата начала',
+    dueDate: 'Дедлайн',
+    priority: 'Приоритет',
+    status: 'Статус',
+    progress: 'Прогресс',
+    responsible: 'Ответственные',
+    owner: 'Менеджер проекта',
+    ownerPlaceholder: 'Выберите менеджера проекта',
+    ownerRequired: 'Укажите менеджера проекта',
+    ownerNotAssigned: 'Менеджер не назначен',
+    ownerSection: 'Менеджер проекта',
+    ownerSectionHint: 'Менеджера могут менять только администратор и руководитель.',
+    ownerDepartmentMismatch: 'Менеджер должен быть из того же отдела, что и проект.',
+    ownerSameDepartment: 'Назначать можно только менеджера из отдела проекта.',
+    ownerAnyDepartment: 'Супер-админ может назначать менеджера из любого отдела.',
+    supportingSpecialists: 'Поддерживающие специалисты',
+    supportingSpecialistsHint: 'Можно выбрать нескольких специалистов из вашего отдела',
+    noAssignableUsers: 'Нет доступных пользователей',
+    assignableUsersLoadError: 'Не удалось загрузить список исполнителей',
+    assigneeDepartment: 'Отдел исполнителей',
+    departmentRequired: 'Выберите отдел исполнителей',
+    startDateRequired: 'Укажите дату начала проекта',
+    dueDateRequired: 'Укажите дату окончания проекта',
+    dueDateBeforeStart: 'Дата окончания не может быть раньше даты начала',
+    deadlinesRequired: 'Дедлайны проекта обязательны',
+    stage: 'Стадия',
+    tasks: 'Подзадачи',
+    meetings: 'Планёрки',
+    createProject: 'Создать проект',
+    editProject: 'Редактировать проект',
+    archiveProject: 'Архивировать',
+    restoreProject: 'Восстановить',
+    deleteProject: 'Удалить проект',
+    deleteProjectConfirm: 'Удалить проект? Он будет перемещен в "Удаленные". Только супер-админ может удалить навсегда.',
+    deleteProjectPermanently: 'Удалить навсегда',
+    deleteProjectPermanentlyConfirm: 'Удалить проект навсегда? Это действие нельзя отменить.',
+    deletedProjects: 'Удаленные проекты',
+    noProjects: 'Проектов пока нет',
+    overdue: 'Просрочено',
+    dueSoon: 'Скоро дедлайн',
+  },
+
+  // Tasks
+  task: {
+    title: 'Задача',
+    addTask: 'Добавить задачу',
+    createTask: 'Новая задача',
+    editTask: 'Редактировать задачу',
+    markComplete: 'Отметить выполненной',
+    markIncomplete: 'Снять отметку',
+    assignee: 'Исполнитель',
+    assigneePlaceholder: 'Выберите исполнителя',
+    todo: 'К выполнению',
+    inProgress: 'В работе',
+    done: 'Выполнено',
+    progress: 'Прогресс',
+    nextStage: 'Перевести на следующую стадию',
+    subtasks: 'Подзадачи',
+    addSubtask: 'Добавить подзадачу',
+    subtaskPlaceholder: 'Название подзадачи',
+    noSubtasks: 'Подзадач пока нет',
+    subtasksHint: 'Прогресс считается по подзадачам.',
+    progressDerivedFromSubtasks: 'Прогресс рассчитывается по подзадачам.',
+    departmentForbidden:
+      'Назначать задачи и исполнителей можно только в пределах своего отдела.',
+    deadlineExceeded: 'Даты задачи не могут выходить за пределы дедлайна проекта.',
+    ideas: 'Идеи / Запросы',
+    preparation: 'Подготовка к проекту',
+    in_progress: 'В работе',
+    testing: 'Тестирование',
+    production: 'В промышленной эксплуатации',
+    archived: 'В архиве',
+    noTasks: 'Задач нет',
+    TODO: 'К выполнению',
+    IN_PROGRESS: 'В работе',
+    DONE: 'Выполнено',
+    ARCHIVED: 'В архиве',
+  },
+
+  // Meetings
+  meeting: {
+    title: 'Планёрка',
+    addNote: 'Добавить заметку',
+    noNotes: 'Заметок пока нет',
+    author: 'Автор',
+  },
+
+  // Documents
+  documents: {
+    title: 'Документы',
+    add: 'Добавить',
+    uploading: 'Загрузка...',
+    empty: 'Нет прикрепленных документов',
+    download: 'Скачать',
+    delete: 'Удалить',
+    confirmDelete: 'Удалить документ?',
+    unknown: 'Неизвестно',
+  },
+
+  // Surveys
+  survey: {
+    title: 'Анкеты',
+    create: 'Создать анкету',
+    edit: 'Редактировать анкету',
+    delete: 'Удалить',
+    duplicate: 'Дублировать',
+    viewResults: 'Посмотреть ответы',
+    results: 'Результаты анкеты',
+    empty: 'Анкеты ещё не созданы',
+    completeToCreate: 'Доведите проект до 100% чтобы создать анкету',
+    completeProjectFirst: 'Завершите проект (100%) чтобы создать анкету',
+    requiresComplete: 'Требуется 100% выполнения',
+    
+    // Builder
+    titleLabel: 'Название анкеты',
+    titlePlaceholder: 'Введите название',
+    description: 'Описание (необязательно)',
+    descriptionPlaceholder: 'Краткое описание цели анкеты',
+    settings: 'Настройки анкеты',
+    anonymous: 'Анонимная анкета',
+    anonymousHint: 'Респонденты не будут указывать ФИО и должность',
+    allowMultiple: 'Разрешить повторные ответы',
+    showProgress: 'Показывать прогресс заполнения',
+    expiresAt: 'Дата окончания (необязательно)',
+    thankYou: 'Сообщение после отправки',
+    nonAnonymousHint: 'Перед вопросами анкеты респонденты укажут: ФИО, Должность, Отдел, Email',
+    questions: 'Вопросы',
+    addQuestion: 'Добавить вопрос',
+    questionPlaceholder: 'Введите вопрос',
+    required: 'Обязательный',
+    option: 'Вариант',
+    addOption: 'Добавить вариант',
+    titleRequired: 'Введите название анкеты',
+    questionsRequired: 'Добавьте хотя бы один вопрос',
+    emptyQuestion: 'Заполните текст всех вопросов',
+    saveFailed: 'Не удалось сохранить анкету',
+    
+    // Status
+    statusDraft: 'Черновик',
+    statusActive: 'Активна',
+    statusClosed: 'Закрыта',
+    activate: 'Запустить сбор',
+    deactivate: 'Остановить сбор',
+    
+    // Links
+    link: 'Ссылка',
+    copyLink: 'Скопировать ссылку',
+    openLink: 'Открыть анкету',
+    
+    // Results
+    responses: 'ответов',
+    responsesCount: 'ответов',
+    questionsCount: 'вопросов',
+    answersCount: 'ответов',
+    summaryView: 'Сводка',
+    individualView: 'По респондентам',
+    exportCSV: 'Экспорт CSV',
+    noResults: 'Не удалось загрузить результаты',
+    noResponses: 'Пока нет ответов',
+    noTextAnswers: 'Нет текстовых ответов',
+    outOf5: 'из 5',
+    anonymousRespondent: 'Анонимный респондент',
+    noName: 'Без имени',
+    respondentName: 'ФИО',
+    respondentPosition: 'Должность',
+    respondentDepartment: 'Отдел',
+    respondentEmail: 'Email',
+    confirmDelete: 'Удалить анкету? Все ответы будут потеряны.',
+    
+    // Public survey
+    loadError: 'Не удалось загрузить анкету',
+    submitError: 'Не удалось отправить ответы',
+    error: 'Ошибка',
+    thankYouDefault: 'Спасибо за участие!',
+    canClose: 'Теперь вы можете закрыть эту страницу',
+    aboutYou: 'О вас',
+    fillInfo: 'Пожалуйста, укажите ваши данные',
+    yourName: 'Ваше ФИО',
+    namePlaceholder: 'Иванов Иван Иванович',
+    yourPosition: 'Ваша должность',
+    positionPlaceholder: 'Менеджер проектов',
+    yourDepartment: 'Ваш отдел',
+    departmentPlaceholder: 'IT отдел',
+    yourEmail: 'Ваш Email',
+    enterAnswer: 'Введите ваш ответ...',
+    requiredField: 'Обязательный',
+    questionOf: 'Вопрос',
+    of: 'из',
+    allDone: 'Вы ответили на все вопросы!',
+    clickSubmit: 'Нажмите кнопку "Отправить" чтобы завершить',
+    back: 'Назад',
+    next: 'Далее',
+    submit: 'Отправить',
+    submitting: 'Отправка...',
+    yes: 'Да',
+    no: 'Нет',
+  },
+
+  // Helpdesk
+  helpdesk: {
+    title: 'Заявки',
+    subtitle: 'Управление заявками',
+    ticketNumber: '№ заявки',
+    requesterName: 'ФИО заявителя',
+    requesterPhone: 'Телефон',
+    requesterDepartment: 'Отдел заявителя',
+    comment: 'Описание проблемы',
+    staffComment: 'Комментарий специалиста',
+    staffCommentPlaceholder: 'Добавьте комментарий...',
+    category: 'Категория',
+    serviceGroup: 'Служба',
+    assignee: 'Исполнитель',
+    complexity: 'Сложность',
+    status: 'Статус',
+    createdAt: 'Дата создания',
+    info: 'Информация',
+    requesterInfo: 'Информация о заявителе',
+    reassign: 'Переназначить',
+    changeAssignee: 'Сменить исполнителя',
+    notAssigned: 'Не назначен',
+    noTickets: 'Заявок пока нет',
+    noUsers: 'Пользователи не найдены',
+    searchUser: 'Поиск по имени...',
+    applyAssignees: 'Применить',
+    publicForm: 'Форма подачи',
+
+    // Statuses
+    statusNew: 'Новая',
+    statusInProgress: 'В работе',
+    statusDone: 'Выполнено',
+    statusInvalid: 'Некорректная',
+
+    // Filters
+    filterAll: 'Все',
+    filterNew: 'Новые',
+    filterInProgress: 'В работе',
+    filterDone: 'Выполнено',
+    filterInvalid: 'Некорректные',
+    searchPlaceholder: 'Поиск по ФИО, номеру, отделу...',
+    myTickets: 'Мои заявки',
+    allTickets: 'Все заявки',
+    allAssignees: 'Все исполнители',
+
+    // Public form
+    publicTitle: 'Подать заявку',
+    publicSubtitle: 'Заполните форму для подачи заявки в техническую службу',
+    selectService: 'Выберите службу',
+    selectCategory: 'Выберите категорию',
+    selectedService: 'Служба',
+    selectedCategory: 'Категория',
+    namePlaceholder: 'Иванов Иван Иванович',
+    departmentPlaceholder: 'АКЦ',
+    commentPlaceholder: 'Опишите вашу проблему...',
+    submit: 'Отправить заявку',
+    submitting: 'Отправка...',
+    submitSuccess: 'Заявка успешно подана!',
+    yourTicketNumber: 'Номер вашей заявки',
+    submitAnother: 'Подать еще одну заявку',
+    loadError: 'Не удалось загрузить категории',
+    submitError: 'Не удалось отправить заявку',
+  },
+
+  // Departments
+  department: {
+    IT: 'IT отдел',
+    DIGITALIZATION: 'Цифровизация',
+    MEDICAL_EQUIPMENT: 'Медицинское оборудование',
+    ENGINEERING: 'Инженерная служба',
+  },
+
+  // Status
+  status: {
+    ACTIVE: 'Активный',
+    ARCHIVED: 'В архиве',
+    DELETED: 'Удален',
+  },
+
+  // Priority
+  priority: {
+    RED: 'Срочный',
+    YELLOW: 'Средний',
+    GREEN: 'Обычный',
+  },
+
+  // Board
+  board: {
+    title: 'Канбан доска',
+    dragHint: 'Перетащите проект для изменения стадии',
+    noProjectsInStage: 'Нет проектов',
+    showArchiveColumn: 'Показать архив',
+  },
+
+  // Table
+  table: {
+    title: 'Таблица проектов',
+    showArchived: 'Показать архив',
+    hideArchived: 'Скрыть архив',
+  },
+
+  // Stages
+  stage: {
+    start: 'Начало',
+    planning: 'Планирование',
+    inProgress: 'В работе',
+    testing: 'Тестирование',
+    completion: 'Завершение',
+  },
+
+  // Workflow Columns
+  workflow: {
+    descriptionButton: 'Описание',
+    descriptionTitle: 'Описание колонки',
+    sectionPurpose: 'Назначение',
+    sectionContent: 'Содержимое',
+    sectionRules: 'Правила',
+    ideas: {
+      title: 'Идеи / Запросы',
+      purpose: 'Единая точка входа для всех инициатив.',
+      content:
+        'Идеи развития, запросы от бизнеса и руководства, предложения по автоматизации, инициативы без бюджета.',
+      rules:
+        'Задачи не исполняются напрямую: они проходят оценку, затем отклоняются или переводятся в подготовку.',
+    },
+    preparation: {
+      title: 'Подготовка к проекту (ТЗ, аналитика)',
+      purpose: 'Превращение идеи в формализованный проект.',
+      content:
+        'ТЗ, бизнес-требования, архитектурные решения, оценки сроков и ресурсов, согласование ответственных.',
+      rules:
+        'Проект готов только после утверждения ТЗ; без критериев приёмки переход запрещён.',
+    },
+    inProgress: {
+      title: 'В работе',
+      purpose: 'Активная реализация проекта.',
+      content:
+        'Разработка, интеграции, настройка инфраструктуры, координация команды.',
+      rules:
+        'Есть ограничение параллельных проектов; у каждого проекта есть ответственный; статус обновляется регулярно.',
+    },
+    testing: {
+      title: 'Тестирование',
+      purpose: 'Проверка качества и соответствия требованиям.',
+      content:
+        'Функциональное тестирование, приёмочные проверки, выявление и устранение дефектов, подтверждение ТЗ.',
+      rules:
+        'Критические ошибки возвращают в "В работе"; переход только после успешного теста.',
+    },
+    production: {
+      title: 'В промышленной эксплуатации',
+      purpose: 'Работа проекта в боевой среде.',
+      content:
+        'Развертывание в продакшене, мониторинг, сопровождение, исправление инцидентов.',
+      rules:
+        'Изменения проходят через процедуры, а показатели стабильности и эффективности фиксируются.',
+    },
+    archive: {
+      title: 'Архив',
+      purpose: 'Колонка для архивных проектов.',
+      content: 'Проекты со статусом ARCHIVED. По умолчанию скрыты.',
+      rules: 'Можно скрыть архив и вернуть проект перетаскиванием.',
+    },
+  },
+
+  // Errors
+  error: {
+    generic: 'Произошла ошибка',
+    notFound: 'Страница не найдена',
+    unauthorized: 'Доступ запрещён',
+    forbidden: 'Недостаточно прав',
+    networkError: 'Ошибка сети',
+  },
+
+  // Roles
+  role: {
+    superadmin: 'Супер-администратор',
+    admin: 'Администратор',
+    lead: 'Руководитель',
+    member: 'Участник',
+  },
+};
