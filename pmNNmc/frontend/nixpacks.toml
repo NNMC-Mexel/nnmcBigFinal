@@ -8,4 +8,4 @@ cmds = ["npm ci"]
 cmds = ["npm run build"]
 
 [start]
-cmd = "npx serve dist -p 13005 -s"
+cmd = "npx serve dist -p 13010 -s"
