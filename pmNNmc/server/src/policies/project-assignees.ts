@@ -1,8 +1,11 @@
+import { errors } from '@strapi/utils';
 import {
   extractIdsFromValue,
   getOwnerIds,
   getRoleFlags,
 } from '../utils/project-assignments';
+
+const { UnauthorizedError, ForbiddenError, ValidationError } = errors;
 
 const parseNumericId = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -82,10 +85,15 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
   const ctx = policyContext;
   const data = ctx.request?.body?.data || {};
 
+  // Skip assignment validation for status-only updates (soft delete, archive, restore)
+  const dataKeys = Object.keys(data);
+  if (dataKeys.length === 1 && dataKeys[0] === 'status') {
+    return true;
+  }
+
   const currentUser = ctx.state.user;
   if (!currentUser) {
-    ctx.throw(401, 'Not authenticated');
-    return false;
+    throw new UnauthorizedError('Not authenticated');
   }
 
   const userWithRole = (await strapi.entityService.findOne(
@@ -103,20 +111,17 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
   const isCreate = ctx.request?.method === 'POST';
 
   if (isCreate && ownerIds.length === 0) {
-    ctx.throw(400, 'Project owner is required');
-    return false;
+    throw new ValidationError('Project owner is required');
   }
 
   if (hasOwnerField && !isCreate) {
     if (!canManageOwner) {
-      ctx.throw(403, 'Only admin or lead can change project owner');
-      return false;
+      throw new ForbiddenError('Only admin or lead can change project owner');
     }
   }
 
   if (hasOwnerField && ownerIds.length === 0) {
-    ctx.throw(400, 'Project owner is required');
-    return false;
+    throw new ValidationError('Project owner is required');
   }
 
   if (isSuperAdmin) {
@@ -125,8 +130,7 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
 
   const requesterDepartmentKey = userWithRole?.department?.key ?? null;
   if (!requesterDepartmentKey) {
-    ctx.throw(403, 'User department is required to assign project users');
-    return false;
+    throw new ForbiddenError('User department is required to assign project users');
   }
 
   const hasSupportingField = Object.prototype.hasOwnProperty.call(data, 'supportingSpecialists');
@@ -144,8 +148,7 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
     requesterDepartmentKey;
 
   if (!projectDepartmentKey) {
-    ctx.throw(403, 'Project department is required to assign project users');
-    return false;
+    throw new ForbiddenError('Project department is required to assign project users');
   }
 
   const ownerIdsForValidation = hasOwnerField
@@ -175,16 +178,14 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
 
   const missingIds = assigneeIds.filter((id) => !assignees.some((user: any) => user.id === id));
   if (missingIds.length > 0) {
-    ctx.throw(400, 'Some assignees were not found');
-    return false;
+    throw new ValidationError('Some assignees were not found');
   }
 
   const invalidDepartment = assignees.some(
     (user: any) => user.department?.key !== projectDepartmentKey
   );
   if (invalidDepartment) {
-    ctx.throw(403, 'You can assign users only from the project department');
-    return false;
+    throw new ForbiddenError('You can assign users only from the project department');
   }
 
   return true;

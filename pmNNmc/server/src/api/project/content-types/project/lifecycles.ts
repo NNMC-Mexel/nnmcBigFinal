@@ -97,6 +97,8 @@ export default {
 
   async beforeUpdate(event: any) {
     const strapi = (global as any).strapi;
+    const data = event?.params?.data || {};
+    if (data.status === 'DELETED') return;
     await validateProjectDates(event, strapi);
   },
 
