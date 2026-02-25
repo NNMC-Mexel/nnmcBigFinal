@@ -30,6 +30,7 @@ export interface User {
   canViewTable?: boolean;
   canViewHelpdesk?: boolean;
   canViewKpi?: boolean;
+  canViewKpiTimesheet?: boolean;
   blocked: boolean;
   confirmed: boolean;
 }
