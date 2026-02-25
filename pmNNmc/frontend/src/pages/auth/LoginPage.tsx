@@ -115,6 +115,25 @@ export default function LoginPage() {
         </Button>
       </form>
 
+      {import.meta.env.VITE_KEYCLOAK_ENABLED === 'true' && (
+        <>
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-slate-200" />
+            <span className="text-xs text-slate-400">или</span>
+            <div className="flex-1 h-px bg-slate-200" />
+          </div>
+          <a
+            href={`${import.meta.env.VITE_API_URL}/api/connect/keycloak`}
+            className="flex items-center justify-center gap-2 w-full py-2 px-4 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 4.5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15zm0 2.5a5 5 0 1 0 0 10A5 5 0 0 0 12 7z"/>
+            </svg>
+            Войти через Keycloak
+          </a>
+        </>
+      )}
+
       <p className="mt-6 text-center text-sm text-slate-500">
         {t('auth.noAccount')}{' '}
         <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">

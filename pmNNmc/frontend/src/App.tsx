@@ -12,6 +12,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
+import KeycloakCallbackPage from './pages/auth/KeycloakCallbackPage';
 
 // App pages
 import DashboardPage from './pages/app/DashboardPage';
@@ -125,6 +126,9 @@ function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
       </Route>
+
+      {/* Keycloak SSO callback */}
+      <Route path="/connect/keycloak/redirect" element={<KeycloakCallbackPage />} />
 
       {/* Protected app routes */}
       <Route
