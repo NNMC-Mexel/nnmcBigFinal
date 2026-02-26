@@ -16,8 +16,9 @@ export default (plugin) => {
     const base = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect`;
     grantConfig.keycloak.authorize_url = `${base}/auth`;
     grantConfig.keycloak.access_url   = `${base}/token`;
+    grantConfig.keycloak.profile_url   = `${base}/userinfo`;
     await pluginStore.set({ key: 'grant', value: grantConfig });
-    strapi.log.info(`[keycloak] grant URLs set to ${keycloakUrl}`);
+    strapi.log.info(`[keycloak] grant URLs set to ${keycloakUrl} (auth/token/userinfo)`);
   };
 
   return plugin;
