@@ -9,15 +9,38 @@ export default function KeycloakCallbackPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const jwt = params.get('jwt');
 
-    if (!jwt) {
-      setError('Токен не получен от Keycloak');
+    // Direct JWT from Strapi (legacy flow)
+    const jwt = params.get('jwt');
+    if (jwt) {
+      handleJwt(jwt);
       return;
     }
 
-    localStorage.setItem('jwt', jwt);
+    // Grant querystring transport: Strapi passed raw Keycloak tokens to frontend.
+    // Exchange the access_token for a Strapi JWT via /api/auth/keycloak/callback.
+    const accessToken = params.get('access_token');
+    if (accessToken) {
+      const apiUrl = import.meta.env.VITE_API_URL;
+      fetch(`${apiUrl}/api/auth/keycloak/callback?access_token=${encodeURIComponent(accessToken)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.jwt) {
+            handleJwt(data.jwt);
+          } else {
+            setError(data.error?.message || 'Не удалось получить токен от сервера');
+          }
+        })
+        .catch(() => setError('Ошибка соединения с сервером'));
+      return;
+    }
 
+    const errorMessage = params.get('errorMessage');
+    setError(errorMessage ? decodeURIComponent(errorMessage) : 'Токен не получен от Keycloak');
+  }, [navigate]);
+
+  function handleJwt(jwt: string) {
+    localStorage.setItem('jwt', jwt);
     authApi
       .getMe()
       .then((user) => {
@@ -34,7 +57,7 @@ export default function KeycloakCallbackPage() {
         localStorage.removeItem('jwt');
         setError('Не удалось получить данные пользователя');
       });
-  }, [navigate]);
+  }
 
   if (error) {
     return (
