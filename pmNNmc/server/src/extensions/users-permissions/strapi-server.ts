@@ -43,6 +43,44 @@ export default (plugin) => {
     }
   };
 
+  // Assign "Member" role to new Keycloak users on first SSO login.
+  // Users who already have a custom role (Lead, Admin, etc.) are not affected.
+  const originalCallback = plugin.controllers.auth.callback;
+  plugin.controllers.auth.callback = async (ctx) => {
+    await originalCallback(ctx);
+
+    if (ctx.params?.provider !== 'keycloak') return;
+
+    const body = ctx.body as any;
+    const userId = body?.user?.id;
+    if (!userId) return;
+
+    const user = await strapi.entityService.findOne(
+      'plugin::users-permissions.user',
+      userId,
+      { populate: ['role'] }
+    );
+
+    const role = (user as any)?.role;
+    // Only reassign if still on the default "Authenticated" role
+    if (!role || role.type !== 'authenticated') return;
+
+    const memberRole = await strapi.db
+      .query('plugin::users-permissions.role')
+      .findOne({ where: { name: 'Member' } });
+
+    if (!memberRole) {
+      strapi.log.warn('[keycloak] Member role not found — user keeps Authenticated role');
+      return;
+    }
+
+    await strapi.entityService.update('plugin::users-permissions.user', userId, {
+      data: { role: memberRole.id },
+    });
+
+    strapi.log.info(`[keycloak] User ${userId} assigned Member role on first SSO login`);
+  };
+
   // Extend the me controller to include role
   const originalMe = plugin.controllers.user.me;
 
