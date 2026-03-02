@@ -19,16 +19,31 @@ export default function KeycloakCallbackPage() {
 
     // Grant querystring transport: Strapi passed raw Keycloak tokens to frontend.
     // Exchange the access_token for a Strapi JWT via /api/auth/keycloak/callback.
+    // Also exchange it for a KPI JWT (server-kpi) so KPI Табель works without a second login.
     const accessToken = params.get('access_token');
     if (accessToken) {
       const apiUrl = import.meta.env.VITE_API_URL;
-      fetch(`${apiUrl}/api/auth/keycloak/callback?access_token=${encodeURIComponent(accessToken)}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.jwt) {
-            handleJwt(data.jwt);
+      const kpiApiBase = import.meta.env.VITE_KPI_API_BASE; // e.g. http://host:12011/api
+      const encoded = encodeURIComponent(accessToken);
+
+      // Fire both requests in parallel; KPI failure is non-fatal
+      const pmPromise = fetch(`${apiUrl}/api/auth/keycloak/callback?access_token=${encoded}`)
+        .then((res) => res.json());
+      const kpiPromise = kpiApiBase
+        ? fetch(`${kpiApiBase}/auth/keycloak/callback?access_token=${encoded}`)
+            .then((res) => res.json())
+            .catch(() => null)
+        : Promise.resolve(null);
+
+      Promise.all([pmPromise, kpiPromise])
+        .then(([pmData, kpiData]) => {
+          if (kpiData?.jwt) {
+            localStorage.setItem('kpi_token', kpiData.jwt);
+          }
+          if (pmData?.jwt) {
+            handleJwt(pmData.jwt);
           } else {
-            setError(data.error?.message || 'Не удалось получить токен от сервера');
+            setError(pmData?.error?.message || 'Не удалось получить токен от сервера');
           }
         })
         .catch(() => setError('Ошибка соединения с сервером'));
