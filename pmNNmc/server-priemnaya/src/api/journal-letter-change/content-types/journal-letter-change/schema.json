@@ -1,0 +1,29 @@
+﻿{
+  "kind": "collectionType",
+  "collectionName": "journal_letter_changes",
+  "info": {
+    "singularName": "journal-letter-change",
+    "pluralName": "journal-letter-changes",
+    "displayName": "Journal Letter Change",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "letter": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::journal-letter.journal-letter"
+    },
+    "changed_by_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "field_name": { "type": "string", "required": true },
+    "old_value": { "type": "text" },
+    "new_value": { "type": "text" },
+    "changed_at": { "type": "datetime" }
+  }
+}

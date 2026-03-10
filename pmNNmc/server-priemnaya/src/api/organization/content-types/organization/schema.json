@@ -1,0 +1,19 @@
+﻿{
+  "kind": "collectionType",
+  "collectionName": "organizations",
+  "info": {
+    "singularName": "organization",
+    "pluralName": "organizations",
+    "displayName": "Organization",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": { "type": "string", "required": true },
+    "primary_email": { "type": "string" },
+    "emails": { "type": "json" },
+    "sort": { "type": "integer" }
+  }
+}

@@ -9,11 +9,11 @@ build/
 .next/
 out/
 
-# Strapi
-server/.tmp/
-server/.cache/
-server/dist/
-server/build/
+# Strapi (all servers)
+**/.tmp/
+**/.cache/
+.strapi/
+.strapi-updater.json
 
 # Environment files
 .env

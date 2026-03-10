@@ -1,0 +1,17 @@
+﻿{
+  "kind": "collectionType",
+  "collectionName": "mkb_codes",
+  "info": {
+    "singularName": "mkb-code",
+    "pluralName": "mkb-codes",
+    "displayName": "MKB Code",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "code": { "type": "string", "required": true },
+    "sort": { "type": "integer" }
+  }
+}

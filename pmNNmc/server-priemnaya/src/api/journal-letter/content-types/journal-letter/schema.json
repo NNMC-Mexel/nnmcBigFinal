@@ -1,0 +1,52 @@
+﻿{
+  "kind": "collectionType",
+  "collectionName": "journal_letters",
+  "info": {
+    "singularName": "journal-letter",
+    "pluralName": "journal-letters",
+    "displayName": "Journal Letter",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "letter_number": { "type": "string", "required": true },
+    "incoming_number": { "type": "string" },
+    "outgoing_number": { "type": "string" },
+    "fio": { "type": "string", "required": true },
+    "region": { "type": "string" },
+    "direction": {
+      "type": "enumeration",
+      "enum": ["incoming", "outgoing"],
+      "default": "incoming"
+    },
+    "arrival_date": { "type": "date" },
+    "send_date": { "type": "date" },
+    "transfer_from": { "type": "date" },
+    "transfer_to": { "type": "date" },
+    "transfer_org": { "type": "string" },
+    "transfer_email": { "type": "string" },
+    "mkb": { "type": "string" },
+    "mkb_other": { "type": "string" },
+    "operation_code": { "type": "string" },
+    "operation_other": { "type": "string" },
+    "department": { "type": "string" },
+    "department_other": { "type": "string" },
+    "incoming_content": { "type": "text" },
+    "outgoing_content": { "type": "text" },
+    "subject": { "type": "string" },
+    "content": { "type": "text" },
+    "help_type": { "type": "string" },
+    "created_by_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "updated_by_user": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+﻿{
+  "kind": "collectionType",
+  "collectionName": "help_types",
+  "info": {
+    "singularName": "help-type",
+    "pluralName": "help-types",
+    "displayName": "Help Type",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": { "type": "string", "required": true },
+    "sort": { "type": "integer" }
+  }
+}

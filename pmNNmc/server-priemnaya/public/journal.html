@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Журнал писем</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Playfair+Display:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/journal.css" />
+  </head>
+  <body>
+    <div class="page">
+      <div class="brand">
+        <h1>Электронный журнал писем</h1>
+        <div class="user">
+          <span id="journal-user">Пользователь: —</span>
+          <button class="btn secondary btn-logout" id="logout-btn" type="button">Выйти</button>
+        </div>
+      </div>
+
+      <div class="shell">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Письма</h2>
+            <input id="search" class="search" type="text" placeholder="Поиск по номеру, ФИО, теме" />
+            <div class="actions" style="margin-top: 12px;">
+              <button class="btn secondary" id="new-letter">+ Новое письмо</button>
+              <div class="list-filters" role="group" aria-label="Фильтры писем">
+                <button class="btn secondary btn-filter active" type="button" data-list-filter="all">Все</button>
+                <button class="btn secondary btn-filter" type="button" data-list-filter="incoming">Входящие</button>
+                <button class="btn secondary btn-filter" type="button" data-list-filter="outgoing">Исходящие</button>
+                <button class="btn secondary btn-filter" type="button" data-list-filter="overdue">Просрочка</button>
+              </div>
+            </div>
+          </div>
+          <div class="list" id="letters-list"></div>
+        </div>
+
+        <div class="panel detail">
+          <h2 id="detail-title">Новое письмо</h2>
+          <form id="letter-form">
+            <div class="grid">
+              <div class="field">
+                <label for="fio">ФИО</label>
+                <input id="fio" type="text" required />
+              </div>
+              <div class="field">
+                <label for="region">Область (Казахстан)</label>
+                <select id="region"></select>
+              </div>
+              <div class="field full">
+                <label for="subject">Тема</label>
+                <input id="subject" type="text" />
+              </div>
+              <div class="row-4">
+                <div class="field">
+                  <label for="mkb">МКБ</label>
+                  <div class="combobox" id="mkb-combobox">
+                    <input id="mkb" type="text" autocomplete="off" placeholder="Введите код МКБ..." />
+                    <div class="combobox-dropdown" id="mkb-dropdown"></div>
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="operation-code">Код операции</label>
+                  <div class="combobox" id="operation-code-combobox">
+                    <input id="operation-code" type="text" autocomplete="off" placeholder="Введите код операции..." />
+                    <div class="combobox-dropdown" id="operation-code-dropdown"></div>
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="help-type">Вид помощи</label>
+                  <select id="help-type"></select>
+                </div>
+                <div class="field">
+                  <label for="department">Отделение</label>
+                  <div class="combobox" id="department-combobox">
+                    <input id="department" type="text" autocomplete="off" placeholder="Введите отделение..." />
+                    <div class="combobox-dropdown" id="department-dropdown"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-title toggle-title">
+              <span>Входящее</span>
+              <button class="btn secondary btn-toggle" type="button" id="incoming-toggle">Развернуть</button>
+            </div>
+            <div class="grid hidden" id="incoming-section">
+              <div class="field">
+                <label for="incoming-number">Номер входящего</label>
+                <input id="incoming-number" type="text" />
+              </div>
+              <div class="field">
+                <label for="arrival-date">Дата прибытия</label>
+                <input id="arrival-date" type="date" />
+              </div>
+              <div class="field" style="grid-column: 1 / -1;">
+                <label for="incoming-content">Содержание входящего</label>
+                <textarea id="incoming-content"></textarea>
+              </div>
+            </div>
+
+            <div class="section-title toggle-title">
+              <span>Исходящее</span>
+              <button class="btn secondary btn-toggle" type="button" id="outgoing-toggle">Развернуть</button>
+            </div>
+            <div class="grid hidden" id="outgoing-section">
+              <div class="field">
+                <label for="outgoing-number">Номер исходящего</label>
+                <input id="outgoing-number" type="text" />
+              </div>
+              <div class="field">
+                <label for="send-date">Дата отправки</label>
+                <input id="send-date" type="date" />
+              </div>
+              <div class="field" style="grid-column: 1 / -1;">
+                <label for="outgoing-content">Содержание исходящего</label>
+                <textarea id="outgoing-content"></textarea>
+              </div>
+            </div>
+
+            <div class="section-title toggle-title">
+              <span>Перенос</span>
+              <button class="btn secondary btn-toggle" type="button" id="transfer-toggle">Развернуть</button>
+            </div>
+            <div class="grid hidden" id="transfer-section">
+              <div class="field">
+                <label for="transfer-from">Перенос (с)</label>
+                <input id="transfer-from" type="date" />
+              </div>
+              <div class="field">
+                <label for="transfer-to">Перенос (на)</label>
+                <input id="transfer-to" type="date" />
+              </div>
+              <div class="field hidden" id="transfer-org-field">
+                <label for="transfer-org">Медицинская организация</label>
+                <div class="combobox" id="transfer-org-combobox">
+                  <input id="transfer-org" type="text" autocomplete="off" placeholder="Поиск организации..." />
+                  <div class="combobox-dropdown" id="transfer-org-dropdown"></div>
+                </div>
+              </div>
+              <div class="field hidden" id="transfer-email-field">
+                <label for="transfer-email">Электронная почта</label>
+                <input id="transfer-email" type="text" autocomplete="off" placeholder="Email организации..." />
+                <div class="small-note" id="transfer-email-hint" style="margin-top: 2px;"></div>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="btn primary" type="submit">Сохранить</button>
+              <button class="btn secondary" type="button" id="reset-form">Очистить</button>
+              <button class="btn danger" type="button" id="delete-letter">Удалить</button>
+            </div>
+            <div class="small-note" id="status-text"></div>
+            <div class="small-note" id="audit-text"></div>
+            <div class="history">
+              <h3>История изменений</h3>
+              <div id="history-list" class="history-list"></div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <script src="js/journal.js"></script>
+  </body>
+</html>

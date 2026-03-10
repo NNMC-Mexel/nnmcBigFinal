@@ -32,6 +32,9 @@ export default {
           800: '#075985',
           900: '#0c4a6e',
         },
+        // Conference room colors
+        'room-1': '#3B82F6', // blue-500 — Большой зал
+        'room-2': '#10B981', // emerald-500 — Малый зал
         slate: {
           50: '#f8fafc',
           100: '#f1f5f9',

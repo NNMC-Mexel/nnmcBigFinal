@@ -34,6 +34,8 @@ import HelpdeskPage from './pages/app/HelpdeskPage';
 import TicketDetailPage from './pages/app/TicketDetailPage';
 import KpiItPage from './pages/app/KpiItPage';
 import KpiTimesheetPage from './pages/app/KpiTimesheetPage';
+import ConferenceRoomsPage from './pages/app/ConferenceRoomsPage';
+import JournalPage from './pages/app/JournalPage';
 
 // Protected Route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -249,6 +251,8 @@ function App() {
             </FeatureRoute>
           }
         />
+        <Route path="rooms" element={<ConferenceRoomsPage />} />
+        <Route path="journal" element={<JournalPage />} />
       </Route>
 
       {/* Public pages (no auth required) */}

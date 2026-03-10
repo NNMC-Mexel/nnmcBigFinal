@@ -1,0 +1,57 @@
+{
+  "kind": "collectionType",
+  "collectionName": "bookings",
+  "info": {
+    "singularName": "booking",
+    "pluralName": "bookings",
+    "displayName": "Booking",
+    "description": "Room bookings"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "date": {
+      "type": "date",
+      "required": true
+    },
+    "startTime": {
+      "type": "time",
+      "required": true
+    },
+    "endTime": {
+      "type": "time",
+      "required": true
+    },
+    "bookerName": {
+      "type": "string",
+      "required": true
+    },
+    "department": {
+      "type": "string",
+      "required": true
+    },
+    "topic": {
+      "type": "string"
+    },
+    "cancelCode": {
+      "type": "string"
+    },
+    "room": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::room.room",
+      "inversedBy": "bookings"
+    },
+    "userId": {
+      "type": "integer"
+    },
+    "isRecurring": {
+      "type": "boolean",
+      "default": false
+    },
+    "recurringDayOfWeek": {
+      "type": "integer"
+    }
+  }
+}

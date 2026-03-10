@@ -15,6 +15,8 @@ import {
     BarChart2,
     Newspaper,
     Settings2,
+    CalendarRange,
+    BookOpen,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuthStore, useUserRole } from "../store/authStore";
@@ -247,6 +249,39 @@ export default function AppLayout() {
               <Calculator className="w-5 h-5" />
               KPI расчет
             </a> */}
+
+                        {/* Conference rooms — always visible to all authenticated users */}
+                        <div className='pt-4 pb-2'>
+                            <p className='px-3 text-xs font-medium text-slate-400 uppercase'>
+                                Сервисы
+                            </p>
+                        </div>
+                        <NavLink
+                            to="/app/rooms"
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                                    isActive
+                                        ? "bg-primary-50 text-primary-700 font-medium"
+                                        : "text-slate-600 hover:bg-slate-50"
+                                }`
+                            }
+                            onClick={() => setSidebarOpen(false)}>
+                            <CalendarRange className='w-5 h-5' />
+                            Конференц-залы
+                        </NavLink>
+                        <NavLink
+                            to="/app/journal"
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                                    isActive
+                                        ? "bg-primary-50 text-primary-700 font-medium"
+                                        : "text-slate-600 hover:bg-slate-50"
+                                }`
+                            }
+                            onClick={() => setSidebarOpen(false)}>
+                            <BookOpen className='w-5 h-5' />
+                            Журнал приёмной
+                        </NavLink>
 
                         {/* Admin items */}
                         {adminNavItems.length > 0 && (

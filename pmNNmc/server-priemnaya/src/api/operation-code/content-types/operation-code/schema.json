@@ -1,0 +1,17 @@
+﻿{
+  "kind": "collectionType",
+  "collectionName": "operation_codes",
+  "info": {
+    "singularName": "operation-code",
+    "pluralName": "operation-codes",
+    "displayName": "Operation Code",
+    "description": ""
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "code": { "type": "string", "required": true },
+    "sort": { "type": "integer" }
+  }
+}
