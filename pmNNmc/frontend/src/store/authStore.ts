@@ -87,10 +87,12 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         localStorage.removeItem('jwt');
         sessionStorage.removeItem('jwt');
-        // Очищаем KPI-сессию при выходе из основного приложения
+        // Очищаем все sub-service сессии при выходе
         localStorage.removeItem('kpi_token');
         localStorage.removeItem('kpi_user_cache_v1');
         localStorage.removeItem('kpi_cache_v1');
+        localStorage.removeItem('conf_token');
+        localStorage.removeItem('journal_token');
         set({
           user: null,
           token: null,
