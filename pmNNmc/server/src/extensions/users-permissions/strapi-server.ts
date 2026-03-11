@@ -49,6 +49,47 @@ export default (plugin) => {
     }
   };
 
+  // Patch the connect service to handle "Email is already taken" by linking existing local user to Keycloak
+  const originalConnect = plugin.services['providers'].connect;
+  plugin.services['providers'].connect = async (provider, query) => {
+    try {
+      return await originalConnect(provider, query);
+    } catch (error: any) {
+      if (provider === 'keycloak' && error?.message?.includes('Email is already taken')) {
+        // Decode email from Keycloak JWT access_token (base64 payload)
+        let userEmail: string | undefined;
+        try {
+          const token = query?.access_token;
+          if (token) {
+            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+            userEmail = (payload.email || '').toLowerCase();
+          }
+        } catch (e) {
+          strapi.log.error('[keycloak] Failed to decode access_token JWT');
+        }
+
+        if (!userEmail) throw error;
+
+        // Find existing user by email
+        const existingUser = await strapi.db
+          .query('plugin::users-permissions.user')
+          .findOne({ where: { email: userEmail }, populate: ['role'] });
+
+        if (!existingUser) throw error;
+
+        strapi.log.info(`[keycloak] Linking existing user ${existingUser.id} (${userEmail}) to Keycloak provider`);
+
+        // Update provider to keycloak so future logins work directly
+        await strapi.entityService.update('plugin::users-permissions.user', existingUser.id, {
+          data: { provider: 'keycloak' },
+        });
+
+        return existingUser;
+      }
+      throw error;
+    }
+  };
+
   // Assign "Member" role to new Keycloak users on first SSO login.
   // Users who already have a custom role (Lead, Admin, etc.) are not affected.
   const originalCallback = plugin.controllers.auth.callback;
