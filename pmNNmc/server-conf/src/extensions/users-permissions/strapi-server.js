@@ -1,4 +1,4 @@
-export default (plugin) => {
+module.exports = (plugin) => {
   const originalBootstrap = plugin.bootstrap;
   plugin.bootstrap = async ({ strapi }) => {
     await originalBootstrap({ strapi });
@@ -9,7 +9,7 @@ export default (plugin) => {
 
     // Upsert grant config for Keycloak
     const pluginStore = strapi.store({ type: 'plugin', name: 'users-permissions' });
-    const grantConfig = ((await pluginStore.get({ key: 'grant' })) || {}) as Record<string, any>;
+    const grantConfig = (await pluginStore.get({ key: 'grant' })) || {};
     const base = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect`;
     const keycloakHost = new URL(keycloakUrl).host;
     grantConfig.keycloak = {
@@ -38,7 +38,7 @@ export default (plugin) => {
         }
         strapi.log.info('[keycloak] purest config patched to use HTTP');
       }
-    } catch (e: any) {
+    } catch (e) {
       strapi.log.warn('[keycloak] Could not patch purest config:', e?.message);
     }
   };
