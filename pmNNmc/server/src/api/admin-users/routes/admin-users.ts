@@ -10,8 +10,16 @@ export default {
     },
     {
       method: 'GET',
-      path: '/admin-users/:id',
-      handler: 'admin-users.findOne',
+      path: '/admin-users/roles/list',
+      handler: 'admin-users.getRoles',
+      config: {
+        policies: [],
+      },
+    },
+    {
+      method: 'POST',
+      path: '/admin-users/create-keycloak',
+      handler: 'admin-users.createKeycloakUser',
       config: {
         policies: [],
       },
@@ -20,6 +28,14 @@ export default {
       method: 'POST',
       path: '/admin-users',
       handler: 'admin-users.create',
+      config: {
+        policies: [],
+      },
+    },
+    {
+      method: 'GET',
+      path: '/admin-users/:id',
+      handler: 'admin-users.findOne',
       config: {
         policies: [],
       },
@@ -44,22 +60,6 @@ export default {
       method: 'DELETE',
       path: '/admin-users/:id',
       handler: 'admin-users.delete',
-      config: {
-        policies: [],
-      },
-    },
-    {
-      method: 'GET',
-      path: '/admin-users/roles/list',
-      handler: 'admin-users.getRoles',
-      config: {
-        policies: [],
-      },
-    },
-    {
-      method: 'POST',
-      path: '/admin-users/create-keycloak',
-      handler: 'admin-users.createKeycloakUser',
       config: {
         policies: [],
       },
