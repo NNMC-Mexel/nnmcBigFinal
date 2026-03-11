@@ -49,17 +49,23 @@ export default (plugin) => {
     }
   };
 
-  // Patch the connect service to handle "Email is already taken" by linking existing local user to Keycloak
-  const originalConnect = plugin.services['providers'].connect;
-  plugin.services['providers'].connect = async (provider, query) => {
+  // Override the auth callback to handle "Email is already taken" for Keycloak users.
+  // When a user is created via admin panel (provider: local) and then logs in via Keycloak,
+  // Strapi can't find them (wrong provider) and tries to create a duplicate → error.
+  // We catch this, find the existing user by email, link them to Keycloak, and issue a JWT.
+  const originalCallback = plugin.controllers.auth.callback;
+  plugin.controllers.auth.callback = async (ctx) => {
     try {
-      return await originalConnect(provider, query);
+      await originalCallback(ctx);
     } catch (error: any) {
-      if (provider === 'keycloak' && error?.message?.includes('Email is already taken')) {
-        // Decode email from Keycloak JWT access_token (base64 payload)
+      const isKeycloak = ctx.params?.provider === 'keycloak';
+      const isEmailTaken = error?.message?.includes('Email is already taken');
+
+      if (isKeycloak && isEmailTaken) {
+        // Extract email from the Keycloak JWT access_token
         let userEmail: string | undefined;
         try {
-          const token = query?.access_token;
+          const token = ctx.query?.access_token as string;
           if (token) {
             const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
             userEmail = (payload.email || '').toLowerCase();
@@ -84,18 +90,22 @@ export default (plugin) => {
           data: { provider: 'keycloak' },
         });
 
-        return existingUser;
+        // Issue JWT and return the same response format as normal callback
+        const jwt = strapi.plugins['users-permissions'].services.jwt.issue({
+          id: existingUser.id,
+        });
+
+        ctx.body = {
+          jwt,
+          user: existingUser,
+        };
+        return;
       }
+
       throw error;
     }
-  };
 
-  // Assign "Member" role to new Keycloak users on first SSO login.
-  // Users who already have a custom role (Lead, Admin, etc.) are not affected.
-  const originalCallback = plugin.controllers.auth.callback;
-  plugin.controllers.auth.callback = async (ctx) => {
-    await originalCallback(ctx);
-
+    // Post-callback: assign Member role to new Keycloak users on first SSO login
     if (ctx.params?.provider !== 'keycloak') return;
 
     const body = ctx.body as any;
