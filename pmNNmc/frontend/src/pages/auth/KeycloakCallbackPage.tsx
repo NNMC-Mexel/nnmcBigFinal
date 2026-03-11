@@ -7,57 +7,64 @@ export default function KeycloakCallbackPage() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
+  // Exchange Keycloak access_token with secondary backends (KPI, Conf, Journal)
+  function exchangeSecondaryTokens(accessToken: string) {
+    const kpiApiBase = import.meta.env.VITE_KPI_API_BASE;
+    const confApiUrl = import.meta.env.VITE_CONF_API_URL;
+    const journalApiUrl = import.meta.env.VITE_JOURNAL_API_URL;
+    const encoded = encodeURIComponent(accessToken);
+
+    const kpiPromise = kpiApiBase
+      ? fetch(`${kpiApiBase}/auth/keycloak/callback?access_token=${encoded}`)
+          .then((res) => res.json())
+          .catch(() => null)
+      : Promise.resolve(null);
+    const confPromise = confApiUrl
+      ? fetch(`${confApiUrl}/api/auth/keycloak/callback?access_token=${encoded}`)
+          .then((res) => res.json())
+          .catch(() => null)
+      : Promise.resolve(null);
+    const journalPromise = journalApiUrl
+      ? fetch(`${journalApiUrl}/api/auth/keycloak/callback?access_token=${encoded}`)
+          .then((res) => res.json())
+          .catch(() => null)
+      : Promise.resolve(null);
+
+    return Promise.all([kpiPromise, confPromise, journalPromise]).then(
+      ([kpiData, confData, journalData]) => {
+        if (kpiData?.jwt) localStorage.setItem('kpi_token', kpiData.jwt);
+        if (confData?.jwt) localStorage.setItem('conf_token', confData.jwt);
+        if (journalData?.jwt) localStorage.setItem('journal_token', journalData.jwt);
+      }
+    );
+  }
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-
-    // Direct JWT from Strapi (legacy flow)
+    const accessToken = params.get('access_token');
     const jwt = params.get('jwt');
+
+    // Debug: see which params Keycloak flow provides
+    console.log('[KeycloakCallback] jwt:', !!jwt, 'access_token:', !!accessToken, 'all params:', window.location.search.substring(0, 200));
     if (jwt) {
-      handleJwt(jwt);
+      if (accessToken) {
+        exchangeSecondaryTokens(accessToken).finally(() => handleJwt(jwt));
+      } else {
+        handleJwt(jwt);
+      }
       return;
     }
 
-    // Grant querystring transport: Strapi passed raw Keycloak tokens to frontend.
-    // Exchange the access_token for a Strapi JWT via /api/auth/keycloak/callback.
-    // Also exchange it for KPI, Conference, and Journal JWTs so all modules work without separate login.
-    const accessToken = params.get('access_token');
+    // Grant querystring transport: exchange access_token with all backends
     if (accessToken) {
       const apiUrl = import.meta.env.VITE_API_URL;
-      const kpiApiBase = import.meta.env.VITE_KPI_API_BASE; // e.g. http://host:12011/api
-      const confApiUrl = import.meta.env.VITE_CONF_API_URL; // e.g. http://host:12013
-      const journalApiUrl = import.meta.env.VITE_JOURNAL_API_URL; // e.g. http://host:12014
       const encoded = encodeURIComponent(accessToken);
 
-      // Fire all requests in parallel; secondary failures are non-fatal
       const pmPromise = fetch(`${apiUrl}/api/auth/keycloak/callback?access_token=${encoded}`)
         .then((res) => res.json());
-      const kpiPromise = kpiApiBase
-        ? fetch(`${kpiApiBase}/auth/keycloak/callback?access_token=${encoded}`)
-            .then((res) => res.json())
-            .catch(() => null)
-        : Promise.resolve(null);
-      const confPromise = confApiUrl
-        ? fetch(`${confApiUrl}/api/auth/keycloak/callback?access_token=${encoded}`)
-            .then((res) => res.json())
-            .catch(() => null)
-        : Promise.resolve(null);
-      const journalPromise = journalApiUrl
-        ? fetch(`${journalApiUrl}/api/auth/keycloak/callback?access_token=${encoded}`)
-            .then((res) => res.json())
-            .catch(() => null)
-        : Promise.resolve(null);
 
-      Promise.all([pmPromise, kpiPromise, confPromise, journalPromise])
-        .then(([pmData, kpiData, confData, journalData]) => {
-          if (kpiData?.jwt) {
-            localStorage.setItem('kpi_token', kpiData.jwt);
-          }
-          if (confData?.jwt) {
-            localStorage.setItem('conf_token', confData.jwt);
-          }
-          if (journalData?.jwt) {
-            localStorage.setItem('journal_token', journalData.jwt);
-          }
+      Promise.all([pmPromise, exchangeSecondaryTokens(accessToken)])
+        .then(([pmData]) => {
           if (pmData?.jwt) {
             handleJwt(pmData.jwt);
           } else {
