@@ -44,8 +44,6 @@ export default function KeycloakCallbackPage() {
     const accessToken = params.get('access_token');
     const jwt = params.get('jwt');
 
-    // Debug: see which params Keycloak flow provides
-    console.log('[KeycloakCallback] jwt:', !!jwt, 'access_token:', !!accessToken, 'all params:', window.location.search.substring(0, 200));
     if (jwt) {
       if (accessToken) {
         exchangeSecondaryTokens(accessToken).finally(() => handleJwt(jwt));
