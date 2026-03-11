@@ -350,7 +350,7 @@ export default {
         return;
       }
 
-      const { access_token } = await tokenRes.json();
+      const { access_token } = await tokenRes.json() as any;
 
       // 2. Create user in Keycloak
       const userPayload: any = {
