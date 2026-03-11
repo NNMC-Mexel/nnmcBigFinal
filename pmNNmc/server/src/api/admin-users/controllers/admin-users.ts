@@ -419,7 +419,7 @@ export default {
             department: department || null,
             moduleAccess: moduleAccess || [],
             confirmed: true,
-            provider: 'local',
+            provider: 'keycloak',
           },
         });
       }
