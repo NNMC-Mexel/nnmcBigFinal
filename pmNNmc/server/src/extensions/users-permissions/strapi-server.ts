@@ -49,61 +49,42 @@ export default (plugin) => {
     }
   };
 
-  // Override the auth callback to handle "Email is already taken" for Keycloak users.
-  // When a user is created via admin panel (provider: local) and then logs in via Keycloak,
-  // Strapi can't find them (wrong provider) and tries to create a duplicate → error.
-  // We catch this, find the existing user by email, link them to Keycloak, and issue a JWT.
+  // Pre-link local users to Keycloak before the callback runs.
+  // When a user is created via admin panel (provider: local) and logs in via Keycloak,
+  // Strapi can't find them (wrong provider) and throws "Email is already taken".
+  // Fix: before the callback, decode the JWT, find user by email, update provider to keycloak.
   const originalCallback = plugin.controllers.auth.callback;
   plugin.controllers.auth.callback = async (ctx) => {
-    try {
-      await originalCallback(ctx);
-    } catch (error: any) {
-      const isKeycloak = ctx.params?.provider === 'keycloak';
-      const isEmailTaken = error?.message?.includes('Email is already taken');
+    if (ctx.params?.provider === 'keycloak') {
+      try {
+        const token = ctx.query?.access_token as string;
+        if (token) {
+          const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+          const email = (payload.email || '').toLowerCase();
 
-      if (isKeycloak && isEmailTaken) {
-        // Extract email from the Keycloak JWT access_token
-        let userEmail: string | undefined;
-        try {
-          const token = ctx.query?.access_token as string;
-          if (token) {
-            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-            userEmail = (payload.email || '').toLowerCase();
+          if (email) {
+            // Check if user exists with this email but provider != keycloak
+            const existingUser = await strapi.db
+              .query('plugin::users-permissions.user')
+              .findOne({ where: { email } });
+
+            if (existingUser && existingUser.provider !== 'keycloak') {
+              strapi.log.info(
+                `[keycloak] Pre-linking user ${existingUser.id} (${email}) from provider '${existingUser.provider}' to 'keycloak'`
+              );
+              await strapi.entityService.update('plugin::users-permissions.user', existingUser.id, {
+                data: { provider: 'keycloak' },
+              });
+            }
           }
-        } catch (e) {
-          strapi.log.error('[keycloak] Failed to decode access_token JWT');
         }
-
-        if (!userEmail) throw error;
-
-        // Find existing user by email
-        const existingUser = await strapi.db
-          .query('plugin::users-permissions.user')
-          .findOne({ where: { email: userEmail }, populate: ['role'] });
-
-        if (!existingUser) throw error;
-
-        strapi.log.info(`[keycloak] Linking existing user ${existingUser.id} (${userEmail}) to Keycloak provider`);
-
-        // Update provider to keycloak so future logins work directly
-        await strapi.entityService.update('plugin::users-permissions.user', existingUser.id, {
-          data: { provider: 'keycloak' },
-        });
-
-        // Issue JWT and return the same response format as normal callback
-        const jwt = strapi.plugins['users-permissions'].services.jwt.issue({
-          id: existingUser.id,
-        });
-
-        ctx.body = {
-          jwt,
-          user: existingUser,
-        };
-        return;
+      } catch (e: any) {
+        strapi.log.warn('[keycloak] Pre-link check failed:', e?.message);
       }
-
-      throw error;
     }
+
+    // Now call the original callback — user already has provider: keycloak, so it will find them
+    await originalCallback(ctx);
 
     // Post-callback: assign Member role to new Keycloak users on first SSO login
     if (ctx.params?.provider !== 'keycloak') return;
