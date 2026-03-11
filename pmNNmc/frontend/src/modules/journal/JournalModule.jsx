@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import {
-  journalLogin,
   journalGetMe,
-  journalLogout,
   journalGetLookups,
   journalGetLetters,
   journalGetLetter,
@@ -12,62 +10,6 @@ import {
   journalDeleteLetter,
   journalGetHistory,
 } from '../../api/journalClient';
-
-// ---------- Login Form ----------
-function LoginForm({ onLogin }) {
-  const [login, setLogin] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      await onLogin(login, password);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="font-bold text-gray-900">Журнал приёмной</h2>
-            <p className="text-xs text-gray-400">Войдите для работы с журналом</p>
-          </div>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Логин</label>
-            <input type="text" value={login} onChange={(e) => setLogin(e.target.value)} required autoFocus
-              placeholder="username" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Пароль</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
-              placeholder="••••••••" className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-colors" />
-          </div>
-          {error && <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl">{error}</div>}
-          <button type="submit" disabled={loading}
-            className="w-full py-2.5 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors disabled:opacity-50">
-            {loading ? 'Вход...' : 'Войти'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 // ---------- Combobox ----------
 function Combobox({ value, onChange, options, placeholder, fieldKey }) {
@@ -456,23 +398,24 @@ export default function JournalModule() {
     journalGetMe().then(setUser).catch(() => localStorage.removeItem('journal_token')).finally(() => setAuthLoading(false));
   }, []);
 
-  async function handleLogin(login, password) {
-    const data = await journalLogin(login, password);
-    setUser(data.user);
-  }
-
-  function handleLogout() {
-    journalLogout();
-    setUser(null);
-  }
-
   if (authLoading) return <div className="flex items-center justify-center h-96"><div className="animate-spin w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full" /></div>;
-  if (!user) return <LoginForm onLogin={handleLogin} />;
-  return <JournalDashboard user={user} onLogout={handleLogout} />;
+  if (!user) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="text-center p-8">
+        <div className="w-16 h-16 bg-teal-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+        <p className="text-gray-500 text-sm">Для доступа к журналу приёмной необходимо авторизоваться через систему</p>
+      </div>
+    </div>
+  );
+  return <JournalDashboard user={user} />;
 }
 
 // ---------- Dashboard ----------
-function JournalDashboard({ user, onLogout }) {
+function JournalDashboard({ user }) {
   const [letters, setLetters] = useState([]);
   const [lookups, setLookups] = useState(null);
   const [activeLetter, setActiveLetter] = useState(null);
@@ -573,12 +516,6 @@ function JournalDashboard({ user, onLogout }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Новое письмо
-          </button>
-          <button onClick={onLogout} title="Выйти"
-            className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
           </button>
         </div>
       </div>

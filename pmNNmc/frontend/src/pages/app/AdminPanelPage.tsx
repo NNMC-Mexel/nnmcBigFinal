@@ -17,6 +17,7 @@ import {
   EyeOff,
   RefreshCw,
   RotateCcw,
+  Settings2,
 } from 'lucide-react';
 import { adminUsersApi, AdminUser, Role } from '../../api/adminUsers';
 import { projectsApi } from '../../api/projects';
@@ -69,6 +70,8 @@ export default function AdminPanelPage() {
     department: null as number | null,
     blocked: false,
     generatePasswordAuto: true,
+    createInKeycloak: true,
+    moduleAccess: [] as string[],
   });
 
   useEffect(() => {
@@ -126,23 +129,38 @@ export default function AdminPanelPage() {
 
   const handleCreateUser = async () => {
     try {
-      const result = await adminUsersApi.create({
-        email: formData.email,
-        username: formData.username,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        password: formData.generatePasswordAuto ? undefined : formData.password,
-        role: formData.role,
-        department: formData.department,
-        blocked: formData.blocked,
-        generatePasswordAuto: formData.generatePasswordAuto,
-      });
-      
+      let result: { generatedPassword?: string | null };
+
+      if (formData.createInKeycloak) {
+        result = await adminUsersApi.createKeycloakUser({
+          email: formData.email,
+          username: formData.username,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          password: formData.generatePasswordAuto ? undefined : formData.password,
+          role: formData.role,
+          department: formData.department,
+          moduleAccess: formData.moduleAccess,
+        });
+      } else {
+        result = await adminUsersApi.create({
+          email: formData.email,
+          username: formData.username,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          password: formData.generatePasswordAuto ? undefined : formData.password,
+          role: formData.role,
+          department: formData.department,
+          blocked: formData.blocked,
+          generatePasswordAuto: formData.generatePasswordAuto,
+        });
+      }
+
       if (result.generatedPassword) {
         setGeneratedPassword(result.generatedPassword);
         setShowPassword(true);
       }
-      
+
       setShowCreateModal(false);
       resetForm();
       loadUsers();
@@ -249,6 +267,8 @@ export default function AdminPanelPage() {
       department: null,
       blocked: false,
       generatePasswordAuto: true,
+      createInKeycloak: true,
+      moduleAccess: [],
     });
   };
 
@@ -264,6 +284,8 @@ export default function AdminPanelPage() {
       department: user.department?.id || null,
       blocked: user.blocked,
       generatePasswordAuto: true,
+      createInKeycloak: true,
+      moduleAccess: Array.isArray(user.moduleAccess) ? user.moduleAccess : [],
     });
     setShowEditModal(true);
   };
@@ -544,6 +566,88 @@ export default function AdminPanelPage() {
         </div>
       </Card>
 
+      {/* Module Access Management */}
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+              <Settings2 className="w-5 h-5 text-primary-500" />
+              Доступы к модулям
+            </h3>
+            <p className="text-sm text-slate-500 mt-1">Управление доступом пользователей к сервисам</p>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="text-left text-sm text-slate-500 border-b border-slate-200">
+                <th className="px-4 py-3 font-medium">Пользователь</th>
+                <th className="px-4 py-3 font-medium text-center">Конференц-залы</th>
+                <th className="px-4 py-3 font-medium text-center">Журнал приёмной</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="px-4 py-8 text-center text-slate-500">
+                    Нет пользователей
+                  </td>
+                </tr>
+              ) : (
+                users.map((u) => {
+                  const access: string[] = Array.isArray(u.moduleAccess) ? u.moduleAccess : [];
+                  const toggleModule = async (mod: string) => {
+                    const newAccess = access.includes(mod)
+                      ? access.filter((m) => m !== mod)
+                      : [...access, mod];
+                    try {
+                      await adminUsersApi.update(u.id, { moduleAccess: newAccess });
+                      setUsers((prev) =>
+                        prev.map((usr) =>
+                          usr.id === u.id ? { ...usr, moduleAccess: newAccess } : usr
+                        )
+                      );
+                    } catch (err: any) {
+                      alert(err.response?.data?.error?.message || 'Ошибка обновления доступа');
+                    }
+                  };
+                  return (
+                    <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-slate-800">
+                            {u.firstName || u.lastName
+                              ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
+                              : u.username}
+                          </span>
+                          <span className="text-sm text-slate-400">@{u.username}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={access.includes('conf')}
+                          onChange={() => toggleModule('conf')}
+                          className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={access.includes('journal')}
+                          onChange={() => toggleModule('journal')}
+                          className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
       {/* Deleted Projects */}
       <Card>
         <div className="flex items-center justify-between mb-4">
@@ -673,13 +777,23 @@ export default function AdminPanelPage() {
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
+                checked={formData.createInKeycloak}
+                onChange={(e) => setFormData({ ...formData, createInKeycloak: e.target.checked })}
+                className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm text-slate-700">Создать в Keycloak (SSO)</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
                 checked={formData.generatePasswordAuto}
                 onChange={(e) => setFormData({ ...formData, generatePasswordAuto: e.target.checked })}
                 className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
               />
               <span className="text-sm text-slate-700">Сгенерировать пароль автоматически</span>
             </label>
-            
+
             {!formData.generatePasswordAuto && (
               <Input
                 label="Пароль"
@@ -689,6 +803,40 @@ export default function AdminPanelPage() {
                 minLength={6}
               />
             )}
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-lg space-y-2">
+            <p className="text-sm font-medium text-slate-700">Доступ к модулям</p>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.moduleAccess.includes('conf')}
+                  onChange={(e) => {
+                    const m = e.target.checked
+                      ? [...formData.moduleAccess, 'conf']
+                      : formData.moduleAccess.filter((x) => x !== 'conf');
+                    setFormData({ ...formData, moduleAccess: m });
+                  }}
+                  className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-slate-700">Конференц-залы</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.moduleAccess.includes('journal')}
+                  onChange={(e) => {
+                    const m = e.target.checked
+                      ? [...formData.moduleAccess, 'journal']
+                      : formData.moduleAccess.filter((x) => x !== 'journal');
+                    setFormData({ ...formData, moduleAccess: m });
+                  }}
+                  className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-slate-700">Журнал приёмной</span>
+              </label>
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

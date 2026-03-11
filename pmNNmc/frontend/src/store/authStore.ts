@@ -24,7 +24,7 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isAuthenticated: false,
-      isLoading: false,
+      isLoading: true,
       error: null,
       rememberMe: true,
 
@@ -104,16 +104,18 @@ export const useAuthStore = create<AuthState>()(
         // Проверяем оба хранилища
         const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt');
         if (!token) {
-          set({ isAuthenticated: false, user: null });
+          set({ isAuthenticated: false, user: null, isLoading: false });
           return;
         }
 
+        set({ isLoading: true });
         try {
           const user = await authApi.getMe();
           set({
             user,
             token,
             isAuthenticated: true,
+            isLoading: false,
           });
         } catch {
           localStorage.removeItem('jwt');
@@ -122,6 +124,7 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             token: null,
             isAuthenticated: false,
+            isLoading: false,
           });
         }
       },

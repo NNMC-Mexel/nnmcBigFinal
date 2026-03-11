@@ -333,7 +333,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
 
   const handleLogout = () => {
     localStorage.removeItem("kpi_cache_v1");
-    onKpiLogout();
+    if (onKpiLogout) onKpiLogout();
   };
 
   // Загрузка кэша
@@ -609,17 +609,6 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
 
   return (
     <div className="kpi-wrapper">
-      {/* Пользователь и выход */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
-        <div style={{ fontSize: "13px", color: "var(--kpi-muted)" }}>
-          Вошли как: <strong style={{ color: "var(--kpi-ink)" }}>{user.login}</strong>
-          <span style={{ marginLeft: "6px", opacity: 0.7 }}>({user.role})</span>
-        </div>
-        <button className="btn btn-secondary" onClick={handleLogout} style={{ fontSize: "12px", minHeight: "32px", padding: "5px 12px" }}>
-          Выйти из KPI
-        </button>
-      </div>
-
       {/* Вкладки */}
       <div className="kpi-module-nav">
         <button className={`kpi-module-nav-tab${activeTab === "calc" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => setActiveTab("calc")}>

@@ -37,25 +37,46 @@ import KpiTimesheetPage from './pages/app/KpiTimesheetPage';
 import ConferenceRoomsPage from './pages/app/ConferenceRoomsPage';
 import JournalPage from './pages/app/JournalPage';
 
-// Protected Route component
+// Protected Route component — redirects to Keycloak SSO
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  const isLoading = useAuthStore((state) => state.isLoading);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-500 text-sm">Загрузка...</p>
+        </div>
+      </div>
+    );
   }
-  
+
+  if (!isAuthenticated) {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    window.location.href = `${apiUrl}/api/connect/keycloak`;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-500 text-sm">Перенаправление на страницу входа...</p>
+        </div>
+      </div>
+    );
+  }
+
   return <>{children}</>;
 };
 
 // Public Route (redirect if authenticated)
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  
+
   if (isAuthenticated) {
     return <DefaultAppRedirect />;
   }
-  
+
   return <>{children}</>;
 };
 
@@ -259,8 +280,8 @@ function App() {
       <Route path="/survey/:token" element={<PublicSurveyPage />} />
       <Route path="/helpdesk/submit" element={<PublicTicketPage />} />
 
-      {/* Redirect root to app or login */}
-      <Route path="/" element={<DefaultAppRedirect />} />
+      {/* Redirect root — if not authenticated, ProtectedRoute will redirect to Keycloak */}
+      <Route path="/" element={<ProtectedRoute><DefaultAppRedirect /></ProtectedRoute>} />
       
       {/* 404 */}
       <Route path="*" element={<DefaultAppRedirect />} />

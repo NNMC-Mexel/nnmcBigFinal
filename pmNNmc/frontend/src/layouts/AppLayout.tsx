@@ -44,8 +44,13 @@ export default function AppLayout() {
 
     const handleLogout = () => {
         logout();
-        navigate("/login");
+        // Redirect to Keycloak login
+        const apiUrl = import.meta.env.VITE_API_URL;
+        window.location.href = `${apiUrl}/api/connect/keycloak`;
     };
+
+    const moduleAccess: string[] = Array.isArray(user?.moduleAccess) ? user.moduleAccess : [];
+    const hasModuleAccess = (mod: string) => isSuperAdmin || isAdmin || moduleAccess.includes(mod);
 
     // News feed — always visible to all authenticated users
     const newsNavItems = [
@@ -250,38 +255,44 @@ export default function AppLayout() {
               KPI расчет
             </a> */}
 
-                        {/* Conference rooms — always visible to all authenticated users */}
-                        <div className='pt-4 pb-2'>
-                            <p className='px-3 text-xs font-medium text-slate-400 uppercase'>
-                                Сервисы
-                            </p>
-                        </div>
-                        <NavLink
-                            to="/app/rooms"
-                            className={({ isActive }) =>
-                                `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                                    isActive
-                                        ? "bg-primary-50 text-primary-700 font-medium"
-                                        : "text-slate-600 hover:bg-slate-50"
-                                }`
-                            }
-                            onClick={() => setSidebarOpen(false)}>
-                            <CalendarRange className='w-5 h-5' />
-                            Конференц-залы
-                        </NavLink>
-                        <NavLink
-                            to="/app/journal"
-                            className={({ isActive }) =>
-                                `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                                    isActive
-                                        ? "bg-primary-50 text-primary-700 font-medium"
-                                        : "text-slate-600 hover:bg-slate-50"
-                                }`
-                            }
-                            onClick={() => setSidebarOpen(false)}>
-                            <BookOpen className='w-5 h-5' />
-                            Журнал приёмной
-                        </NavLink>
+                        {/* Services — visible based on moduleAccess */}
+                        {(hasModuleAccess('conf') || hasModuleAccess('journal')) && (
+                            <div className='pt-4 pb-2'>
+                                <p className='px-3 text-xs font-medium text-slate-400 uppercase'>
+                                    Сервисы
+                                </p>
+                            </div>
+                        )}
+                        {hasModuleAccess('conf') && (
+                            <NavLink
+                                to="/app/rooms"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                                        isActive
+                                            ? "bg-primary-50 text-primary-700 font-medium"
+                                            : "text-slate-600 hover:bg-slate-50"
+                                    }`
+                                }
+                                onClick={() => setSidebarOpen(false)}>
+                                <CalendarRange className='w-5 h-5' />
+                                Конференц-залы
+                            </NavLink>
+                        )}
+                        {hasModuleAccess('journal') && (
+                            <NavLink
+                                to="/app/journal"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                                        isActive
+                                            ? "bg-primary-50 text-primary-700 font-medium"
+                                            : "text-slate-600 hover:bg-slate-50"
+                                    }`
+                                }
+                                onClick={() => setSidebarOpen(false)}>
+                                <BookOpen className='w-5 h-5' />
+                                Журнал приёмной
+                            </NavLink>
+                        )}
 
                         {/* Admin items */}
                         {adminNavItems.length > 0 && (

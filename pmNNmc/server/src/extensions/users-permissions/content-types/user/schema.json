@@ -95,6 +95,10 @@
     "canViewKpi": {
       "type": "boolean",
       "default": true
+    },
+    "moduleAccess": {
+      "type": "json",
+      "default": []
     }
   }
 }

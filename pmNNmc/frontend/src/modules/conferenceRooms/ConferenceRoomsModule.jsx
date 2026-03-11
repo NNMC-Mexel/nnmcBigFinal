@@ -5,7 +5,7 @@ import Calendar from '../../components/Calendar/Calendar';
 import BookingForm from '../../components/BookingForm/BookingForm';
 import Modal from '../../components/ui/Modal';
 import { useRooms } from '../../hooks/useRooms';
-import { confLogin, confGetMe, confLogout } from '../../api/confClient';
+import { confGetMe } from '../../api/confClient';
 
 const ROOM_COLORS = ['bg-room-1', 'bg-room-2'];
 
@@ -16,89 +16,11 @@ function formatDateLabel(dateStr) {
   return format(date, 'd MMMM, EEEE', { locale: ru });
 }
 
-// --- Login form ---
-function LoginForm({ onLogin }) {
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      await onLogin(identifier, password);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center">
-            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
-          <div>
-            <h2 className="font-bold text-gray-900">Конференц-залы</h2>
-            <p className="text-xs text-gray-400">Войдите для бронирования</p>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Логин</label>
-            <input
-              type="text"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              required
-              autoFocus
-              placeholder="username или email"
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Пароль</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-            />
-          </div>
-
-          {error && (
-            <div className="bg-red-50 text-red-600 text-sm p-3 rounded-xl">{error}</div>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-blue-500 text-white rounded-xl font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Вход...' : 'Войти'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 // --- Main module ---
 export default function ConferenceRoomsModule() {
   const [confUser, setConfUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Check existing conf_token on mount
   useEffect(() => {
     const token = localStorage.getItem('conf_token');
     if (!token) {
@@ -113,16 +35,6 @@ export default function ConferenceRoomsModule() {
       .finally(() => setAuthLoading(false));
   }, []);
 
-  async function handleLogin(identifier, password) {
-    const data = await confLogin(identifier, password);
-    setConfUser(data.user);
-  }
-
-  function handleLogout() {
-    confLogout();
-    setConfUser(null);
-  }
-
   if (authLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -132,14 +44,25 @@ export default function ConferenceRoomsModule() {
   }
 
   if (!confUser) {
-    return <LoginForm onLogin={handleLogin} />;
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center p-8">
+          <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+          <p className="text-gray-500 text-sm">Для доступа к конференц-залам необходимо авторизоваться через систему</p>
+        </div>
+      </div>
+    );
   }
 
-  return <BookingDashboard confUser={confUser} onLogout={handleLogout} />;
+  return <BookingDashboard confUser={confUser} />;
 }
 
 // --- Booking dashboard (shown after login) ---
-function BookingDashboard({ confUser, onLogout }) {
+function BookingDashboard({ confUser }) {
   const { rooms, loading } = useRooms();
   const [bookingModal, setBookingModal] = useState({ open: false, data: null });
   const [detailModal, setDetailModal] = useState({ open: false, booking: null });
@@ -222,15 +145,6 @@ function BookingDashboard({ confUser, onLogout }) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Забронировать
-          </button>
-          <button
-            onClick={onLogout}
-            title="Выйти из системы бронирования"
-            className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
           </button>
         </div>
       </div>

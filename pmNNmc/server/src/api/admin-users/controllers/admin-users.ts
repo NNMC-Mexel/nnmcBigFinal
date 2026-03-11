@@ -200,16 +200,17 @@ export default {
     await checkSuperAdmin(ctx, strapi);
     
     const { id } = ctx.params;
-    const { firstName, lastName, role, department, blocked } = ctx.request.body as any;
-    
+    const { firstName, lastName, role, department, blocked, moduleAccess } = ctx.request.body as any;
+
     try {
       const updateData: any = {};
-      
+
       if (firstName !== undefined) updateData.firstName = firstName;
       if (lastName !== undefined) updateData.lastName = lastName;
       if (role !== undefined) updateData.role = role;
       if (department !== undefined) updateData.department = department;
       if (blocked !== undefined) updateData.blocked = blocked;
+      if (moduleAccess !== undefined) updateData.moduleAccess = moduleAccess;
       
       const user = await strapi.entityService.update('plugin::users-permissions.user', id, {
         data: updateData,
@@ -288,16 +289,152 @@ export default {
   // Получить список ролей
   async getRoles(ctx: Context) {
     const strapi = (global as any).strapi;
-    
+
     await checkSuperAdmin(ctx, strapi);
-    
+
     try {
       const roles = await strapi.entityService.findMany('plugin::users-permissions.role', {});
-      
+
       ctx.body = { data: roles };
     } catch (error) {
       console.error('Error fetching roles:', error);
       ctx.throw(500, 'Error fetching roles');
+    }
+  },
+
+  // Создать пользователя в Keycloak + Strapi
+  async createKeycloakUser(ctx: Context) {
+    const strapi = (global as any).strapi;
+
+    await checkSuperAdmin(ctx, strapi);
+
+    const {
+      username, email, firstName, lastName,
+      password, role, department, moduleAccess,
+    } = ctx.request.body as any;
+
+    if (!username || !email) {
+      ctx.throw(400, 'Username and email are required');
+      return;
+    }
+
+    const keycloakUrl = process.env.KEYCLOAK_URL;
+    const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
+    const adminClientId = process.env.KEYCLOAK_ADMIN_CLIENT_ID || 'admin-cli';
+    const adminClientSecret = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET;
+
+    if (!keycloakUrl || !adminClientSecret) {
+      ctx.throw(500, 'Keycloak admin credentials not configured (KEYCLOAK_URL, KEYCLOAK_ADMIN_CLIENT_SECRET)');
+      return;
+    }
+
+    try {
+      // 1. Get admin access token via client credentials
+      const tokenRes = await fetch(
+        `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/token`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'client_credentials',
+            client_id: adminClientId,
+            client_secret: adminClientSecret,
+          }),
+        }
+      );
+
+      if (!tokenRes.ok) {
+        const err = await tokenRes.text();
+        strapi.log.error('[keycloak-admin] Token error:', err);
+        ctx.throw(500, 'Failed to get Keycloak admin token');
+        return;
+      }
+
+      const { access_token } = await tokenRes.json();
+
+      // 2. Create user in Keycloak
+      const userPayload: any = {
+        username,
+        email,
+        firstName: firstName || '',
+        lastName: lastName || '',
+        enabled: true,
+        emailVerified: true,
+      };
+
+      if (password) {
+        userPayload.credentials = [{
+          type: 'password',
+          value: password,
+          temporary: true, // User must change on first login
+        }];
+      }
+
+      const createRes = await fetch(
+        `${keycloakUrl}/admin/realms/${keycloakRealm}/users`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${access_token}`,
+          },
+          body: JSON.stringify(userPayload),
+        }
+      );
+
+      if (!createRes.ok) {
+        const errBody = await createRes.json().catch(() => ({}));
+        const errMsg = (errBody as any)?.errorMessage || (errBody as any)?.error || `Keycloak returned ${createRes.status}`;
+        strapi.log.error('[keycloak-admin] Create user error:', errMsg);
+        ctx.throw(400, `Keycloak: ${errMsg}`);
+        return;
+      }
+
+      // 3. Also create user in Strapi (so they have a local account for module access, etc.)
+      const tempPassword = password || generatePassword();
+
+      // Check if user already exists in Strapi
+      const existingUsers = await strapi.entityService.findMany('plugin::users-permissions.user', {
+        filters: { $or: [{ email }, { username }] },
+      });
+
+      let strapiUser;
+      if (existingUsers.length > 0) {
+        strapiUser = existingUsers[0];
+        // Update moduleAccess if provided
+        if (moduleAccess) {
+          await strapi.entityService.update('plugin::users-permissions.user', strapiUser.id, {
+            data: { moduleAccess },
+          });
+        }
+      } else {
+        strapiUser = await strapi.entityService.create('plugin::users-permissions.user', {
+          data: {
+            email,
+            username,
+            firstName: firstName || '',
+            lastName: lastName || '',
+            password: tempPassword,
+            role: role || 1,
+            department: department || null,
+            moduleAccess: moduleAccess || [],
+            confirmed: true,
+            provider: 'local',
+          },
+        });
+      }
+
+      const { password: _, ...safeUser } = strapiUser;
+
+      ctx.body = {
+        data: safeUser,
+        message: 'User created in Keycloak and Strapi',
+        generatedPassword: !password ? tempPassword : null,
+      };
+    } catch (error: any) {
+      if (error.status) throw error; // Re-throw ctx.throw errors
+      strapi.log.error('[keycloak-admin] Error:', error);
+      ctx.throw(500, error.message || 'Error creating Keycloak user');
     }
   },
 };

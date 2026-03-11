@@ -22,6 +22,7 @@ export interface AdminUser {
     name_ru: string;
     name_kz: string;
   };
+  moduleAccess?: string[];
 }
 
 export interface Role {
@@ -72,6 +73,7 @@ export const adminUsersApi = {
     role?: number;
     department?: number | null;
     blocked?: boolean;
+    moduleAccess?: string[];
   }): Promise<AdminUser> => {
     const response = await client.put(`/admin-users/${id}`, data);
     return response.data.data;
@@ -95,5 +97,20 @@ export const adminUsersApi = {
   getRoles: async (): Promise<Role[]> => {
     const response = await client.get('/admin-users/roles/list');
     return response.data.data;
+  },
+
+  // Создать пользователя в Keycloak + Strapi
+  createKeycloakUser: async (data: {
+    username: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    password?: string;
+    role?: number;
+    department?: number | null;
+    moduleAccess?: string[];
+  }): Promise<{ data: AdminUser; generatedPassword?: string; message: string }> => {
+    const response = await client.post('/admin-users/create-keycloak', data);
+    return response.data;
   },
 };

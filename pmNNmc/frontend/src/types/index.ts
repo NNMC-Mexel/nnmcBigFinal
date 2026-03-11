@@ -31,6 +31,7 @@ export interface User {
   canViewHelpdesk?: boolean;
   canViewKpi?: boolean;
   canViewKpiTimesheet?: boolean;
+  moduleAccess?: string[];
   blocked: boolean;
   confirmed: boolean;
 }

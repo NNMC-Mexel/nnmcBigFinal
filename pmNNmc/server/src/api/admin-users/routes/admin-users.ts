@@ -56,5 +56,13 @@ export default {
         policies: [],
       },
     },
+    {
+      method: 'POST',
+      path: '/admin-users/create-keycloak',
+      handler: 'admin-users.createKeycloakUser',
+      config: {
+        policies: [],
+      },
+    },
   ],
 };
