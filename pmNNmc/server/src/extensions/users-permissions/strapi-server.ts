@@ -10,7 +10,6 @@ export default (plugin) => {
     if (!keycloakUrl) return;
 
     // 1. Patch grant config URLs in DB (for OAuth redirect flow).
-    // Also creates the keycloak entry if it doesn't exist yet (e.g. first deploy).
     const pluginStore = strapi.store({ type: 'plugin', name: 'users-permissions' });
     const grantConfig = ((await pluginStore.get({ key: 'grant' })) || {}) as Record<string, any>;
     const base = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect`;
@@ -29,11 +28,8 @@ export default (plugin) => {
     await pluginStore.set({ key: 'grant', value: grantConfig });
     strapi.log.info(`[keycloak] grant config upserted: subdomain=${grantConfig.keycloak.subdomain}`);
 
-    // 2. Patch purest's hardcoded https:// for Keycloak (used in /api/auth/keycloak/callback).
-    // purest/config/providers.json has "origin": "https://{subdomain}" hardcoded for Keycloak.
-    // Modifying the cached module object makes all subsequent purest calls use HTTP.
+    // 2. Patch purest's hardcoded https:// for Keycloak
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const purestProviders = require('purest/config/providers');
       if (purestProviders.keycloak) {
         if (purestProviders.keycloak.default) {
@@ -49,97 +45,108 @@ export default (plugin) => {
     }
   };
 
-  // Pre-link local users to Keycloak before the callback runs.
-  // When a user is created via admin panel (provider: local) and logs in via Keycloak,
-  // Strapi can't find them (wrong provider) and throws "Email is already taken".
-  // Fix: before the callback, decode the JWT, find user by email, update provider to keycloak.
-  const originalCallback = plugin.controllers.auth.callback;
-  plugin.controllers.auth.callback = async (ctx) => {
-    if (ctx.params?.provider === 'keycloak') {
-      try {
-        const token = ctx.query?.access_token as string;
-        if (token) {
-          const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-          const email = (payload.email || '').toLowerCase();
+  // Wrap the auth controller factory to override the callback method.
+  // Strapi controllers are factory functions: (context) => ({ method1, method2, ... })
+  // We must wrap the factory, not assign properties to it.
+  const originalAuthController = plugin.controllers.auth;
+  plugin.controllers.auth = (context) => {
+    const original = typeof originalAuthController === 'function'
+      ? originalAuthController(context)
+      : originalAuthController;
 
-          if (email) {
-            // Check if user exists with this email but provider != keycloak
-            const existingUser = await strapi.db
-              .query('plugin::users-permissions.user')
-              .findOne({ where: { email } });
+    return {
+      ...original,
+      async callback(ctx) {
+        // Pre-link: if a local user exists with same email, update provider to keycloak
+        if (ctx.params?.provider === 'keycloak') {
+          try {
+            const token = ctx.query?.access_token as string;
+            if (token) {
+              const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+              const email = (payload.email || '').toLowerCase();
 
-            if (existingUser && existingUser.provider !== 'keycloak') {
-              strapi.log.info(
-                `[keycloak] Pre-linking user ${existingUser.id} (${email}) from provider '${existingUser.provider}' to 'keycloak'`
-              );
-              await strapi.entityService.update('plugin::users-permissions.user', existingUser.id, {
-                data: { provider: 'keycloak' },
-              });
+              if (email) {
+                const existingUser = await strapi.db
+                  .query('plugin::users-permissions.user')
+                  .findOne({ where: { email } });
+
+                if (existingUser && existingUser.provider !== 'keycloak') {
+                  strapi.log.info(
+                    `[keycloak] Pre-linking user ${existingUser.id} (${email}) from '${existingUser.provider}' to 'keycloak'`
+                  );
+                  await strapi.entityService.update('plugin::users-permissions.user', existingUser.id, {
+                    data: { provider: 'keycloak' },
+                  });
+                }
+              }
             }
+          } catch (e: any) {
+            strapi.log.warn('[keycloak] Pre-link check failed:', e?.message);
           }
         }
-      } catch (e: any) {
-        strapi.log.warn('[keycloak] Pre-link check failed:', e?.message);
-      }
-    }
 
-    // Now call the original callback — user already has provider: keycloak, so it will find them
-    await originalCallback(ctx);
+        // Call original callback
+        await original.callback(ctx);
 
-    // Post-callback: assign Member role to new Keycloak users on first SSO login
-    if (ctx.params?.provider !== 'keycloak') return;
+        // Post-callback: assign Member role to new Keycloak users
+        if (ctx.params?.provider !== 'keycloak') return;
 
-    const body = ctx.body as any;
-    const userId = body?.user?.id;
-    if (!userId) return;
+        const body = ctx.body as any;
+        const userId = body?.user?.id;
+        if (!userId) return;
 
-    const user = await strapi.entityService.findOne(
-      'plugin::users-permissions.user',
-      userId,
-      { populate: ['role'] }
-    );
+        const user = await strapi.entityService.findOne(
+          'plugin::users-permissions.user',
+          userId,
+          { populate: ['role'] }
+        );
 
-    const role = (user as any)?.role;
-    // Only reassign if still on the default "Authenticated" role
-    if (!role || role.type !== 'authenticated') return;
+        const role = (user as any)?.role;
+        if (!role || role.type !== 'authenticated') return;
 
-    const memberRole = await strapi.db
-      .query('plugin::users-permissions.role')
-      .findOne({ where: { name: 'Member' } });
+        const memberRole = await strapi.db
+          .query('plugin::users-permissions.role')
+          .findOne({ where: { name: 'Member' } });
 
-    if (!memberRole) {
-      strapi.log.warn('[keycloak] Member role not found — user keeps Authenticated role');
-      return;
-    }
+        if (!memberRole) {
+          strapi.log.warn('[keycloak] Member role not found — user keeps Authenticated role');
+          return;
+        }
 
-    await strapi.entityService.update('plugin::users-permissions.user', userId, {
-      data: { role: memberRole.id },
-    });
+        await strapi.entityService.update('plugin::users-permissions.user', userId, {
+          data: { role: memberRole.id },
+        });
 
-    strapi.log.info(`[keycloak] User ${userId} assigned Member role on first SSO login`);
+        strapi.log.info(`[keycloak] User ${userId} assigned Member role on first SSO login`);
+      },
+    };
   };
 
-  // Extend the me controller to include role
-  const originalMe = plugin.controllers.user.me;
+  // Wrap the user controller factory to override the me method
+  const originalUserController = plugin.controllers.user;
+  plugin.controllers.user = (context) => {
+    const original = typeof originalUserController === 'function'
+      ? originalUserController(context)
+      : originalUserController;
 
-  plugin.controllers.user.me = async (ctx) => {
-    // Call original me
-    await originalMe(ctx);
+    return {
+      ...original,
+      async me(ctx) {
+        await original.me(ctx);
 
-    if (ctx.body && ctx.state.user) {
-      // Fetch user with role populated
-      const user = await strapi.entityService.findOne(
-        'plugin::users-permissions.user',
-        ctx.state.user.id,
-        {
-          populate: ['role', 'department'],
+        if (ctx.body && ctx.state.user) {
+          const user = await strapi.entityService.findOne(
+            'plugin::users-permissions.user',
+            ctx.state.user.id,
+            { populate: ['role', 'department'] }
+          );
+
+          if (user) {
+            ctx.body = user;
+          }
         }
-      );
-
-      if (user) {
-        ctx.body = user;
-      }
-    }
+      },
+    };
   };
 
   return plugin;
