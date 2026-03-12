@@ -26,7 +26,7 @@ export default function AppLayout() {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const { user, logout } = useAuthStore();
+    const { user } = useAuthStore();
     const {
         role,
         canEdit,
@@ -43,8 +43,9 @@ export default function AppLayout() {
     } = useUserRole();
 
     const handleLogout = () => {
-        logout();
-        // End Keycloak session, then redirect back to app (which will trigger new SSO login)
+        // Clear local storage directly (without triggering React re-render via logout())
+        localStorage.removeItem('auth-storage');
+        // End Keycloak session, then redirect back to app
         const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://192.168.101.25:12012';
         const keycloakRealm = import.meta.env.VITE_KEYCLOAK_REALM || 'nnmc';
         const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'pmnnmc-app';
