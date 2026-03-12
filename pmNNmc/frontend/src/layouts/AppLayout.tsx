@@ -45,11 +45,11 @@ export default function AppLayout() {
     const handleLogout = () => {
         // Clear local storage directly (without triggering React re-render via logout())
         localStorage.removeItem('auth-storage');
-        // End Keycloak session, then redirect back to app
+        // End Keycloak session, then redirect to /logged-out page
         const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://192.168.101.25:12012';
         const keycloakRealm = import.meta.env.VITE_KEYCLOAK_REALM || 'nnmc';
         const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'pmnnmc-app';
-        const redirectUri = encodeURIComponent(window.location.origin);
+        const redirectUri = encodeURIComponent(`${window.location.origin}/logged-out`);
         window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout?client_id=${clientId}&post_logout_redirect_uri=${redirectUri}`;
     };
 
