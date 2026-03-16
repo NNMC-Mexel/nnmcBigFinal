@@ -23,6 +23,12 @@ export interface AdminUser {
     name_kz: string;
   };
   moduleAccess?: string[];
+  canViewDashboard?: boolean;
+  canViewBoard?: boolean;
+  canViewTable?: boolean;
+  canViewHelpdesk?: boolean;
+  canViewKpi?: boolean;
+  canViewKpiTimesheet?: boolean;
 }
 
 export interface Role {
@@ -61,6 +67,12 @@ export const adminUsersApi = {
     department?: number | null;
     blocked?: boolean;
     generatePasswordAuto?: boolean;
+    canViewDashboard?: boolean;
+    canViewBoard?: boolean;
+    canViewTable?: boolean;
+    canViewHelpdesk?: boolean;
+    canViewKpi?: boolean;
+    canViewKpiTimesheet?: boolean;
   }): Promise<{ data: AdminUser; generatedPassword?: string }> => {
     const response = await client.post('/admin-users', data);
     return response.data;
@@ -74,6 +86,12 @@ export const adminUsersApi = {
     department?: number | null;
     blocked?: boolean;
     moduleAccess?: string[];
+    canViewDashboard?: boolean;
+    canViewBoard?: boolean;
+    canViewTable?: boolean;
+    canViewHelpdesk?: boolean;
+    canViewKpi?: boolean;
+    canViewKpiTimesheet?: boolean;
   }): Promise<AdminUser> => {
     const response = await client.put(`/admin-users/${id}`, data);
     return response.data.data;
@@ -109,6 +127,12 @@ export const adminUsersApi = {
     role?: number;
     department?: number | null;
     moduleAccess?: string[];
+    canViewDashboard?: boolean;
+    canViewBoard?: boolean;
+    canViewTable?: boolean;
+    canViewHelpdesk?: boolean;
+    canViewKpi?: boolean;
+    canViewKpiTimesheet?: boolean;
   }): Promise<{ data: AdminUser; generatedPassword?: string; message: string }> => {
     const response = await client.post('/admin-users/create-keycloak', data);
     return response.data;

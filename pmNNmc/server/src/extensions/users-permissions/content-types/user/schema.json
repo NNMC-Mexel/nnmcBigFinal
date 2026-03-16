@@ -96,6 +96,10 @@
       "type": "boolean",
       "default": true
     },
+    "canViewKpiTimesheet": {
+      "type": "boolean",
+      "default": false
+    },
     "moduleAccess": {
       "type": "json",
       "default": []

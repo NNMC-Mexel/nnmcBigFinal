@@ -130,7 +130,10 @@ export default {
     
     await checkSuperAdmin(ctx, strapi);
     
-    const { email, username, firstName, lastName, role, department, blocked, generatePasswordAuto } = ctx.request.body as any;
+    const {
+      email, username, firstName, lastName, role, department, blocked, generatePasswordAuto,
+      canViewDashboard, canViewBoard, canViewTable, canViewHelpdesk, canViewKpi, canViewKpiTimesheet,
+    } = ctx.request.body as any;
     
     if (!email || !username) {
       ctx.throw(400, 'Email and username are required');
@@ -172,11 +175,17 @@ export default {
           firstName: firstName || '',
           lastName: lastName || '',
           password,
-          role: role || 1, // Default role
+          role: role || 1,
           department: department || null,
           blocked: blocked || false,
-          confirmed: true, // Автоподтверждение при создании админом
+          confirmed: true,
           provider: 'local',
+          ...(canViewDashboard !== undefined && { canViewDashboard }),
+          ...(canViewBoard !== undefined && { canViewBoard }),
+          ...(canViewTable !== undefined && { canViewTable }),
+          ...(canViewHelpdesk !== undefined && { canViewHelpdesk }),
+          ...(canViewKpi !== undefined && { canViewKpi }),
+          ...(canViewKpiTimesheet !== undefined && { canViewKpiTimesheet }),
         },
       });
       
@@ -200,7 +209,10 @@ export default {
     await checkSuperAdmin(ctx, strapi);
     
     const { id } = ctx.params;
-    const { firstName, lastName, role, department, blocked, moduleAccess } = ctx.request.body as any;
+    const {
+      firstName, lastName, role, department, blocked, moduleAccess,
+      canViewDashboard, canViewBoard, canViewTable, canViewHelpdesk, canViewKpi, canViewKpiTimesheet,
+    } = ctx.request.body as any;
 
     try {
       const updateData: any = {};
@@ -211,6 +223,12 @@ export default {
       if (department !== undefined) updateData.department = department;
       if (blocked !== undefined) updateData.blocked = blocked;
       if (moduleAccess !== undefined) updateData.moduleAccess = moduleAccess;
+      if (canViewDashboard !== undefined) updateData.canViewDashboard = canViewDashboard;
+      if (canViewBoard !== undefined) updateData.canViewBoard = canViewBoard;
+      if (canViewTable !== undefined) updateData.canViewTable = canViewTable;
+      if (canViewHelpdesk !== undefined) updateData.canViewHelpdesk = canViewHelpdesk;
+      if (canViewKpi !== undefined) updateData.canViewKpi = canViewKpi;
+      if (canViewKpiTimesheet !== undefined) updateData.canViewKpiTimesheet = canViewKpiTimesheet;
       
       const user = await strapi.entityService.update('plugin::users-permissions.user', id, {
         data: updateData,
@@ -311,6 +329,7 @@ export default {
     const {
       username, email, firstName, lastName,
       password, role, department, moduleAccess,
+      canViewDashboard, canViewBoard, canViewTable, canViewHelpdesk, canViewKpi, canViewKpiTimesheet,
     } = ctx.request.body as any;
 
     if (!username || !email) {
@@ -420,6 +439,12 @@ export default {
             moduleAccess: moduleAccess || [],
             confirmed: true,
             provider: 'keycloak',
+            ...(canViewDashboard !== undefined && { canViewDashboard }),
+            ...(canViewBoard !== undefined && { canViewBoard }),
+            ...(canViewTable !== undefined && { canViewTable }),
+            ...(canViewHelpdesk !== undefined && { canViewHelpdesk }),
+            ...(canViewKpi !== undefined && { canViewKpi }),
+            ...(canViewKpiTimesheet !== undefined && { canViewKpiTimesheet }),
           },
         });
       }

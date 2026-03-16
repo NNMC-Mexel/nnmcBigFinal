@@ -72,6 +72,12 @@ export default function AdminPanelPage() {
     generatePasswordAuto: true,
     createInKeycloak: true,
     moduleAccess: [] as string[],
+    canViewDashboard: true,
+    canViewBoard: true,
+    canViewTable: true,
+    canViewHelpdesk: true,
+    canViewKpi: true,
+    canViewKpiTimesheet: false,
   });
 
   useEffect(() => {
@@ -131,6 +137,15 @@ export default function AdminPanelPage() {
     try {
       let result: { generatedPassword?: string | null };
 
+      const featureFlags = {
+        canViewDashboard: formData.canViewDashboard,
+        canViewBoard: formData.canViewBoard,
+        canViewTable: formData.canViewTable,
+        canViewHelpdesk: formData.canViewHelpdesk,
+        canViewKpi: formData.canViewKpi,
+        canViewKpiTimesheet: formData.canViewKpiTimesheet,
+      };
+
       if (formData.createInKeycloak) {
         result = await adminUsersApi.createKeycloakUser({
           email: formData.email,
@@ -141,6 +156,7 @@ export default function AdminPanelPage() {
           role: formData.role,
           department: formData.department,
           moduleAccess: formData.moduleAccess,
+          ...featureFlags,
         });
       } else {
         result = await adminUsersApi.create({
@@ -153,6 +169,7 @@ export default function AdminPanelPage() {
           department: formData.department,
           blocked: formData.blocked,
           generatePasswordAuto: formData.generatePasswordAuto,
+          ...featureFlags,
         });
       }
 
@@ -179,6 +196,13 @@ export default function AdminPanelPage() {
         role: formData.role,
         department: formData.department,
         blocked: formData.blocked,
+        moduleAccess: formData.moduleAccess,
+        canViewDashboard: formData.canViewDashboard,
+        canViewBoard: formData.canViewBoard,
+        canViewTable: formData.canViewTable,
+        canViewHelpdesk: formData.canViewHelpdesk,
+        canViewKpi: formData.canViewKpi,
+        canViewKpiTimesheet: formData.canViewKpiTimesheet,
       });
       
       setShowEditModal(false);
@@ -269,6 +293,12 @@ export default function AdminPanelPage() {
       generatePasswordAuto: true,
       createInKeycloak: true,
       moduleAccess: [],
+      canViewDashboard: true,
+      canViewBoard: true,
+      canViewTable: true,
+      canViewHelpdesk: true,
+      canViewKpi: true,
+      canViewKpiTimesheet: false,
     });
   };
 
@@ -286,6 +316,12 @@ export default function AdminPanelPage() {
       generatePasswordAuto: true,
       createInKeycloak: true,
       moduleAccess: Array.isArray(user.moduleAccess) ? user.moduleAccess : [],
+      canViewDashboard: user.canViewDashboard !== false,
+      canViewBoard: user.canViewBoard !== false,
+      canViewTable: user.canViewTable !== false,
+      canViewHelpdesk: user.canViewHelpdesk !== false,
+      canViewKpi: user.canViewKpi !== false,
+      canViewKpiTimesheet: user.canViewKpiTimesheet === true,
     });
     setShowEditModal(true);
   };
@@ -572,30 +608,51 @@ export default function AdminPanelPage() {
           <div>
             <h3 className="font-semibold text-slate-800 flex items-center gap-2">
               <Settings2 className="w-5 h-5 text-primary-500" />
-              Доступы к модулям
+              Доступы и видимость разделов
             </h3>
-            <p className="text-sm text-slate-500 mt-1">Управление доступом пользователей к сервисам</p>
+            <p className="text-sm text-slate-500 mt-1">Управление доступом пользователей к разделам и сервисам</p>
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-sm text-slate-500 border-b border-slate-200">
-                <th className="px-4 py-3 font-medium">Пользователь</th>
-                <th className="px-4 py-3 font-medium text-center">Конференц-залы</th>
-                <th className="px-4 py-3 font-medium text-center">Журнал приёмной</th>
+              <tr className="text-left text-xs text-slate-500 border-b border-slate-200">
+                <th className="px-3 py-2 font-medium">Пользователь</th>
+                <th className="px-2 py-2 font-medium text-center">Дашборд</th>
+                <th className="px-2 py-2 font-medium text-center">Канбан</th>
+                <th className="px-2 py-2 font-medium text-center">Таблица</th>
+                <th className="px-2 py-2 font-medium text-center">Helpdesk</th>
+                <th className="px-2 py-2 font-medium text-center">KPI</th>
+                <th className="px-2 py-2 font-medium text-center">KPI Табель</th>
+                <th className="px-2 py-2 font-medium text-center">Конф-залы</th>
+                <th className="px-2 py-2 font-medium text-center">Журнал</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                     Нет пользователей
                   </td>
                 </tr>
               ) : (
                 users.map((u) => {
                   const access: string[] = Array.isArray(u.moduleAccess) ? u.moduleAccess : [];
+
+                  const toggleFeature = async (field: string, currentValue: boolean | undefined) => {
+                    const newValue = !(currentValue !== false);
+                    try {
+                      await adminUsersApi.update(u.id, { [field]: newValue });
+                      setUsers((prev) =>
+                        prev.map((usr) =>
+                          usr.id === u.id ? { ...usr, [field]: newValue } : usr
+                        )
+                      );
+                    } catch (err: any) {
+                      alert(err.response?.data?.error?.message || 'Ошибка обновления');
+                    }
+                  };
+
                   const toggleModule = async (mod: string) => {
                     const newAccess = access.includes(mod)
                       ? access.filter((m) => m !== mod)
@@ -611,19 +668,37 @@ export default function AdminPanelPage() {
                       alert(err.response?.data?.error?.message || 'Ошибка обновления доступа');
                     }
                   };
+
                   return (
                     <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-slate-800">
                             {u.firstName || u.lastName
                               ? `${u.firstName || ''} ${u.lastName || ''}`.trim()
                               : u.username}
                           </span>
-                          <span className="text-sm text-slate-400">@{u.username}</span>
+                          <span className="text-xs text-slate-400">@{u.username}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      {([
+                        { field: 'canViewDashboard', val: u.canViewDashboard },
+                        { field: 'canViewBoard', val: u.canViewBoard },
+                        { field: 'canViewTable', val: u.canViewTable },
+                        { field: 'canViewHelpdesk', val: u.canViewHelpdesk },
+                        { field: 'canViewKpi', val: u.canViewKpi },
+                        { field: 'canViewKpiTimesheet', val: u.canViewKpiTimesheet },
+                      ] as const).map(({ field, val }) => (
+                        <td key={field} className="px-2 py-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={field === 'canViewKpiTimesheet' ? val === true : val !== false}
+                            onChange={() => toggleFeature(field, val)}
+                            className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                          />
+                        </td>
+                      ))}
+                      <td className="px-2 py-2 text-center">
                         <input
                           type="checkbox"
                           checked={access.includes('conf')}
@@ -631,7 +706,7 @@ export default function AdminPanelPage() {
                           className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
                         />
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-2 py-2 text-center">
                         <input
                           type="checkbox"
                           checked={access.includes('journal')}
@@ -806,36 +881,51 @@ export default function AdminPanelPage() {
           </div>
 
           <div className="p-3 bg-slate-50 rounded-lg space-y-2">
+            <p className="text-sm font-medium text-slate-700">Видимость разделов</p>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { key: 'canViewDashboard', label: 'Дашборд' },
+                { key: 'canViewBoard', label: 'Канбан' },
+                { key: 'canViewTable', label: 'Таблица' },
+                { key: 'canViewHelpdesk', label: 'Helpdesk' },
+                { key: 'canViewKpi', label: 'KPI' },
+                { key: 'canViewKpiTimesheet', label: 'KPI Табель' },
+              ] as const).map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData[key]}
+                    onChange={(e) => setFormData({ ...formData, [key]: e.target.checked })}
+                    className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-slate-700">{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-3 bg-slate-50 rounded-lg space-y-2">
             <p className="text-sm font-medium text-slate-700">Доступ к модулям</p>
             <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.moduleAccess.includes('conf')}
-                  onChange={(e) => {
-                    const m = e.target.checked
-                      ? [...formData.moduleAccess, 'conf']
-                      : formData.moduleAccess.filter((x) => x !== 'conf');
-                    setFormData({ ...formData, moduleAccess: m });
-                  }}
-                  className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-sm text-slate-700">Конференц-залы</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.moduleAccess.includes('journal')}
-                  onChange={(e) => {
-                    const m = e.target.checked
-                      ? [...formData.moduleAccess, 'journal']
-                      : formData.moduleAccess.filter((x) => x !== 'journal');
-                    setFormData({ ...formData, moduleAccess: m });
-                  }}
-                  className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-sm text-slate-700">Журнал приёмной</span>
-              </label>
+              {([
+                { mod: 'conf', label: 'Конференц-залы' },
+                { mod: 'journal', label: 'Журнал приёмной' },
+              ] as const).map(({ mod, label }) => (
+                <label key={mod} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.moduleAccess.includes(mod)}
+                    onChange={(e) => {
+                      const m = e.target.checked
+                        ? [...formData.moduleAccess, mod]
+                        : formData.moduleAccess.filter((x) => x !== mod);
+                      setFormData({ ...formData, moduleAccess: m });
+                    }}
+                    className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-slate-700">{label}</span>
+                </label>
+              ))}
             </div>
           </div>
 
@@ -895,6 +985,57 @@ export default function AdminPanelPage() {
             />
             <span className="text-sm text-slate-700">Заблокировать аккаунт</span>
           </label>
+
+          {/* Feature flags */}
+          <div className="p-3 bg-slate-50 rounded-lg space-y-2">
+            <p className="text-sm font-medium text-slate-700">Видимость разделов</p>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { key: 'canViewDashboard', label: 'Дашборд' },
+                { key: 'canViewBoard', label: 'Канбан' },
+                { key: 'canViewTable', label: 'Таблица' },
+                { key: 'canViewHelpdesk', label: 'Helpdesk' },
+                { key: 'canViewKpi', label: 'KPI' },
+                { key: 'canViewKpiTimesheet', label: 'KPI Табель' },
+              ] as const).map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData[key]}
+                    onChange={(e) => setFormData({ ...formData, [key]: e.target.checked })}
+                    className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-slate-700">{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Module access */}
+          <div className="p-3 bg-slate-50 rounded-lg space-y-2">
+            <p className="text-sm font-medium text-slate-700">Доступ к модулям</p>
+            <div className="flex gap-4">
+              {([
+                { mod: 'conf', label: 'Конференц-залы' },
+                { mod: 'journal', label: 'Журнал приёмной' },
+              ] as const).map(({ mod, label }) => (
+                <label key={mod} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.moduleAccess.includes(mod)}
+                    onChange={(e) => {
+                      const m = e.target.checked
+                        ? [...formData.moduleAccess, mod]
+                        : formData.moduleAccess.filter((x) => x !== mod);
+                      setFormData({ ...formData, moduleAccess: m });
+                    }}
+                    className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-slate-700">{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
 
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="secondary" onClick={() => { setShowEditModal(false); setSelectedUser(null); }}>
