@@ -227,26 +227,23 @@ export const useUserRole = () => {
   const hasProjectDepartmentAccess =
     isSuperAdmin || isAdmin || PROJECT_DEPARTMENTS.includes(departmentKey || '');
 
-  const featureDashboard = resolveFeatureFlag(user?.canViewDashboard, true);
-  const featureBoard = resolveFeatureFlag(user?.canViewBoard, true);
-  const featureTable = resolveFeatureFlag(user?.canViewTable, true);
-  const featureHelpdesk = resolveFeatureFlag(user?.canViewHelpdesk, true);
-  const featureKpi = resolveFeatureFlag(user?.canViewKpi, true);
+  // Если флаг явно задан (true/false) — он имеет приоритет.
+  // Если флаг не задан (undefined/null) — используем проверку по отделу как fallback.
+  const resolveAccess = (flag: boolean | undefined, departmentCheck: boolean) =>
+    typeof flag === 'boolean' ? flag : departmentCheck;
 
-  const canViewDashboard = featureDashboard && hasProjectDepartmentAccess;
-  const canViewBoard = featureBoard && hasProjectDepartmentAccess;
-  const canViewTable = featureTable && hasProjectDepartmentAccess;
-  const canViewHelpdesk = featureHelpdesk && hasHelpdeskDepartmentAccess;
-  const canViewKpi = featureKpi && hasHelpdeskDepartmentAccess;
-  const canViewKpiIt = canViewKpi && (isSuperAdmin || isAdmin || departmentKey === 'IT');
-  const canViewKpiMedical = canViewKpi && (isSuperAdmin || isAdmin || departmentKey === 'MEDICAL_EQUIPMENT');
-  const canViewKpiEngineering = canViewKpi && (isSuperAdmin || isAdmin || departmentKey === 'ENGINEERING');
+  const canViewDashboard = resolveAccess(user?.canViewDashboard, hasProjectDepartmentAccess);
+  const canViewBoard = resolveAccess(user?.canViewBoard, hasProjectDepartmentAccess);
+  const canViewTable = resolveAccess(user?.canViewTable, hasProjectDepartmentAccess);
+  const canViewHelpdesk = resolveAccess(user?.canViewHelpdesk, hasHelpdeskDepartmentAccess);
+  const canViewKpi = resolveAccess(user?.canViewKpi, hasHelpdeskDepartmentAccess);
+  const canViewKpiIt = canViewKpi && (isSuperAdmin || isAdmin || departmentKey === 'IT' || user?.canViewKpi === true);
+  const canViewKpiMedical = canViewKpi && (isSuperAdmin || isAdmin || departmentKey === 'MEDICAL_EQUIPMENT' || user?.canViewKpi === true);
+  const canViewKpiEngineering = canViewKpi && (isSuperAdmin || isAdmin || departmentKey === 'ENGINEERING' || user?.canViewKpi === true);
   const canViewProjects = canViewDashboard || canViewBoard || canViewTable;
 
-  // KPI Табель (kpiServer) — отдельный модуль расчёта KPI по табелям
-  // Доступ: явный флаг на пользователе ИЛИ Admin/SuperAdmin
-  const featureKpiTimesheet = resolveFeatureFlag(user?.canViewKpiTimesheet as boolean | undefined, false);
-  const canViewKpiTimesheet = isSuperAdmin || isAdmin || featureKpiTimesheet;
+  // KPI Табель — явный флаг или Admin/SuperAdmin
+  const canViewKpiTimesheet = isSuperAdmin || isAdmin || user?.canViewKpiTimesheet === true;
 
   return {
     isAdmin,
