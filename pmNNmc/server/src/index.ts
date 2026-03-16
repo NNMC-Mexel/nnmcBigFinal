@@ -77,6 +77,8 @@ async function setupPermissions(strapi: any) {
     'api::ticket.ticket': ['find', 'findOne', 'findFiltered', 'create', 'update', 'delete', 'reassign', 'assignableUsers', 'publicCategories'],
     'api::service-group.service-group': ['find', 'findOne'],
     'api::ticket-category.ticket-category': ['find', 'findOne'],
+    // News
+    'api::news-post.news-post': ['find', 'findOne', 'create', 'update', 'delete'],
     // Role config
     'api::role-config.role-config': ['find', 'update'],
   };
