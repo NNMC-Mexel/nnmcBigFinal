@@ -100,6 +100,12 @@
       "type": "boolean",
       "default": false
     },
+    "canDeleteProject": {
+      "type": "boolean"
+    },
+    "canDragProjects": {
+      "type": "boolean"
+    },
     "moduleAccess": {
       "type": "json",
       "default": []

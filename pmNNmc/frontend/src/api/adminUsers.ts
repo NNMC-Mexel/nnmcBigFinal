@@ -29,6 +29,23 @@ export interface AdminUser {
   canViewHelpdesk?: boolean;
   canViewKpi?: boolean;
   canViewKpiTimesheet?: boolean;
+  canDeleteProject?: boolean;
+  canDragProjects?: boolean;
+}
+
+export interface RoleConfig {
+  id: number;
+  roleName: string;
+  roleId?: number;
+  canViewDashboard: boolean;
+  canViewBoard: boolean;
+  canViewTable: boolean;
+  canViewHelpdesk: boolean;
+  canViewKpi: boolean;
+  canViewKpiTimesheet: boolean;
+  canDeleteProject: boolean;
+  canDragProjects: boolean;
+  defaultModuleAccess: string[];
 }
 
 export interface Role {
@@ -92,6 +109,8 @@ export const adminUsersApi = {
     canViewHelpdesk?: boolean;
     canViewKpi?: boolean;
     canViewKpiTimesheet?: boolean;
+    canDeleteProject?: boolean;
+    canDragProjects?: boolean;
   }): Promise<AdminUser> => {
     const response = await client.put(`/admin-users/${id}`, data);
     return response.data.data;
@@ -136,5 +155,16 @@ export const adminUsersApi = {
   }): Promise<{ data: AdminUser; generatedPassword?: string; message: string }> => {
     const response = await client.post('/admin-users/create-keycloak', data);
     return response.data;
+  },
+
+  // Role configs
+  getRoleConfigs: async (): Promise<RoleConfig[]> => {
+    const response = await client.get('/role-configs');
+    return response.data.data;
+  },
+
+  updateRoleConfig: async (id: number, data: Partial<Omit<RoleConfig, 'id' | 'roleName' | 'roleId'>>): Promise<RoleConfig> => {
+    const response = await client.put(`/role-configs/${id}`, data);
+    return response.data.data;
   },
 };

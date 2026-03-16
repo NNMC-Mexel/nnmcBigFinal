@@ -1,0 +1,59 @@
+{
+  "kind": "collectionType",
+  "collectionName": "role_configs",
+  "info": {
+    "singularName": "role-config",
+    "pluralName": "role-configs",
+    "displayName": "RoleConfig",
+    "description": "Per-role default permission settings"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "roleName": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "roleId": {
+      "type": "integer"
+    },
+    "canViewDashboard": {
+      "type": "boolean",
+      "default": true
+    },
+    "canViewBoard": {
+      "type": "boolean",
+      "default": true
+    },
+    "canViewTable": {
+      "type": "boolean",
+      "default": true
+    },
+    "canViewHelpdesk": {
+      "type": "boolean",
+      "default": true
+    },
+    "canViewKpi": {
+      "type": "boolean",
+      "default": true
+    },
+    "canViewKpiTimesheet": {
+      "type": "boolean",
+      "default": false
+    },
+    "canDeleteProject": {
+      "type": "boolean",
+      "default": false
+    },
+    "canDragProjects": {
+      "type": "boolean",
+      "default": false
+    },
+    "defaultModuleAccess": {
+      "type": "json",
+      "default": []
+    }
+  }
+}

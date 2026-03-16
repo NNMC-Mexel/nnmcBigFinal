@@ -212,6 +212,7 @@ export default {
     const {
       firstName, lastName, role, department, blocked, moduleAccess,
       canViewDashboard, canViewBoard, canViewTable, canViewHelpdesk, canViewKpi, canViewKpiTimesheet,
+      canDeleteProject, canDragProjects,
     } = ctx.request.body as any;
 
     try {
@@ -229,6 +230,8 @@ export default {
       if (canViewHelpdesk !== undefined) updateData.canViewHelpdesk = canViewHelpdesk;
       if (canViewKpi !== undefined) updateData.canViewKpi = canViewKpi;
       if (canViewKpiTimesheet !== undefined) updateData.canViewKpiTimesheet = canViewKpiTimesheet;
+      if (canDeleteProject !== undefined) updateData.canDeleteProject = canDeleteProject;
+      if (canDragProjects !== undefined) updateData.canDragProjects = canDragProjects;
       
       const user = await strapi.entityService.update('plugin::users-permissions.user', id, {
         data: updateData,

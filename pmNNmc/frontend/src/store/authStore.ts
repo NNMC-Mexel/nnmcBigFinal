@@ -179,13 +179,14 @@ export const useUserRole = () => {
   
   // === ПРАВА ДОСТУПА ===
 
-  // SuperAdmin имеет полный доступ ко всему
-  const resolveFeatureFlag = (value: boolean | undefined, fallback = true) =>
-    typeof value === 'boolean' ? value : fallback;
+  // Если флаг явно задан (true/false) — он имеет приоритет.
+  // Если флаг не задан (undefined/null) — используем fallback.
+  const resolveAccess = (flag: boolean | undefined, fallback: boolean) =>
+    typeof flag === 'boolean' ? flag : fallback;
 
   // Может редактировать проект (описание, даты, приоритет, статус)
   const canEditProject = isSuperAdmin || isAdmin || isLead || isMember;
-  const canDeleteProject = isSuperAdmin || isAdmin || isLead;
+  const canDeleteProject = resolveAccess(user?.canDeleteProject, isSuperAdmin || isAdmin || isLead);
 
   // Может назначать ответственных пользователей
   const canAssignResponsible = isSuperAdmin || isAdmin || isLead || isMember;
@@ -196,17 +197,17 @@ export const useUserRole = () => {
   // Может удалять задачи
   const canDeleteTasks = isSuperAdmin || isAdmin || isLead || isMember;
 
-  // Может менять статус задач (выполнено/не выполнено) - все пользователи как исполнители
+  // Может менять статус задач
   const canChangeTaskStatus = true;
 
   // Может добавлять записи совещаний
   const canAddMeetingNotes = true;
 
-  // Может редактировать/удалять записи совещаний (свои или все для руководителей)
+  // Может редактировать/удалять записи совещаний
   const canManageMeetingNotes = isSuperAdmin || isAdmin || isLead || isMember;
 
   // Может перетаскивать проекты на канбане
-  const canDragProjects = (isSuperAdmin || isAdmin || isLead) && resolveFeatureFlag(user?.canViewBoard, true);
+  const canDragProjects = resolveAccess(user?.canDragProjects, isSuperAdmin || isAdmin || isLead);
 
   // Может работать с документами
   const canManageDocuments = isSuperAdmin || isAdmin || isLead || isMember;
@@ -226,11 +227,6 @@ export const useUserRole = () => {
   const PROJECT_DEPARTMENTS = ['IT', 'DIGITALIZATION'];
   const hasProjectDepartmentAccess =
     isSuperAdmin || isAdmin || PROJECT_DEPARTMENTS.includes(departmentKey || '');
-
-  // Если флаг явно задан (true/false) — он имеет приоритет.
-  // Если флаг не задан (undefined/null) — используем проверку по отделу как fallback.
-  const resolveAccess = (flag: boolean | undefined, departmentCheck: boolean) =>
-    typeof flag === 'boolean' ? flag : departmentCheck;
 
   const canViewDashboard = resolveAccess(user?.canViewDashboard, hasProjectDepartmentAccess);
   const canViewBoard = resolveAccess(user?.canViewBoard, hasProjectDepartmentAccess);

@@ -31,6 +31,8 @@ export interface User {
   canViewHelpdesk?: boolean;
   canViewKpi?: boolean;
   canViewKpiTimesheet?: boolean;
+  canDeleteProject?: boolean;
+  canDragProjects?: boolean;
   moduleAccess?: string[];
   blocked: boolean;
   confirmed: boolean;

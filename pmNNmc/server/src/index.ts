@@ -33,6 +33,9 @@ export default {
 
     // Always ensure permissions are set correctly
     await setupPermissions(strapi);
+
+    // Seed role configs for permission management
+    await seedRoleConfigs(strapi);
   },
 };
 
@@ -74,6 +77,8 @@ async function setupPermissions(strapi: any) {
     'api::ticket.ticket': ['find', 'findOne', 'findFiltered', 'create', 'update', 'delete', 'reassign', 'assignableUsers', 'publicCategories'],
     'api::service-group.service-group': ['find', 'findOne'],
     'api::ticket-category.ticket-category': ['find', 'findOne'],
+    // Role config
+    'api::role-config.role-config': ['find', 'update'],
   };
 
   // Apply public permissions
@@ -143,6 +148,63 @@ async function normalizeTicketCategoryDefaultAssignees(strapi: any) {
     }
   } catch (err) {
     console.error('Failed to normalize ticket category assignees:', err);
+  }
+}
+
+async function seedRoleConfigs(strapi: any) {
+  console.log('🔧 Checking role configs...');
+
+  const roles = await strapi.entityService.findMany('plugin::users-permissions.role');
+  const existingConfigs = await strapi.entityService.findMany('api::role-config.role-config');
+  const existingNames = new Set(existingConfigs.map((c: any) => c.roleName));
+
+  const defaults: Record<string, any> = {
+    superadmin: {
+      canViewDashboard: true, canViewBoard: true, canViewTable: true,
+      canViewHelpdesk: true, canViewKpi: true, canViewKpiTimesheet: true,
+      canDeleteProject: true, canDragProjects: true,
+      defaultModuleAccess: ['conf', 'journal'],
+    },
+    admin: {
+      canViewDashboard: true, canViewBoard: true, canViewTable: true,
+      canViewHelpdesk: true, canViewKpi: true, canViewKpiTimesheet: true,
+      canDeleteProject: true, canDragProjects: true,
+      defaultModuleAccess: ['conf', 'journal'],
+    },
+    lead: {
+      canViewDashboard: true, canViewBoard: true, canViewTable: true,
+      canViewHelpdesk: true, canViewKpi: true, canViewKpiTimesheet: false,
+      canDeleteProject: true, canDragProjects: true,
+      defaultModuleAccess: [],
+    },
+    member: {
+      canViewDashboard: true, canViewBoard: true, canViewTable: true,
+      canViewHelpdesk: true, canViewKpi: true, canViewKpiTimesheet: false,
+      canDeleteProject: false, canDragProjects: false,
+      defaultModuleAccess: [],
+    },
+    authenticated: {
+      canViewDashboard: false, canViewBoard: false, canViewTable: false,
+      canViewHelpdesk: false, canViewKpi: false, canViewKpiTimesheet: false,
+      canDeleteProject: false, canDragProjects: false,
+      defaultModuleAccess: [],
+    },
+  };
+
+  for (const role of roles) {
+    if (existingNames.has(role.name)) continue;
+
+    const roleType = (role.type || '').toLowerCase();
+    const defaultConfig = defaults[roleType] || defaults.authenticated;
+
+    await strapi.entityService.create('api::role-config.role-config', {
+      data: {
+        roleName: role.name,
+        roleId: role.id,
+        ...defaultConfig,
+      },
+    });
+    console.log(`  ✅ Created role config for: ${role.name}`);
   }
 }
 

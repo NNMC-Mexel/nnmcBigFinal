@@ -19,7 +19,7 @@ import {
   RotateCcw,
   Settings2,
 } from 'lucide-react';
-import { adminUsersApi, AdminUser, Role } from '../../api/adminUsers';
+import { adminUsersApi, AdminUser, Role, RoleConfig } from '../../api/adminUsers';
 import { projectsApi } from '../../api/projects';
 import type { Project } from '../../types';
 import { useProjectStore } from '../../store/projectStore';
@@ -38,6 +38,7 @@ export default function AdminPanelPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [roleConfigs, setRoleConfigs] = useState<RoleConfig[]>([]);
   const [deletedProjects, setDeletedProjects] = useState<Project[]>([]);
   const [isDeletedProjectsLoading, setIsDeletedProjectsLoading] = useState(false);
   const [showDeleteProjectConfirm, setShowDeleteProjectConfirm] = useState(false);
@@ -78,6 +79,8 @@ export default function AdminPanelPage() {
     canViewHelpdesk: true,
     canViewKpi: true,
     canViewKpiTimesheet: false,
+    canDeleteProject: true,
+    canDragProjects: true,
   });
 
   useEffect(() => {
@@ -85,6 +88,7 @@ export default function AdminPanelPage() {
     loadRoles();
     loadUsers();
     loadDeletedProjects();
+    loadRoleConfigs();
   }, []);
 
   useEffect(() => {
@@ -133,6 +137,36 @@ export default function AdminPanelPage() {
     }
   };
 
+  const loadRoleConfigs = async () => {
+    try {
+      const data = await adminUsersApi.getRoleConfigs();
+      setRoleConfigs(data);
+    } catch (error) {
+      console.error('Failed to load role configs:', error);
+    }
+  };
+
+  // Apply role config defaults when role changes
+  const applyRoleDefaults = (roleId: number) => {
+    const role = roles.find((r) => r.id === roleId);
+    if (!role) return;
+    const config = roleConfigs.find((c) => c.roleName === role.name);
+    if (!config) return;
+    setFormData((prev) => ({
+      ...prev,
+      role: roleId,
+      canViewDashboard: config.canViewDashboard,
+      canViewBoard: config.canViewBoard,
+      canViewTable: config.canViewTable,
+      canViewHelpdesk: config.canViewHelpdesk,
+      canViewKpi: config.canViewKpi,
+      canViewKpiTimesheet: config.canViewKpiTimesheet,
+      canDeleteProject: config.canDeleteProject,
+      canDragProjects: config.canDragProjects,
+      moduleAccess: config.defaultModuleAccess || [],
+    }));
+  };
+
   const handleCreateUser = async () => {
     try {
       let result: { generatedPassword?: string | null };
@@ -144,6 +178,8 @@ export default function AdminPanelPage() {
         canViewHelpdesk: formData.canViewHelpdesk,
         canViewKpi: formData.canViewKpi,
         canViewKpiTimesheet: formData.canViewKpiTimesheet,
+        canDeleteProject: formData.canDeleteProject,
+        canDragProjects: formData.canDragProjects,
       };
 
       if (formData.createInKeycloak) {
@@ -203,8 +239,10 @@ export default function AdminPanelPage() {
         canViewHelpdesk: formData.canViewHelpdesk,
         canViewKpi: formData.canViewKpi,
         canViewKpiTimesheet: formData.canViewKpiTimesheet,
+        canDeleteProject: formData.canDeleteProject,
+        canDragProjects: formData.canDragProjects,
       });
-      
+
       setShowEditModal(false);
       setSelectedUser(null);
       resetForm();
@@ -299,6 +337,8 @@ export default function AdminPanelPage() {
       canViewHelpdesk: true,
       canViewKpi: true,
       canViewKpiTimesheet: false,
+      canDeleteProject: true,
+      canDragProjects: true,
     });
   };
 
@@ -322,6 +362,8 @@ export default function AdminPanelPage() {
       canViewHelpdesk: user.canViewHelpdesk !== false,
       canViewKpi: user.canViewKpi !== false,
       canViewKpiTimesheet: user.canViewKpiTimesheet === true,
+      canDeleteProject: user.canDeleteProject !== false,
+      canDragProjects: user.canDragProjects !== false,
     });
     setShowEditModal(true);
   };
@@ -624,6 +666,8 @@ export default function AdminPanelPage() {
                 <th className="px-2 py-2 font-medium text-center">Helpdesk</th>
                 <th className="px-2 py-2 font-medium text-center">KPI</th>
                 <th className="px-2 py-2 font-medium text-center">KPI Табель</th>
+                <th className="px-2 py-2 font-medium text-center">Удаление</th>
+                <th className="px-2 py-2 font-medium text-center">Перетаск.</th>
                 <th className="px-2 py-2 font-medium text-center">Конф-залы</th>
                 <th className="px-2 py-2 font-medium text-center">Журнал</th>
               </tr>
@@ -631,7 +675,7 @@ export default function AdminPanelPage() {
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={11} className="px-4 py-8 text-center text-slate-500">
                     Нет пользователей
                   </td>
                 </tr>
@@ -688,6 +732,8 @@ export default function AdminPanelPage() {
                         { field: 'canViewHelpdesk', val: u.canViewHelpdesk },
                         { field: 'canViewKpi', val: u.canViewKpi },
                         { field: 'canViewKpiTimesheet', val: u.canViewKpiTimesheet },
+                        { field: 'canDeleteProject', val: u.canDeleteProject },
+                        { field: 'canDragProjects', val: u.canDragProjects },
                       ] as const).map(({ field, val }) => (
                         <td key={field} className="px-2 py-2 text-center">
                           <input
@@ -721,6 +767,124 @@ export default function AdminPanelPage() {
             </tbody>
           </table>
         </div>
+      </Card>
+
+      {/* Role Configs */}
+      <Card>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-red-500" />
+              Настройки ролей
+            </h3>
+            <p className="text-sm text-slate-500 mt-1">Права по умолчанию для каждой роли</p>
+          </div>
+          <Button variant="ghost" onClick={loadRoleConfigs} icon={<RefreshCw className="w-4 h-4" />}>
+            Обновить
+          </Button>
+        </div>
+        {roleConfigs.length === 0 ? (
+          <p className="text-center py-8 text-slate-500">Конфигурации ролей не найдены. Перезапустите сервер для инициализации.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-500 border-b border-slate-200">
+                  <th className="px-3 py-2 font-medium">Роль</th>
+                  <th className="px-2 py-2 font-medium text-center">Дашборд</th>
+                  <th className="px-2 py-2 font-medium text-center">Канбан</th>
+                  <th className="px-2 py-2 font-medium text-center">Таблица</th>
+                  <th className="px-2 py-2 font-medium text-center">Helpdesk</th>
+                  <th className="px-2 py-2 font-medium text-center">KPI</th>
+                  <th className="px-2 py-2 font-medium text-center">KPI Табель</th>
+                  <th className="px-2 py-2 font-medium text-center">Удаление</th>
+                  <th className="px-2 py-2 font-medium text-center">Перетаск.</th>
+                  <th className="px-2 py-2 font-medium text-center">Конф-залы</th>
+                  <th className="px-2 py-2 font-medium text-center">Журнал</th>
+                </tr>
+              </thead>
+              <tbody>
+                {roleConfigs.map((rc) => {
+                  const toggleRoleFlag = async (field: string, currentValue: boolean) => {
+                    const newValue = !currentValue;
+                    try {
+                      await adminUsersApi.updateRoleConfig(rc.id, { [field]: newValue });
+                      setRoleConfigs((prev) =>
+                        prev.map((c) => (c.id === rc.id ? { ...c, [field]: newValue } : c))
+                      );
+                    } catch (err: any) {
+                      alert(err.response?.data?.error?.message || 'Ошибка обновления');
+                    }
+                  };
+
+                  const toggleRoleModule = async (mod: string) => {
+                    const access = rc.defaultModuleAccess || [];
+                    const newAccess = access.includes(mod)
+                      ? access.filter((m) => m !== mod)
+                      : [...access, mod];
+                    try {
+                      await adminUsersApi.updateRoleConfig(rc.id, { defaultModuleAccess: newAccess });
+                      setRoleConfigs((prev) =>
+                        prev.map((c) => (c.id === rc.id ? { ...c, defaultModuleAccess: newAccess } : c))
+                      );
+                    } catch (err: any) {
+                      alert(err.response?.data?.error?.message || 'Ошибка обновления');
+                    }
+                  };
+
+                  return (
+                    <tr key={rc.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                      <td className="px-3 py-2">
+                        <Badge variant={
+                          rc.roleName.toLowerCase().includes('admin') ? 'danger' :
+                          rc.roleName.toLowerCase().includes('lead') ? 'warning' : 'default'
+                        }>
+                          <Shield className="w-3 h-3 mr-1" />
+                          {rc.roleName}
+                        </Badge>
+                      </td>
+                      {([
+                        { field: 'canViewDashboard', val: rc.canViewDashboard },
+                        { field: 'canViewBoard', val: rc.canViewBoard },
+                        { field: 'canViewTable', val: rc.canViewTable },
+                        { field: 'canViewHelpdesk', val: rc.canViewHelpdesk },
+                        { field: 'canViewKpi', val: rc.canViewKpi },
+                        { field: 'canViewKpiTimesheet', val: rc.canViewKpiTimesheet },
+                        { field: 'canDeleteProject', val: rc.canDeleteProject },
+                        { field: 'canDragProjects', val: rc.canDragProjects },
+                      ] as const).map(({ field, val }) => (
+                        <td key={field} className="px-2 py-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={val}
+                            onChange={() => toggleRoleFlag(field, val)}
+                            className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                          />
+                        </td>
+                      ))}
+                      <td className="px-2 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={(rc.defaultModuleAccess || []).includes('conf')}
+                          onChange={() => toggleRoleModule('conf')}
+                          className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={(rc.defaultModuleAccess || []).includes('journal')}
+                          onChange={() => toggleRoleModule('journal')}
+                          className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       {/* Deleted Projects */}
@@ -838,7 +1002,7 @@ export default function AdminPanelPage() {
               label="Роль"
               options={roleSelectOptions}
               value={String(formData.role)}
-              onChange={(e) => setFormData({ ...formData, role: parseInt(e.target.value) })}
+              onChange={(e) => applyRoleDefaults(parseInt(e.target.value))}
             />
             <Select
               label="Отдел"
@@ -890,6 +1054,8 @@ export default function AdminPanelPage() {
                 { key: 'canViewHelpdesk', label: 'Helpdesk' },
                 { key: 'canViewKpi', label: 'KPI' },
                 { key: 'canViewKpiTimesheet', label: 'KPI Табель' },
+                { key: 'canDeleteProject', label: 'Удаление проектов' },
+                { key: 'canDragProjects', label: 'Перетаскивание' },
               ] as const).map(({ key, label }) => (
                 <label key={key} className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -966,7 +1132,7 @@ export default function AdminPanelPage() {
               label="Роль"
               options={roleSelectOptions}
               value={String(formData.role)}
-              onChange={(e) => setFormData({ ...formData, role: parseInt(e.target.value) })}
+              onChange={(e) => applyRoleDefaults(parseInt(e.target.value))}
             />
             <Select
               label="Отдел"
@@ -997,6 +1163,8 @@ export default function AdminPanelPage() {
                 { key: 'canViewHelpdesk', label: 'Helpdesk' },
                 { key: 'canViewKpi', label: 'KPI' },
                 { key: 'canViewKpiTimesheet', label: 'KPI Табель' },
+                { key: 'canDeleteProject', label: 'Удаление проектов' },
+                { key: 'canDragProjects', label: 'Перетаскивание' },
               ] as const).map(({ key, label }) => (
                 <label key={key} className="flex items-center gap-2 cursor-pointer">
                   <input
