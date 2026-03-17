@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
+import path from 'path';
 
 type CommissionMember = {
   role: string;
@@ -92,18 +93,27 @@ type FontPair = {
   bold?: string;
 };
 
+// Bundled fonts shipped with the project (works on any OS including Docker)
+// __dirname at runtime: dist/src/api/kpi-calculator/services/ → go up 5 levels to project root
+const BUNDLED_FONTS_DIR = path.resolve(__dirname, '../../../../../fonts');
+
 const FONT_CANDIDATES: FontPair[] = [
   {
     regular: process.env.PDF_FONT_PATH,
     bold: process.env.PDF_FONT_BOLD_PATH,
   },
+  // Bundled fonts (project-local, always available after deploy)
   {
-    regular: 'C:\\\\Windows\\\\Fonts\\\\arial.ttf',
-    bold: 'C:\\\\Windows\\\\Fonts\\\\arialbd.ttf',
+    regular: path.join(BUNDLED_FONTS_DIR, 'times.ttf'),
+    bold: path.join(BUNDLED_FONTS_DIR, 'timesbd.ttf'),
   },
   {
     regular: 'C:\\\\Windows\\\\Fonts\\\\times.ttf',
     bold: 'C:\\\\Windows\\\\Fonts\\\\timesbd.ttf',
+  },
+  {
+    regular: 'C:\\\\Windows\\\\Fonts\\\\arial.ttf',
+    bold: 'C:\\\\Windows\\\\Fonts\\\\arialbd.ttf',
   },
   {
     regular: '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
@@ -124,9 +134,11 @@ function pickFont(): { regular?: string; bold?: string } {
     const regular = candidate.regular;
     if (regular && fs.existsSync(regular)) {
       const bold = candidate.bold && fs.existsSync(candidate.bold) ? candidate.bold : undefined;
+      console.log(`📝 PDF font found: ${regular}${bold ? `, bold: ${bold}` : ''}`);
       return { regular, bold };
     }
   }
+  console.warn('⚠️ No Cyrillic font found for PDF! Cyrillic text will be garbled. Searched:', BUNDLED_FONTS_DIR);
   return {};
 }
 
