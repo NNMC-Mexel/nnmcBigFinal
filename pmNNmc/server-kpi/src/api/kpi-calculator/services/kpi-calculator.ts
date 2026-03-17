@@ -9,6 +9,7 @@ interface Employee {
   
   interface ParsedEmployee {
     fio: string;
+    department?: string;
     letters_weekday: number;
     letters_sat: number;
     letters_sun: number;
@@ -17,7 +18,6 @@ interface Employee {
     numbers_sat: number;
     numbers_sun: number;
     numbers_holiday: number;
-    workedDaysTotal?: number;
   }
   
   interface KPIResult {
@@ -46,6 +46,47 @@ interface Employee {
     details: string;
   }
   
+  export function mergeEmployees(
+    prevParsed: ParsedEmployee[],
+    currParsed: ParsedEmployee[]
+  ): ParsedEmployee[] {
+    const map = new Map<string, ParsedEmployee>();
+
+    const addToMap = (emp: ParsedEmployee) => {
+      const key = String(emp.fio || '').trim().toLowerCase();
+      if (!key) return;
+      const existing = map.get(key);
+      if (existing) {
+        existing.letters_weekday += emp.letters_weekday || 0;
+        existing.letters_sat += emp.letters_sat || 0;
+        existing.letters_sun += emp.letters_sun || 0;
+        existing.letters_holiday += emp.letters_holiday || 0;
+        existing.numbers_weekday += emp.numbers_weekday || 0;
+        existing.numbers_sat += emp.numbers_sat || 0;
+        existing.numbers_sun += emp.numbers_sun || 0;
+        existing.numbers_holiday += emp.numbers_holiday || 0;
+      } else {
+        map.set(key, {
+          fio: emp.fio,
+          department: emp.department,
+          letters_weekday: emp.letters_weekday || 0,
+          letters_sat: emp.letters_sat || 0,
+          letters_sun: emp.letters_sun || 0,
+          letters_holiday: emp.letters_holiday || 0,
+          numbers_weekday: emp.numbers_weekday || 0,
+          numbers_sat: emp.numbers_sat || 0,
+          numbers_sun: emp.numbers_sun || 0,
+          numbers_holiday: emp.numbers_holiday || 0,
+        });
+      }
+    };
+
+    for (const emp of prevParsed) addToMap(emp);
+    for (const emp of currParsed) addToMap(emp);
+
+    return Array.from(map.values());
+  }
+
   export function calculateKPI(
     employees: ParsedEmployee[],
     kpiTable: Employee[],
@@ -117,14 +158,7 @@ interface Employee {
         }
   
         const notWorked = emp.letters_weekday || 0;
-        let daysWorked: number;
-  
-        // Use workedDaysTotal if available
-        if (emp.workedDaysTotal !== undefined && emp.workedDaysTotal !== null) {
-          daysWorked = emp.workedDaysTotal;
-        } else {
-          daysWorked = daysAssigned - notWorked;
-        }
+        let daysWorked = daysAssigned - notWorked;
   
         // Normalize
         if (daysWorked < 0) daysWorked = 0;

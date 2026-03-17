@@ -19,7 +19,6 @@ interface ParsedEmployee {
   numbers_sat: number;
   numbers_sun: number;
   numbers_holiday: number;
-  workedDaysTotal?: number;
 }
 
 function normalizeHolidays(
@@ -217,7 +216,8 @@ export async function parseTimesheet(
   fileBuffer: Buffer,
   year: number,
   month: number,
-  holidays: (string | number)[] = []
+  holidays: (string | number)[] = [],
+  options?: { dayFrom?: number; dayTo?: number }
 ): Promise<ParsedEmployee[]> {
   const holidayDays = normalizeHolidays(holidays, year, month);
   const workbook = await loadWorkbookFromBuffer(fileBuffer);
@@ -241,7 +241,7 @@ export async function parseTimesheet(
   }
 
   if (headerRowIdx !== null) {
-    return parseKazakhTemplate(worksheet, headerRowIdx, year, month, holidayDays);
+    return parseKazakhTemplate(worksheet, headerRowIdx, year, month, holidayDays, options);
   }
 
   // Try simple template with "Сотрудник" column
@@ -257,7 +257,7 @@ export async function parseTimesheet(
   }
 
   if (hasEmployeeCol) {
-    return parseSimpleTemplate(worksheet, year, month, holidayDays);
+    return parseSimpleTemplate(worksheet, year, month, holidayDays, options);
   }
 
   throw new Error(
@@ -270,7 +270,8 @@ function parseKazakhTemplate(
   headerRowIdx: number,
   year: number,
   month: number,
-  holidayDays: Set<number>
+  holidayDays: Set<number>,
+  options?: { dayFrom?: number; dayTo?: number }
 ): ParsedEmployee[] {
   const headerRow = worksheet.getRow(headerRowIdx + 1);
   let fioCol: number | null = null;
@@ -293,30 +294,18 @@ function parseKazakhTemplate(
   const dayHeaderRow = worksheet.getRow(headerRowIdx + 2);
   const dayCols: Array<{ col: number; day: number }> = [];
 
+  const dayFrom = options?.dayFrom ?? 1;
+  const dayTo = options?.dayTo ?? 31;
+
   for (let j = 1; j <= worksheet.columnCount; j++) {
     const cell = dayHeaderRow.getCell(j);
     const value = String(cell.value || '').trim();
     if (/^\d+$/.test(value)) {
       const day = parseInt(value);
-      if (day >= 1 && day <= 31) {
+      if (day >= dayFrom && day <= dayTo) {
         dayCols.push({ col: j, day });
       }
     }
-  }
-
-  // Find "өтелген күндер жиынтығы" column
-  let totalDaysCol: number | null = null;
-  for (let i = Math.max(0, headerRowIdx - 2); i < headerRowIdx + 5 && i < worksheet.rowCount; i++) {
-    const row = worksheet.getRow(i + 1);
-    for (let j = 1; j <= worksheet.columnCount; j++) {
-      const cell = row.getCell(j);
-      const value = String(cell.value || '').toLowerCase().trim();
-      if (value.includes('өтелген') && value.includes('жиынтығы')) {
-        totalDaysCol = j;
-        break;
-      }
-    }
-    if (totalDaysCol !== null) break;
   }
 
   const employees: ParsedEmployee[] = [];
@@ -376,15 +365,6 @@ function parseKazakhTemplate(
       }
     }
 
-    // Get workedDaysTotal if column exists
-    if (totalDaysCol !== null) {
-      const totalCell = row.getCell(totalDaysCol);
-      const total = tryFloat(totalCell.value);
-      if (total !== null) {
-        emp.workedDaysTotal = total;
-      }
-    }
-
     employees.push(emp);
   }
 
@@ -395,12 +375,15 @@ function parseSimpleTemplate(
   worksheet: ExcelJS.Worksheet,
   year: number,
   month: number,
-  holidayDays: Set<number>
+  holidayDays: Set<number>,
+  options?: { dayFrom?: number; dayTo?: number }
 ): ParsedEmployee[] {
   const headerRow = worksheet.getRow(1);
   let employeeCol: number | null = null;
   const departmentCol = findDepartmentColumn(headerRow);
   const dayCols: Array<{ col: number; day: number }> = [];
+  const dayFrom = options?.dayFrom ?? 1;
+  const dayTo = options?.dayTo ?? 31;
 
   // Find columns
   for (let j = 1; j <= worksheet.columnCount; j++) {
@@ -411,7 +394,7 @@ function parseSimpleTemplate(
       employeeCol = j;
     } else if (header.length === 2 && /^\d{2}$/.test(header)) {
       const day = parseInt(header);
-      if (day >= 1 && day <= 31) {
+      if (day >= dayFrom && day <= dayTo) {
         dayCols.push({ col: j, day });
       }
     }

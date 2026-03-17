@@ -51,19 +51,46 @@ const isUnauthorizedError = (value) => {
   );
 };
 
-const MONTH_WORKDAYS = {
-  1: { day: 20, shift: 24 },
-  2: { day: 21, shift: 24 },
-  3: { day: 19, shift: 22 },
-  4: { day: 23, shift: 26 },
-  5: { day: 18, shift: 22 },
-  6: { day: 23, shift: 26 },
-  7: { day: 23, shift: 26 },
-  8: { day: 21, shift: 25 },
-  9: { day: 23, shift: 26 },
-  10: { day: 22, shift: 26 },
-  11: { day: 22, shift: 25 },
-  12: { day: 23, shift: 26 },
+/** Calculate working days for the 25-25 period (25 prevMonth .. 25 currentMonth) */
+const calcWorkdaysForPeriod = (year, month, allHolidays) => {
+  const y = parseInt(year, 10);
+  const m = parseInt(month, 10);
+  if (!y || !m || m < 1 || m > 12) return { day: 0, shift: 25 };
+
+  let prevMonth = m - 1;
+  let prevYear = y;
+  if (prevMonth < 1) { prevMonth = 12; prevYear = y - 1; }
+
+  // Build set of holiday date strings for both months
+  const holidaySet = new Set();
+  (allHolidays || []).forEach((h) => {
+    const d = h?.date || h;
+    if (d) holidaySet.add(String(d));
+  });
+  // Also add static holidays for prev month
+  const prevStaticItems = STATIC_HOLIDAYS[prevMonth] || [];
+  prevStaticItems.forEach((item) => {
+    holidaySet.add(buildHolidayDate(prevYear, prevMonth, item.day));
+  });
+
+  let weekdays = 0;
+  // Days 25..end of prev month
+  const lastDayPrev = new Date(prevYear, prevMonth, 0).getDate();
+  for (let d = 25; d <= lastDayPrev; d++) {
+    const date = new Date(prevYear, prevMonth - 1, d);
+    const dow = date.getDay(); // 0=Sun, 6=Sat
+    const dateStr = buildHolidayDate(prevYear, prevMonth, d);
+    if (dow !== 0 && dow !== 6 && !holidaySet.has(dateStr)) weekdays++;
+  }
+  // Days 1..25 of current month
+  for (let d = 1; d <= 25; d++) {
+    const date = new Date(y, m - 1, d);
+    const dow = date.getDay();
+    const dateStr = buildHolidayDate(y, m, d);
+    if (dow !== 0 && dow !== 6 && !holidaySet.has(dateStr)) weekdays++;
+  }
+
+  return { day: weekdays, shift: 25 };
 };
 
 const MONTH_SELECT_NAMES = [
@@ -287,19 +314,14 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   const [toast, setToast] = useState(null);
 
   const [timesheetFile, setTimesheetFile] = useState(null);
+  const [timesheetFilePrev, setTimesheetFilePrev] = useState(null);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [isDragActivePrev, setIsDragActivePrev] = useState(false);
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
 
-  const activeMonthWorkdays = useMemo(() => {
-    const m = parseInt(month, 10);
-    if (!m || m < 1 || m > 12) return { day: 0, shift: 0 };
-    return MONTH_WORKDAYS[m] || { day: 0, shift: 0 };
-  }, [month]);
-
-  const nchDay = String(activeMonthWorkdays.day);
-  const ndShift = String(activeMonthWorkdays.shift);
-  const workdaysTransitionKey = `${month}-${nchDay}-${ndShift}`;
+  const [nchDayOverride, setNchDayOverride] = useState(null);
+  const [ndShiftOverride, setNdShiftOverride] = useState(null);
 
   const [holidays, setHolidays] = useState([]);
   const [calcResults, setCalcResults] = useState([]);
@@ -328,6 +350,23 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   const isAdmin =
     String(user?.role || "").toLowerCase().includes("admin") ||
     String(user?.login || "").toLowerCase().startsWith("admin");
+
+  // Auto-calculate working days for 25-25 period
+  const autoWorkdays = useMemo(() => calcWorkdaysForPeriod(year, month, holidays), [year, month, holidays]);
+  const nchDay = nchDayOverride !== null ? String(nchDayOverride) : String(autoWorkdays.day);
+  const ndShift = ndShiftOverride !== null ? String(ndShiftOverride) : String(autoWorkdays.shift);
+
+  // Reset overrides when month/year changes
+  useEffect(() => { setNchDayOverride(null); setNdShiftOverride(null); }, [month, year]);
+
+  // Previous month name for labels
+  const prevMonthInfo = useMemo(() => {
+    const m = parseInt(month, 10);
+    let pm = m - 1, py = parseInt(year, 10);
+    if (pm < 1) { pm = 12; py--; }
+    return { month: pm, year: py, name: MONTH_SELECT_NAMES[pm - 1] || "" };
+  }, [month, year]);
+  const currMonthName = MONTH_SELECT_NAMES[parseInt(month, 10) - 1] || "";
 
   const showToast = (text, type = "success") => setToast({ text, type });
 
@@ -448,7 +487,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     if (allDepartments.includes(filterDept)) setCalcDepartment(filterDept);
   }, [filterDept, allDepartments]);
 
-  useEffect(() => { setCalcResults([]); setCalcErrors([]); }, [calcDepartment, timesheetFile]);
+  useEffect(() => { setCalcResults([]); setCalcErrors([]); }, [calcDepartment, timesheetFile, timesheetFilePrev]);
 
   const normalizeCalcError = (item) => {
     if (!item) return { fio: "", type: "", message: "Неизвестная ошибка" };
@@ -480,22 +519,25 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     return `${oldStr || "—"} → ${newStr || "—"}`;
   };
 
-  const handleTimesheetFile = (file) => {
+  const handleTimesheetFile = (file, isPrev = false) => {
     if (!file) return;
     const name = String(file.name || "").toLowerCase();
     if (!name.endsWith(".xls") && !name.endsWith(".xlsx")) {
       showToast("Допустимы только файлы XLSX/XLS", "error");
       return;
     }
-    setTimesheetFile(file);
+    if (isPrev) setTimesheetFilePrev(file);
+    else setTimesheetFile(file);
   };
 
   const handleCalc = async () => {
-    if (!timesheetFile) { showToast("Пожалуйста, выберите файл табеля", "error"); return; }
+    if (!timesheetFile) { showToast("Выберите файл табеля текущего месяца", "error"); return; }
+    if (!timesheetFilePrev) { showToast("Выберите файл табеля прошлого месяца", "error"); return; }
     if (!calcDepartment) { showToast("Выберите отдел для расчёта", "error"); return; }
     try {
       const fd = new FormData();
       fd.append("timesheet", timesheetFile);
+      fd.append("timesheetPrev", timesheetFilePrev);
       fd.append("nchDay", nchDay || "0");
       fd.append("ndShift", ndShift || "0");
       fd.append("year", year);
@@ -517,11 +559,13 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   };
 
   const handleDownload = async (mode) => {
-    if (!timesheetFile) { showToast("Пожалуйста, выберите файл табеля", "error"); return; }
+    if (!timesheetFile) { showToast("Выберите файл табеля текущего месяца", "error"); return; }
+    if (!timesheetFilePrev) { showToast("Выберите файл табеля прошлого месяца", "error"); return; }
     if (!calcDepartment) { showToast("Выберите отдел для расчёта", "error"); return; }
     try {
       const fd = new FormData();
       fd.append("timesheet", timesheetFile);
+      fd.append("timesheetPrev", timesheetFilePrev);
       fd.append("nchDay", nchDay || "0");
       fd.append("ndShift", ndShift || "0");
       fd.append("year", year);
@@ -622,6 +666,11 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
             Доступы к отделам
           </button>
         )}
+        {isAdmin && (
+          <button className={`kpi-module-nav-tab${activeTab === "settings" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => setActiveTab("settings")}>
+            Настройки
+          </button>
+        )}
       </div>
 
       <div className="app-main">
@@ -629,42 +678,66 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         {activeTab === "calc" && (
           <section className="card">
             <h2>Расчёт KPI по табелю</h2>
-            <p className="card-subtitle">Загрузите табель за месяц и нажмите «Рассчитать». Рабочие дни автоматически подставляются по выбранному месяцу.</p>
+            <p className="card-subtitle">Загрузите два табеля (прошлый и текущий месяц). Период расчёта: с 25 {prevMonthInfo.name} по 25 {currMonthName}.</p>
 
             <div className="form-grid">
-              <div className="form-group file-field">
-                <label>Табель (Excel):</label>
-                <div
-                  className={`file-drop${isDragActive ? " file-drop-active" : ""}`}
-                  onDragOver={(e) => { e.preventDefault(); setIsDragActive(true); }}
-                  onDragLeave={() => setIsDragActive(false)}
-                  onDrop={(e) => { e.preventDefault(); setIsDragActive(false); const file = e.dataTransfer?.files?.[0]; if (file) handleTimesheetFile(file); }}
-                >
-                  <div className="file-drop-icon">↑</div>
-                  <div className="file-drop-text">Перетащите сюда таблицу в Excel или выберите файл</div>
-                  <div className="file-drop-actions">
-                    <label className="btn btn-primary upload-btn" htmlFor="kpi-timesheet-input">Выбрать файл</label>
-                    <input id="kpi-timesheet-input" className="file-input-hidden" type="file" accept=".xls,.xlsx" onChange={(e) => handleTimesheetFile(e.target.files[0] || null)} />
+              <div className="form-group file-field" style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+                {/* Prev month file */}
+                <div style={{ flex: "1 1 280px" }}>
+                  <label>Табель за {prevMonthInfo.name} {prevMonthInfo.year} (дни 25-конец):</label>
+                  <div
+                    className={`file-drop${isDragActivePrev ? " file-drop-active" : ""}`}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragActivePrev(true); }}
+                    onDragLeave={() => setIsDragActivePrev(false)}
+                    onDrop={(e) => { e.preventDefault(); setIsDragActivePrev(false); const file = e.dataTransfer?.files?.[0]; if (file) handleTimesheetFile(file, true); }}
+                  >
+                    <div className="file-drop-icon">↑</div>
+                    <div className="file-drop-text">Табель прошлого месяца</div>
+                    <div className="file-drop-actions">
+                      <label className="btn btn-primary upload-btn" htmlFor="kpi-timesheet-prev-input">Выбрать файл</label>
+                      <input id="kpi-timesheet-prev-input" className="file-input-hidden" type="file" accept=".xls,.xlsx" onChange={(e) => handleTimesheetFile(e.target.files[0] || null, true)} />
+                    </div>
+                    <div className="file-drop-hint">XLSX, XLS</div>
+                    {timesheetFilePrev && <div className="file-drop-name">Выбран: {timesheetFilePrev.name}</div>}
                   </div>
-                  <div className="file-drop-hint">XLSX, XLS</div>
-                  {timesheetFile && <div className="file-drop-name">Выбран: {timesheetFile.name}</div>}
+                </div>
+                {/* Current month file */}
+                <div style={{ flex: "1 1 280px" }}>
+                  <label>Табель за {currMonthName} {year} (дни 1-25):</label>
+                  <div
+                    className={`file-drop${isDragActive ? " file-drop-active" : ""}`}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragActive(true); }}
+                    onDragLeave={() => setIsDragActive(false)}
+                    onDrop={(e) => { e.preventDefault(); setIsDragActive(false); const file = e.dataTransfer?.files?.[0]; if (file) handleTimesheetFile(file); }}
+                  >
+                    <div className="file-drop-icon">↑</div>
+                    <div className="file-drop-text">Табель текущего месяца</div>
+                    <div className="file-drop-actions">
+                      <label className="btn btn-primary upload-btn" htmlFor="kpi-timesheet-input">Выбрать файл</label>
+                      <input id="kpi-timesheet-input" className="file-input-hidden" type="file" accept=".xls,.xlsx" onChange={(e) => handleTimesheetFile(e.target.files[0] || null)} />
+                    </div>
+                    <div className="file-drop-hint">XLSX, XLS</div>
+                    {timesheetFile && <div className="file-drop-name">Выбран: {timesheetFile.name}</div>}
+                  </div>
                 </div>
               </div>
 
               <div className="form-group workdays-auto-field">
-                <label>Рабочие дни (авто):</label>
-                <div key={workdaysTransitionKey} className="workdays-auto-card">
+                <label>Рабочие дни (период 25-25):</label>
+                <div className="workdays-auto-card" style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                   <div className="workdays-auto-item">
-                    <span className="workdays-auto-name">Дневные</span>
-                    <strong className="workdays-auto-value">{nchDay}</strong>
+                    <span className="workdays-auto-name">Дневные (Н.ч)</span>
+                    <input type="number" min={0} max={31} style={{ width: "60px", textAlign: "center", fontWeight: "bold", fontSize: "16px" }}
+                      value={nchDay} onChange={(e) => setNchDayOverride(parseInt(e.target.value, 10) || 0)} />
                   </div>
                   <div className="workdays-auto-divider" />
                   <div className="workdays-auto-item">
-                    <span className="workdays-auto-name">Суточные</span>
-                    <strong className="workdays-auto-value">{ndShift}</strong>
+                    <span className="workdays-auto-name">Суточные (Н.д)</span>
+                    <input type="number" min={0} max={31} style={{ width: "60px", textAlign: "center", fontWeight: "bold", fontSize: "16px" }}
+                      value={ndShift} onChange={(e) => setNdShiftOverride(parseInt(e.target.value, 10) || 0)} />
                   </div>
                 </div>
-                <div className="workdays-auto-note">Значения меняются автоматически при выборе месяца.</div>
+                <div className="workdays-auto-note">Рассчитано автоматически для периода 25 {prevMonthInfo.name} — 25 {currMonthName}. Можно скорректировать вручную.</div>
               </div>
 
               <div className="form-group">
@@ -929,6 +1002,42 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                 </table>
               </div>
             )}
+          </section>
+        )}
+
+        {/* =================== Настройки =================== */}
+        {activeTab === "settings" && isAdmin && (
+          <section className="card">
+            <h2>Настройки рабочих дней</h2>
+            <p className="card-subtitle">Автоматически рассчитанные рабочие дни для периода 25-25 на {year} год. Значения можно отредактировать.</p>
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>Месяц</th><th>Период</th><th>Дневные (Н.ч)</th><th>Суточные (Н.д)</th></tr>
+                </thead>
+                <tbody>
+                  {MONTH_SELECT_NAMES.map((name, idx) => {
+                    const m = idx + 1;
+                    const y = parseInt(year, 10);
+                    const computed = calcWorkdaysForPeriod(y, m, holidays);
+                    let pm = m - 1, py = y;
+                    if (pm < 1) { pm = 12; py--; }
+                    const prevName = MONTH_SELECT_NAMES[pm - 1] || "";
+                    return (
+                      <tr key={m}>
+                        <td><strong>{m} - {name}</strong></td>
+                        <td style={{ fontSize: "12px", color: "#64748b" }}>25 {prevName} — 25 {name}</td>
+                        <td style={{ textAlign: "center" }}>{computed.day}</td>
+                        <td style={{ textAlign: "center" }}>{computed.shift}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: "12px", fontSize: "12px", color: "#64748b" }}>
+              Праздники РК учтены автоматически. Для корректировки перейдите на вкладку «Расчёт KPI» и измените значения Н.ч/Н.д перед расчётом.
+            </div>
           </section>
         )}
       </div>

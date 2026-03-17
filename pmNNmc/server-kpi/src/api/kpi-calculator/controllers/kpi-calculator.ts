@@ -8,16 +8,16 @@ import { getUserAccess } from '../../../utils/access';
 
 declare const strapi: any;
 
-async function getFileBufferFromCtx(ctx: Context): Promise<Buffer> {
+async function getFileBufferByName(ctx: Context, fieldName: string): Promise<Buffer | null> {
   const files: any = (ctx.request as any).files || {};
-  let file = files.timesheet;
+  let file = files[fieldName];
 
   if (Array.isArray(file)) {
     file = file[0];
   }
 
   if (!file) {
-    throw new Error('Файл табеля (timesheet) не загружен');
+    return null;
   }
 
   if (file.buffer) {
@@ -26,10 +26,18 @@ async function getFileBufferFromCtx(ctx: Context): Promise<Buffer> {
 
   const filepath: string | undefined = file.filepath || file.path;
   if (!filepath) {
-    throw new Error('Не удалось определить путь к загруженному файлу');
+    return null;
   }
 
   return fs.readFile(filepath);
+}
+
+async function getFileBufferFromCtx(ctx: Context): Promise<Buffer> {
+  const buf = await getFileBufferByName(ctx, 'timesheet');
+  if (!buf) {
+    throw new Error('Файл табеля (timesheet) не загружен');
+  }
+  return buf;
 }
 
 function parseHolidays(raw: any): (string | number)[] {
@@ -413,9 +421,50 @@ async function calcCore(ctx: Context) {
   
   console.log(`📅 Всего праздников для расчёта:`, allHolidays);
 
+  // --- Two-file parsing: prev month (25-end) + current month (1-25) ---
   const fileBuffer = await getFileBufferFromCtx(ctx);
+  const prevFileBuffer = await getFileBufferByName(ctx, 'timesheetPrev');
 
-  const parsedEmployees = await parseTimesheet(fileBuffer, year, month, allHolidays);
+  let parsedEmployees;
+
+  if (prevFileBuffer) {
+    // Calculate previous month/year
+    let prevMonth = month - 1;
+    let prevYear = year;
+    if (prevMonth < 1) {
+      prevMonth = 12;
+      prevYear = year - 1;
+    }
+
+    // Load holidays for previous month too
+    const prevStrapiHolidays = await strapi.entityService.findMany('api::holiday.holiday', {
+      filters: {
+        year: { $eq: prevYear },
+        month: { $eq: prevMonth },
+      },
+      fields: ['date', 'year', 'month'],
+      pagination: { pageSize: 1000 },
+    });
+    const prevHolidayDates: string[] = [];
+    (prevStrapiHolidays || []).forEach((h: any) => {
+      if (h.date) prevHolidayDates.push(String(h.date));
+    });
+    const allPrevHolidays = [...new Set(prevHolidayDates)];
+
+    console.log(`📅 Парсинг двух табелей: ${prevYear}-${prevMonth} (25-конец) + ${year}-${month} (1-25)`);
+
+    // Parse prev month: days 25 to end
+    const prevParsed = await parseTimesheet(prevFileBuffer, prevYear, prevMonth, allPrevHolidays, { dayFrom: 25, dayTo: 31 });
+    // Parse current month: days 1 to 25
+    const currParsed = await parseTimesheet(fileBuffer, year, month, allHolidays, { dayFrom: 1, dayTo: 25 });
+
+    // Merge by FIO
+    parsedEmployees = kpiCalculator.mergeEmployees(prevParsed, currParsed);
+    console.log(`📊 Объединено сотрудников: ${parsedEmployees.length} (prev: ${prevParsed.length}, curr: ${currParsed.length})`);
+  } else {
+    // Fallback: single file mode (backwards compatibility)
+    parsedEmployees = await parseTimesheet(fileBuffer, year, month, allHolidays);
+  }
   const parsedDeptSamples = parsedEmployees
     .map((e: any) => String(e?.department || '').trim())
     .filter(Boolean);
@@ -739,7 +788,7 @@ export default {
         row,
         1,
         totalColumns,
-        `Оцениваемый период: с 1 ${monthGen} ${year} года - по ${lastDay} ${monthGen} ${year} г.`,
+        `Оцениваемый период: с 25 ${MONTHS_GENITIVE[((month - 2 + 12) % 12)]} ${month === 1 ? year - 1 : year} года - по 25 ${monthGen} ${year} г.`,
         {}
       );
       row += 2;
