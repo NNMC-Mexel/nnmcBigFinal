@@ -308,6 +308,8 @@ function parseKazakhTemplate(
     }
   }
 
+  console.log(`📊 KAZ TEMPLATE: диапазон дней [${dayFrom}..${dayTo}], найдено колонок: ${dayCols.length}, дни: [${dayCols.map(d => d.day).join(', ')}]`);
+
   const employees: ParsedEmployee[] = [];
 
   // Process employee rows
@@ -365,9 +367,11 @@ function parseKazakhTemplate(
       }
     }
 
+    console.log(`  👤 ${fio}: letters(wd=${emp.letters_weekday},sat=${emp.letters_sat},sun=${emp.letters_sun},hol=${emp.letters_holiday}) numbers(wd=${emp.numbers_weekday},sat=${emp.numbers_sat},sun=${emp.numbers_sun},hol=${emp.numbers_holiday})`);
     employees.push(emp);
   }
 
+  console.log(`📊 KAZ TEMPLATE: итого сотрудников: ${employees.length}`);
   return employees;
 }
 
@@ -403,6 +407,8 @@ function parseSimpleTemplate(
   if (!employeeCol) {
     throw new Error('Не найдена колонка "Сотрудник"');
   }
+
+  console.log(`📊 SIMPLE TEMPLATE: диапазон дней [${dayFrom}..${dayTo}], найдено колонок: ${dayCols.length}, дни: [${dayCols.map(d => d.day).join(', ')}]`);
 
   const employees: ParsedEmployee[] = [];
 
@@ -451,8 +457,10 @@ function parseSimpleTemplate(
       }
     }
 
+    console.log(`  👤 ${fio}: letters(wd=${emp.letters_weekday},sat=${emp.letters_sat},sun=${emp.letters_sun},hol=${emp.letters_holiday}) numbers(wd=${emp.numbers_weekday},sat=${emp.numbers_sat},sun=${emp.numbers_sun},hol=${emp.numbers_holiday})`);
     employees.push(emp);
   }
 
+  console.log(`📊 SIMPLE TEMPLATE: итого сотрудников: ${employees.length}`);
   return employees;
 }

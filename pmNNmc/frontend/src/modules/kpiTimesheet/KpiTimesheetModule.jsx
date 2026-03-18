@@ -325,6 +325,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
 
   const [holidays, setHolidays] = useState([]);
   const [calcResults, setCalcResults] = useState([]);
+  const [parsedDetails, setParsedDetails] = useState([]);
   const [calcErrors, setCalcErrors] = useState([]);
   const [calcDepartment, setCalcDepartment] = useState("");
 
@@ -487,7 +488,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     if (allDepartments.includes(filterDept)) setCalcDepartment(filterDept);
   }, [filterDept, allDepartments]);
 
-  useEffect(() => { setCalcResults([]); setCalcErrors([]); }, [calcDepartment, timesheetFile, timesheetFilePrev]);
+  useEffect(() => { setCalcResults([]); setCalcErrors([]); setParsedDetails([]); }, [calcDepartment, timesheetFile, timesheetFilePrev]);
 
   const normalizeCalcError = (item) => {
     if (!item) return { fio: "", type: "", message: "Неизвестная ошибка" };
@@ -549,10 +550,11 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       const filteredResults = filterResultsByDept(data.results || [], calcDepartment);
       setCalcResults(filteredResults);
       setCalcErrors(data.errors || []);
+      setParsedDetails(data.parsedDetails || []);
       const deptError = (data.errors || []).find((e) => e && (e.type === "NO_EMPLOYEES" || e.type === "NO_DEPARTMENT_COLUMN"));
       if (deptError) showToast(deptError.details || "Нет сотрудников в выбранном отделе", "error");
       else if (calcDepartment && filteredResults.length === 0) showToast(`Нету никого в отделе ${calcDepartment}`, "error");
-      else showToast("Расчёт KPI выполнен");
+      else { showToast("Расчёт KPI выполнен"); setActiveTab("results"); }
     } catch (err) {
       showToast(err instanceof Error ? err.message : String(err) || "Ошибка расчёта KPI", "error");
     }
@@ -657,6 +659,9 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       <div className="kpi-module-nav">
         <button className={`kpi-module-nav-tab${activeTab === "calc" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => setActiveTab("calc")}>
           Расчёт KPI по табелю
+        </button>
+        <button className={`kpi-module-nav-tab${activeTab === "results" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => setActiveTab("results")}>
+          Результаты
         </button>
         <button className={`kpi-module-nav-tab${activeTab === "kpi" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => setActiveTab("kpi")}>
           Справочник сотрудников
@@ -836,6 +841,136 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                   </table>
                 </div>
               </div>
+            )}
+          </section>
+        )}
+
+        {/* =================== Результаты =================== */}
+        {activeTab === "results" && (
+          <section className="card">
+            <h2>Результаты расчёта</h2>
+            <p className="card-subtitle">
+              Детальные данные парсинга табелей и итоговый расчёт KPI за период 25 {prevMonthInfo.name} — 25 {currMonthName} {year}.
+            </p>
+
+            {calcResults.length === 0 && parsedDetails.length === 0 ? (
+              <div style={{ padding: "32px", textAlign: "center", color: "#94a3b8" }}>
+                Нет данных. Сначала выполните расчёт на вкладке «Расчёт KPI по табелю».
+              </div>
+            ) : (
+              <>
+                {/* Таблица 1: Распарсенные данные из табелей */}
+                {parsedDetails.length > 0 && (
+                  <div className="results-block" style={{ marginBottom: "24px" }}>
+                    <h3>Распарсенные данные из табелей (объединённые 25-25)</h3>
+                    <p style={{ fontSize: "12px", color: "#64748b", marginBottom: "8px" }}>
+                      Буквы — дни с буквенными отметками (Б, ОТ и т.д. — отсутствие). Числа — дни с числовыми значениями (часы работы).
+                    </p>
+                    <div className="table-wrapper">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>ФИО</th>
+                            <th title="Буквы в будни">Б.будни</th>
+                            <th title="Буквы в субботу">Б.сб</th>
+                            <th title="Буквы в воскресенье">Б.вс</th>
+                            <th title="Буквы в праздники">Б.празд</th>
+                            <th title="Числа в будни">Ч.будни</th>
+                            <th title="Числа в субботу">Ч.сб</th>
+                            <th title="Числа в воскресенье">Ч.вс</th>
+                            <th title="Числа в праздники">Ч.празд</th>
+                            <th>Итого букв</th>
+                            <th>Итого чисел</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parsedDetails.map((p, idx) => {
+                            const totalLetters = (p.letters_weekday || 0) + (p.letters_sat || 0) + (p.letters_sun || 0) + (p.letters_holiday || 0);
+                            const totalNumbers = (p.numbers_weekday || 0) + (p.numbers_sat || 0) + (p.numbers_sun || 0) + (p.numbers_holiday || 0);
+                            return (
+                              <tr key={idx}>
+                                <td>{idx + 1}</td>
+                                <td>{p.fio}</td>
+                                <td>{p.letters_weekday || 0}</td>
+                                <td>{p.letters_sat || 0}</td>
+                                <td>{p.letters_sun || 0}</td>
+                                <td>{p.letters_holiday || 0}</td>
+                                <td>{p.numbers_weekday || 0}</td>
+                                <td>{p.numbers_sat || 0}</td>
+                                <td>{p.numbers_sun || 0}</td>
+                                <td>{p.numbers_holiday || 0}</td>
+                                <td style={{ fontWeight: "bold" }}>{totalLetters}</td>
+                                <td style={{ fontWeight: "bold" }}>{totalNumbers}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Таблица 2: Итоговый расчёт KPI */}
+                {calcResults.length > 0 && (
+                  <div className="results-block">
+                    <h3>Итоговый расчёт KPI</h3>
+                    <div className="table-wrapper">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>ФИО</th>
+                            <th>График</th>
+                            <th>Отдел</th>
+                            <th title="Норма дней">Норма</th>
+                            <th title="Не отработано (буквы)">Не отраб.</th>
+                            <th title="Фактически отработано">Факт</th>
+                            <th>% вып.</th>
+                            <th>KPI сумм</th>
+                            <th>KPI итог</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {calcResults.map((r, idx) => (
+                            <tr key={idx}>
+                              <td>{idx + 1}</td>
+                              <td>{r.fio}</td>
+                              <td>{formatScheduleType(r.scheduleType)}</td>
+                              <td>{r.department}</td>
+                              <td>{r.daysAssigned}</td>
+                              <td>{r.notWorked}</td>
+                              <td style={{ fontWeight: "bold" }}>{r.daysWorked}</td>
+                              <td>{r.workPercent}%</td>
+                              <td>{r.kpiSum}</td>
+                              <td style={{ fontWeight: "bold" }}>{r.kpiFinal}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Ошибки */}
+                {calcErrors.length > 0 && (
+                  <div className="issues-block" style={{ marginTop: "16px" }}>
+                    <h3>Ошибки и предупреждения ({calcErrors.length})</h3>
+                    <div className="issues-table">
+                      <table>
+                        <thead>
+                          <tr><th>#</th><th>Сотрудник</th><th>Тип</th><th>Описание</th></tr>
+                        </thead>
+                        <tbody>
+                          {calcErrors.map((e, idx) => (
+                            <tr key={idx}><td>{idx + 1}</td><td>{e.fio || "—"}</td><td>{e.type || "—"}</td><td>{e.details || "—"}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </section>
         )}

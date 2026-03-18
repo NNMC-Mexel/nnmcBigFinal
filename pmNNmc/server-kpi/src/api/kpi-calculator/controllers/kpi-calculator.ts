@@ -557,7 +557,21 @@ async function calcCore(ctx: Context) {
     results = filteredResults;
   }
 
-  return withDebug({ results, errors });
+  // Build parsed details for the "Результаты" tab
+  const parsedDetails = finalEmployees.map((emp: any) => ({
+    fio: emp.fio,
+    department: emp.department || '',
+    letters_weekday: emp.letters_weekday || 0,
+    letters_sat: emp.letters_sat || 0,
+    letters_sun: emp.letters_sun || 0,
+    letters_holiday: emp.letters_holiday || 0,
+    numbers_weekday: emp.numbers_weekday || 0,
+    numbers_sat: emp.numbers_sat || 0,
+    numbers_sun: emp.numbers_sun || 0,
+    numbers_holiday: emp.numbers_holiday || 0,
+  }));
+
+  return withDebug({ results, errors, parsedDetails });
 }
 
 export default {
