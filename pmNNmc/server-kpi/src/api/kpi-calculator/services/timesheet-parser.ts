@@ -8,6 +8,15 @@ interface Holiday {
   month?: number;
 }
 
+interface DayValue {
+  day: number;
+  month: number;
+  year: number;
+  value: string;
+  dayType: 'weekday' | 'sat' | 'sun' | 'holiday';
+  isNumber: boolean;
+}
+
 interface ParsedEmployee {
   fio: string;
   department?: string;
@@ -19,6 +28,7 @@ interface ParsedEmployee {
   numbers_sat: number;
   numbers_sun: number;
   numbers_holiday: number;
+  dayValues?: DayValue[];
 }
 
 function normalizeHolidays(
@@ -339,20 +349,34 @@ function parseKazakhTemplate(
       numbers_sat: 0,
       numbers_sun: 0,
       numbers_holiday: 0,
+      dayValues: [],
     };
 
     // Process day columns
     for (const { col, day } of dayCols) {
       const cell = row.getCell(col);
       const val = cell.value;
-      if (val === null || val === undefined) continue;
-
-      const valStr = String(val).trim();
-      if (!valStr || valStr === '-' || valStr.toUpperCase() === 'В') continue;
+      const rawStr = val === null || val === undefined ? '' : String(val).trim();
 
       const dayType = classifyDay(year, month, day, holidayDays);
-      const num = tryFloat(valStr);
+
+      // Always record the day value (even empty)
+      const skip = !rawStr || rawStr === '-' || rawStr.toUpperCase() === 'В';
+      emp.dayValues!.push({
+        day,
+        month,
+        year,
+        value: rawStr || (rawStr.toUpperCase() === 'В' ? 'В' : ''),
+        dayType,
+        isNumber: false,
+      });
+
+      if (skip) continue;
+
+      const num = tryFloat(rawStr);
       const isNumber = num !== null;
+      // Update last dayValue with correct isNumber
+      emp.dayValues![emp.dayValues!.length - 1].isNumber = isNumber;
 
       if (isNumber) {
         if (dayType === 'weekday') emp.numbers_weekday++;
@@ -367,11 +391,9 @@ function parseKazakhTemplate(
       }
     }
 
-    console.log(`  👤 ${fio}: letters(wd=${emp.letters_weekday},sat=${emp.letters_sat},sun=${emp.letters_sun},hol=${emp.letters_holiday}) numbers(wd=${emp.numbers_weekday},sat=${emp.numbers_sat},sun=${emp.numbers_sun},hol=${emp.numbers_holiday})`);
     employees.push(emp);
   }
 
-  console.log(`📊 KAZ TEMPLATE: итого сотрудников: ${employees.length}`);
   return employees;
 }
 
@@ -430,19 +452,31 @@ function parseSimpleTemplate(
       numbers_sat: 0,
       numbers_sun: 0,
       numbers_holiday: 0,
+      dayValues: [],
     };
 
     for (const { col, day } of dayCols) {
       const cell = row.getCell(col);
       const val = cell.value;
-      if (val === null || val === undefined) continue;
-
-      const valStr = String(val).trim();
-      if (!valStr || valStr === '-' || valStr.toUpperCase() === 'В') continue;
+      const rawStr = val === null || val === undefined ? '' : String(val).trim();
 
       const dayType = classifyDay(year, month, day, holidayDays);
-      const num = tryFloat(valStr);
+      const skip = !rawStr || rawStr === '-' || rawStr.toUpperCase() === 'В';
+
+      emp.dayValues!.push({
+        day,
+        month,
+        year,
+        value: rawStr || '',
+        dayType,
+        isNumber: false,
+      });
+
+      if (skip) continue;
+
+      const num = tryFloat(rawStr);
       const isNumber = num !== null;
+      emp.dayValues![emp.dayValues!.length - 1].isNumber = isNumber;
 
       if (isNumber) {
         if (dayType === 'weekday') emp.numbers_weekday++;
@@ -457,10 +491,8 @@ function parseSimpleTemplate(
       }
     }
 
-    console.log(`  👤 ${fio}: letters(wd=${emp.letters_weekday},sat=${emp.letters_sat},sun=${emp.letters_sun},hol=${emp.letters_holiday}) numbers(wd=${emp.numbers_weekday},sat=${emp.numbers_sat},sun=${emp.numbers_sun},hol=${emp.numbers_holiday})`);
     employees.push(emp);
   }
 
-  console.log(`📊 SIMPLE TEMPLATE: итого сотрудников: ${employees.length}`);
   return employees;
 }

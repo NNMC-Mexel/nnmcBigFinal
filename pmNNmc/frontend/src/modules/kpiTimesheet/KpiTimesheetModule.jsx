@@ -846,11 +846,35 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         )}
 
         {/* =================== Результаты =================== */}
-        {activeTab === "results" && (
+        {activeTab === "results" && (() => {
+          // Build day columns: 25..lastDay of prevMonth, then 1..25 of currentMonth
+          const pm = parseInt(month, 10);
+          const py = parseInt(year, 10);
+          let prevM = pm - 1, prevY = py;
+          if (prevM < 1) { prevM = 12; prevY--; }
+          const lastDayPrev = new Date(prevY, prevM, 0).getDate();
+          const dayCols = [];
+          for (let d = 25; d <= lastDayPrev; d++) dayCols.push({ day: d, month: prevM, year: prevY });
+          for (let d = 1; d <= 25; d++) dayCols.push({ day: d, month: pm, year: py });
+
+          // Day type colors
+          const dayBg = (dv) => {
+            if (!dv || !dv.value) return {};
+            if (dv.dayType === 'holiday') return { background: "#fef2f2", color: "#dc2626" };
+            if (dv.dayType === 'sun') return { background: "#fef2f2", color: "#dc2626" };
+            if (dv.dayType === 'sat') return { background: "#fff7ed", color: "#ea580c" };
+            if (dv.isNumber) return { background: "#f0fdf4", color: "#16a34a" };
+            return { background: "#fefce8", color: "#ca8a04" };
+          };
+
+          // Match KPI result to parsed employee
+          const getKpiResult = (fio) => calcResults.find(r => r.fio === fio);
+
+          return (
           <section className="card">
             <h2>Результаты расчёта</h2>
             <p className="card-subtitle">
-              Детальные данные парсинга табелей и итоговый расчёт KPI за период 25 {prevMonthInfo.name} — 25 {currMonthName} {year}.
+              Период: 25 {prevMonthInfo.name} — 25 {currMonthName} {year}. Каждый столбец — день. Цвета: зелёный — работал (число), жёлтый — буква (отсутствие), красный — вых/праздник.
             </p>
 
             {calcResults.length === 0 && parsedDetails.length === 0 ? (
@@ -859,93 +883,64 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
               </div>
             ) : (
               <>
-                {/* Таблица 1: Распарсенные данные из табелей */}
+                {/* Таблица с днями */}
                 {parsedDetails.length > 0 && (
                   <div className="results-block" style={{ marginBottom: "24px" }}>
-                    <h3>Распарсенные данные из табелей (объединённые 25-25)</h3>
-                    <p style={{ fontSize: "12px", color: "#64748b", marginBottom: "8px" }}>
-                      Буквы — дни с буквенными отметками (Б, ОТ и т.д. — отсутствие). Числа — дни с числовыми значениями (часы работы).
-                    </p>
-                    <div className="table-wrapper">
-                      <table>
+                    <h3>Табель по дням (25-25)</h3>
+                    <div className="table-wrapper" style={{ overflowX: "auto" }}>
+                      <table style={{ fontSize: "11px", borderCollapse: "collapse" }}>
                         <thead>
                           <tr>
-                            <th>#</th>
-                            <th>ФИО</th>
-                            <th title="Буквы в будни">Б.будни</th>
-                            <th title="Буквы в субботу">Б.сб</th>
-                            <th title="Буквы в воскресенье">Б.вс</th>
-                            <th title="Буквы в праздники">Б.празд</th>
-                            <th title="Числа в будни">Ч.будни</th>
-                            <th title="Числа в субботу">Ч.сб</th>
-                            <th title="Числа в воскресенье">Ч.вс</th>
-                            <th title="Числа в праздники">Ч.празд</th>
-                            <th>Итого букв</th>
-                            <th>Итого чисел</th>
+                            <th style={{ position: "sticky", left: 0, background: "#f8fafc", zIndex: 2, minWidth: "30px" }}>#</th>
+                            <th style={{ position: "sticky", left: "30px", background: "#f8fafc", zIndex: 2, minWidth: "180px", textAlign: "left" }}>ФИО</th>
+                            {dayCols.map((dc, i) => {
+                              const isNewMonth = i === 0 || dc.month !== dayCols[i - 1].month;
+                              const shortMonth = MONTH_SELECT_NAMES[dc.month - 1]?.slice(0, 3) || "";
+                              return (
+                                <th key={i} style={{ minWidth: "28px", textAlign: "center", padding: "2px 1px", fontSize: "10px", borderLeft: isNewMonth ? "2px solid #94a3b8" : undefined }}>
+                                  <div>{dc.day}</div>
+                                  {isNewMonth && <div style={{ fontSize: "8px", color: "#94a3b8" }}>{shortMonth}</div>}
+                                </th>
+                              );
+                            })}
+                            <th style={{ minWidth: "40px", textAlign: "center", fontWeight: "bold" }} title="Буквы будни">Б</th>
+                            <th style={{ minWidth: "40px", textAlign: "center", fontWeight: "bold" }} title="Числа (отработано)">Ч</th>
+                            <th style={{ minWidth: "45px", textAlign: "center", fontWeight: "bold" }} title="Норма">Норма</th>
+                            <th style={{ minWidth: "40px", textAlign: "center", fontWeight: "bold" }} title="Факт дней">Факт</th>
+                            <th style={{ minWidth: "35px", textAlign: "center", fontWeight: "bold" }}>%</th>
+                            <th style={{ minWidth: "55px", textAlign: "center", fontWeight: "bold" }}>KPI</th>
                           </tr>
                         </thead>
                         <tbody>
                           {parsedDetails.map((p, idx) => {
+                            const dvMap = {};
+                            (p.dayValues || []).forEach(dv => { dvMap[`${dv.year}-${dv.month}-${dv.day}`] = dv; });
                             const totalLetters = (p.letters_weekday || 0) + (p.letters_sat || 0) + (p.letters_sun || 0) + (p.letters_holiday || 0);
                             const totalNumbers = (p.numbers_weekday || 0) + (p.numbers_sat || 0) + (p.numbers_sun || 0) + (p.numbers_holiday || 0);
+                            const kpi = getKpiResult(p.fio);
                             return (
                               <tr key={idx}>
-                                <td>{idx + 1}</td>
-                                <td>{p.fio}</td>
-                                <td>{p.letters_weekday || 0}</td>
-                                <td>{p.letters_sat || 0}</td>
-                                <td>{p.letters_sun || 0}</td>
-                                <td>{p.letters_holiday || 0}</td>
-                                <td>{p.numbers_weekday || 0}</td>
-                                <td>{p.numbers_sat || 0}</td>
-                                <td>{p.numbers_sun || 0}</td>
-                                <td>{p.numbers_holiday || 0}</td>
-                                <td style={{ fontWeight: "bold" }}>{totalLetters}</td>
-                                <td style={{ fontWeight: "bold" }}>{totalNumbers}</td>
+                                <td style={{ position: "sticky", left: 0, background: "#fff", zIndex: 1, textAlign: "center" }}>{idx + 1}</td>
+                                <td style={{ position: "sticky", left: "30px", background: "#fff", zIndex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "200px" }} title={p.fio}>{p.fio}</td>
+                                {dayCols.map((dc, i) => {
+                                  const dv = dvMap[`${dc.year}-${dc.month}-${dc.day}`];
+                                  const isNewMonth = i === 0 || dc.month !== dayCols[i - 1].month;
+                                  return (
+                                    <td key={i} style={{ textAlign: "center", padding: "2px 1px", fontSize: "10px", borderLeft: isNewMonth ? "2px solid #94a3b8" : undefined, ...dayBg(dv) }}
+                                        title={dv ? `${dc.day}.${String(dc.month).padStart(2,"0")} — ${dv.value || "пусто"} (${dv.dayType})` : ""}>
+                                      {dv?.value || ""}
+                                    </td>
+                                  );
+                                })}
+                                <td style={{ textAlign: "center", fontWeight: "bold", color: totalLetters > 0 ? "#ca8a04" : undefined }}>{totalLetters}</td>
+                                <td style={{ textAlign: "center", fontWeight: "bold", color: totalNumbers > 0 ? "#16a34a" : undefined }}>{totalNumbers}</td>
+                                <td style={{ textAlign: "center" }}>{kpi?.daysAssigned ?? "—"}</td>
+                                <td style={{ textAlign: "center", fontWeight: "bold" }}>{kpi?.daysWorked ?? "—"}</td>
+                                <td style={{ textAlign: "center" }}>{kpi ? `${kpi.workPercent}%` : "—"}</td>
+                                <td style={{ textAlign: "center", fontWeight: "bold" }}>{kpi?.kpiFinal ?? "—"}</td>
                               </tr>
                             );
                           })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Таблица 2: Итоговый расчёт KPI */}
-                {calcResults.length > 0 && (
-                  <div className="results-block">
-                    <h3>Итоговый расчёт KPI</h3>
-                    <div className="table-wrapper">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>#</th>
-                            <th>ФИО</th>
-                            <th>График</th>
-                            <th>Отдел</th>
-                            <th title="Норма дней">Норма</th>
-                            <th title="Не отработано (буквы)">Не отраб.</th>
-                            <th title="Фактически отработано">Факт</th>
-                            <th>% вып.</th>
-                            <th>KPI сумм</th>
-                            <th>KPI итог</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {calcResults.map((r, idx) => (
-                            <tr key={idx}>
-                              <td>{idx + 1}</td>
-                              <td>{r.fio}</td>
-                              <td>{formatScheduleType(r.scheduleType)}</td>
-                              <td>{r.department}</td>
-                              <td>{r.daysAssigned}</td>
-                              <td>{r.notWorked}</td>
-                              <td style={{ fontWeight: "bold" }}>{r.daysWorked}</td>
-                              <td>{r.workPercent}%</td>
-                              <td>{r.kpiSum}</td>
-                              <td style={{ fontWeight: "bold" }}>{r.kpiFinal}</td>
-                            </tr>
-                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -973,7 +968,8 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
               </>
             )}
           </section>
-        )}
+          );
+        })()}
 
         {/* =================== Справочник KPI =================== */}
         {activeTab === "kpi" && (

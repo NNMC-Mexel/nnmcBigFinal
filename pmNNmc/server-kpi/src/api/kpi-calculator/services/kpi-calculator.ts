@@ -7,6 +7,15 @@ interface Employee {
     categoryCode?: string;
   }
   
+  interface DayValue {
+    day: number;
+    month: number;
+    year: number;
+    value: string;
+    dayType: 'weekday' | 'sat' | 'sun' | 'holiday';
+    isNumber: boolean;
+  }
+
   interface ParsedEmployee {
     fio: string;
     department?: string;
@@ -18,6 +27,7 @@ interface Employee {
     numbers_sat: number;
     numbers_sun: number;
     numbers_holiday: number;
+    dayValues?: DayValue[];
   }
   
   interface KPIResult {
@@ -65,6 +75,9 @@ interface Employee {
         existing.numbers_sat += emp.numbers_sat || 0;
         existing.numbers_sun += emp.numbers_sun || 0;
         existing.numbers_holiday += emp.numbers_holiday || 0;
+        if (emp.dayValues) {
+          existing.dayValues = [...(existing.dayValues || []), ...emp.dayValues];
+        }
       } else {
         map.set(key, {
           fio: emp.fio,
@@ -77,6 +90,7 @@ interface Employee {
           numbers_sat: emp.numbers_sat || 0,
           numbers_sun: emp.numbers_sun || 0,
           numbers_holiday: emp.numbers_holiday || 0,
+          dayValues: emp.dayValues ? [...emp.dayValues] : [],
         });
       }
     };

@@ -569,6 +569,7 @@ async function calcCore(ctx: Context) {
     numbers_sat: emp.numbers_sat || 0,
     numbers_sun: emp.numbers_sun || 0,
     numbers_holiday: emp.numbers_holiday || 0,
+    dayValues: emp.dayValues || [],
   }));
 
   return withDebug({ results, errors, parsedDetails });
