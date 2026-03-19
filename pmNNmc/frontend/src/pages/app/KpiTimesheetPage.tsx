@@ -54,10 +54,20 @@ export default function KpiTimesheetPage() {
         setKpiUser(data);
         localStorage.setItem(KPI_USER_KEY, JSON.stringify(data));
       })
-      .catch(() => {
-        // Токен устарел — сбрасываем
-        localStorage.removeItem(KPI_TOKEN_KEY);
-        localStorage.removeItem(KPI_USER_KEY);
+      .catch((err) => {
+        const msg = String(err?.message || err || '').toLowerCase();
+        const is401 = msg.includes('401') || msg.includes('unauthorized') || msg.includes('forbidden');
+        if (is401) {
+          // Токен устарел — сбрасываем
+          localStorage.removeItem(KPI_TOKEN_KEY);
+          localStorage.removeItem(KPI_USER_KEY);
+        } else {
+          // Сетевая ошибка — используем кэш
+          const cached = localStorage.getItem(KPI_USER_KEY);
+          if (cached) {
+            try { setKpiUser(JSON.parse(cached)); } catch { /* ignore */ }
+          }
+        }
       })
       .finally(() => setAuthChecked(true));
   }, []);
