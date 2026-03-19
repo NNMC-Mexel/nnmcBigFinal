@@ -857,24 +857,55 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
           for (let d = 25; d <= lastDayPrev; d++) dayCols.push({ day: d, month: prevM, year: prevY });
           for (let d = 1; d <= 25; d++) dayCols.push({ day: d, month: pm, year: py });
 
-          // Day type colors
-          const dayBg = (dv) => {
-            if (!dv || !dv.value) return {};
-            if (dv.dayType === 'holiday') return { background: "#fef2f2", color: "#dc2626" };
-            if (dv.dayType === 'sun') return { background: "#fef2f2", color: "#dc2626" };
-            if (dv.dayType === 'sat') return { background: "#fff7ed", color: "#ea580c" };
-            if (dv.isNumber) return { background: "#f0fdf4", color: "#16a34a" };
-            return { background: "#fefce8", color: "#ca8a04" };
+          // Weekday info for each column
+          const DOW_SHORT = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+          const dayColsMeta = dayCols.map((dc) => {
+            const date = new Date(dc.year, dc.month - 1, dc.day);
+            const dow = date.getDay(); // 0=Sun, 6=Sat
+            const isWeekend = dow === 0 || dow === 6;
+            return { ...dc, dow, dowName: DOW_SHORT[dow], isWeekend };
+          });
+
+          // Column background for weekends (whole column)
+          const weekendHeaderBg = "#fee2e2";
+          const weekendCellBg = "#fff5f5";
+
+          // Cell value colors
+          const cellStyle = (dv, meta) => {
+            const base = {
+              textAlign: "center",
+              padding: "4px 2px",
+              fontSize: "12px",
+              fontWeight: "600",
+              borderLeft: undefined,
+            };
+            // Weekend column background always
+            if (meta.isWeekend) {
+              base.background = weekendCellBg;
+            }
+            if (!dv || !dv.value) return base;
+            if (dv.dayType === 'holiday') return { ...base, background: "#fecaca", color: "#b91c1c" };
+            if (dv.isNumber) return { ...base, color: "#15803d", background: meta.isWeekend ? "#dcfce7" : "#f0fdf4" };
+            // Letter (absence)
+            return { ...base, color: "#b45309", background: meta.isWeekend ? "#fef3c7" : "#fefce8" };
           };
 
           // Match KPI result to parsed employee
           const getKpiResult = (fio) => calcResults.find(r => r.fio === fio);
 
+          // Sticky cell base
+          const stickyBase = { position: "sticky", zIndex: 2, borderRight: "2px solid #cbd5e1" };
+
           return (
           <section className="card">
             <h2>Результаты расчёта</h2>
             <p className="card-subtitle">
-              Период: 25 {prevMonthInfo.name} — 25 {currMonthName} {year}. Каждый столбец — день. Цвета: зелёный — работал (число), жёлтый — буква (отсутствие), красный — вых/праздник.
+              Период: 25 {prevMonthInfo.name} — 25 {currMonthName} {year}.
+              <span style={{ marginLeft: "8px", fontSize: "11px" }}>
+                <span style={{ display: "inline-block", width: 12, height: 12, background: "#f0fdf4", border: "1px solid #86efac", marginRight: 3, verticalAlign: "middle" }}></span>работал
+                <span style={{ display: "inline-block", width: 12, height: 12, background: "#fefce8", border: "1px solid #fde047", margin: "0 3px 0 10px", verticalAlign: "middle" }}></span>отсутствие
+                <span style={{ display: "inline-block", width: 12, height: 12, background: "#fee2e2", border: "1px solid #fca5a5", margin: "0 3px 0 10px", verticalAlign: "middle" }}></span>выходной/праздник
+              </span>
             </p>
 
             {calcResults.length === 0 && parsedDetails.length === 0 ? (
@@ -888,27 +919,72 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                   <div className="results-block" style={{ marginBottom: "24px" }}>
                     <h3>Табель по дням (25-25)</h3>
                     <div className="table-wrapper" style={{ overflowX: "auto" }}>
-                      <table style={{ fontSize: "11px", borderCollapse: "collapse" }}>
+                      <table style={{ fontSize: "12px", borderCollapse: "collapse", border: "2px solid #94a3b8" }}>
                         <thead>
-                          <tr>
-                            <th style={{ position: "sticky", left: 0, background: "#f8fafc", zIndex: 2, minWidth: "30px" }}>#</th>
-                            <th style={{ position: "sticky", left: "30px", background: "#f8fafc", zIndex: 2, minWidth: "180px", textAlign: "left" }}>ФИО</th>
-                            {dayCols.map((dc, i) => {
-                              const isNewMonth = i === 0 || dc.month !== dayCols[i - 1].month;
-                              const shortMonth = MONTH_SELECT_NAMES[dc.month - 1]?.slice(0, 3) || "";
+                          {/* Row 1: Month names spanning columns */}
+                          <tr style={{ background: "#e2e8f0" }}>
+                            <th style={{ ...stickyBase, left: 0, background: "#e2e8f0", minWidth: "32px", borderBottom: "none" }} rowSpan={3}>#</th>
+                            <th style={{ ...stickyBase, left: "32px", background: "#e2e8f0", minWidth: "200px", textAlign: "left", borderBottom: "none" }} rowSpan={3}>ФИО</th>
+                            {(() => {
+                              // Group columns by month
+                              const groups = [];
+                              let cur = null;
+                              dayColsMeta.forEach((dc, i) => {
+                                if (!cur || dc.month !== cur.month) {
+                                  cur = { month: dc.month, year: dc.year, count: 1 };
+                                  groups.push(cur);
+                                } else {
+                                  cur.count++;
+                                }
+                              });
+                              return groups.map((g, gi) => (
+                                <th key={gi} colSpan={g.count} style={{ textAlign: "center", fontWeight: "bold", fontSize: "13px", padding: "6px 2px", borderLeft: "2px solid #94a3b8", borderBottom: "1px solid #cbd5e1", background: "#e2e8f0", textTransform: "capitalize" }}>
+                                  {MONTH_SELECT_NAMES[g.month - 1]} {g.year}
+                                </th>
+                              ));
+                            })()}
+                            <th colSpan={6} style={{ textAlign: "center", fontWeight: "bold", fontSize: "13px", padding: "6px 2px", borderLeft: "3px solid #475569", background: "#e2e8f0", borderBottom: "1px solid #cbd5e1" }}>Итоги</th>
+                          </tr>
+                          {/* Row 2: Day of week */}
+                          <tr style={{ background: "#f1f5f9" }}>
+                            {dayColsMeta.map((dc, i) => {
+                              const isNewMonth = i === 0 || dc.month !== dayColsMeta[i - 1].month;
                               return (
-                                <th key={i} style={{ minWidth: "28px", textAlign: "center", padding: "2px 1px", fontSize: "10px", borderLeft: isNewMonth ? "2px solid #94a3b8" : undefined }}>
-                                  <div>{dc.day}</div>
-                                  {isNewMonth && <div style={{ fontSize: "8px", color: "#94a3b8" }}>{shortMonth}</div>}
+                                <th key={i} style={{
+                                  textAlign: "center", padding: "2px 1px", fontSize: "10px", fontWeight: "600",
+                                  borderLeft: isNewMonth ? "2px solid #94a3b8" : "1px solid #e2e8f0",
+                                  borderBottom: "1px solid #cbd5e1",
+                                  background: dc.isWeekend ? weekendHeaderBg : "#f1f5f9",
+                                  color: dc.isWeekend ? "#dc2626" : "#475569",
+                                }}>
+                                  {dc.dowName}
                                 </th>
                               );
                             })}
-                            <th style={{ minWidth: "40px", textAlign: "center", fontWeight: "bold" }} title="Буквы будни">Б</th>
-                            <th style={{ minWidth: "40px", textAlign: "center", fontWeight: "bold" }} title="Числа (отработано)">Ч</th>
-                            <th style={{ minWidth: "45px", textAlign: "center", fontWeight: "bold" }} title="Норма">Норма</th>
-                            <th style={{ minWidth: "40px", textAlign: "center", fontWeight: "bold" }} title="Факт дней">Факт</th>
-                            <th style={{ minWidth: "35px", textAlign: "center", fontWeight: "bold" }}>%</th>
-                            <th style={{ minWidth: "55px", textAlign: "center", fontWeight: "bold" }}>KPI</th>
+                            <th style={{ borderLeft: "3px solid #475569", background: "#f1f5f9", borderBottom: "1px solid #cbd5e1" }} colSpan={6}></th>
+                          </tr>
+                          {/* Row 3: Day numbers */}
+                          <tr style={{ background: "#f8fafc" }}>
+                            {dayColsMeta.map((dc, i) => {
+                              const isNewMonth = i === 0 || dc.month !== dayColsMeta[i - 1].month;
+                              return (
+                                <th key={i} style={{
+                                  minWidth: "32px", textAlign: "center", padding: "4px 2px", fontSize: "13px", fontWeight: "bold",
+                                  borderLeft: isNewMonth ? "2px solid #94a3b8" : "1px solid #e2e8f0",
+                                  borderBottom: "2px solid #94a3b8",
+                                  background: dc.isWeekend ? weekendHeaderBg : "#f8fafc",
+                                  color: dc.isWeekend ? "#dc2626" : "#1e293b",
+                                }}>
+                                  {dc.day}
+                                </th>
+                              );
+                            })}
+                            <th style={{ minWidth: "35px", textAlign: "center", fontWeight: "bold", fontSize: "11px", borderLeft: "3px solid #475569", borderBottom: "2px solid #94a3b8", background: "#fefce8", color: "#92400e" }} title="Буквы (отсутствие)">Б</th>
+                            <th style={{ minWidth: "35px", textAlign: "center", fontWeight: "bold", fontSize: "11px", borderLeft: "1px solid #cbd5e1", borderBottom: "2px solid #94a3b8", background: "#f0fdf4", color: "#166534" }} title="Числа (отработано)">Ч</th>
+                            <th style={{ minWidth: "50px", textAlign: "center", fontWeight: "bold", fontSize: "11px", borderLeft: "2px solid #94a3b8", borderBottom: "2px solid #94a3b8" }}>Норма</th>
+                            <th style={{ minWidth: "45px", textAlign: "center", fontWeight: "bold", fontSize: "11px", borderLeft: "1px solid #cbd5e1", borderBottom: "2px solid #94a3b8" }}>Факт</th>
+                            <th style={{ minWidth: "40px", textAlign: "center", fontWeight: "bold", fontSize: "11px", borderLeft: "1px solid #cbd5e1", borderBottom: "2px solid #94a3b8" }}>%</th>
+                            <th style={{ minWidth: "60px", textAlign: "center", fontWeight: "bold", fontSize: "11px", borderLeft: "1px solid #cbd5e1", borderBottom: "2px solid #94a3b8" }}>KPI</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -918,26 +994,32 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                             const totalLetters = (p.letters_weekday || 0) + (p.letters_sat || 0) + (p.letters_sun || 0) + (p.letters_holiday || 0);
                             const totalNumbers = (p.numbers_weekday || 0) + (p.numbers_sat || 0) + (p.numbers_sun || 0) + (p.numbers_holiday || 0);
                             const kpi = getKpiResult(p.fio);
+                            const rowBg = idx % 2 === 0 ? "#fff" : "#f8fafc";
                             return (
-                              <tr key={idx}>
-                                <td style={{ position: "sticky", left: 0, background: "#fff", zIndex: 1, textAlign: "center" }}>{idx + 1}</td>
-                                <td style={{ position: "sticky", left: "30px", background: "#fff", zIndex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "200px" }} title={p.fio}>{p.fio}</td>
-                                {dayCols.map((dc, i) => {
+                              <tr key={idx} style={{ borderBottom: "1px solid #cbd5e1" }}>
+                                <td style={{ ...stickyBase, left: 0, background: rowBg, textAlign: "center", fontWeight: "600", fontSize: "11px", padding: "5px 3px" }}>{idx + 1}</td>
+                                <td style={{ ...stickyBase, left: "32px", background: rowBg, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "220px", padding: "5px 6px", fontWeight: "500", fontSize: "12px" }} title={p.fio}>{p.fio}</td>
+                                {dayColsMeta.map((dc, i) => {
                                   const dv = dvMap[`${dc.year}-${dc.month}-${dc.day}`];
-                                  const isNewMonth = i === 0 || dc.month !== dayCols[i - 1].month;
+                                  const isNewMonth = i === 0 || dc.month !== dayColsMeta[i - 1].month;
+                                  const style = cellStyle(dv, dc);
+                                  if (isNewMonth) style.borderLeft = "2px solid #94a3b8";
+                                  else style.borderLeft = "1px solid #e2e8f0";
+                                  // If weekend and no value, keep weekend bg
+                                  if (dc.isWeekend && (!dv || !dv.value)) style.background = weekendCellBg;
                                   return (
-                                    <td key={i} style={{ textAlign: "center", padding: "2px 1px", fontSize: "10px", borderLeft: isNewMonth ? "2px solid #94a3b8" : undefined, ...dayBg(dv) }}
-                                        title={dv ? `${dc.day}.${String(dc.month).padStart(2,"0")} — ${dv.value || "пусто"} (${dv.dayType})` : ""}>
+                                    <td key={i} style={style}
+                                        title={`${dc.day}.${String(dc.month).padStart(2,"0")} ${dc.dowName}${dv?.value ? " — " + dv.value : ""}`}>
                                       {dv?.value || ""}
                                     </td>
                                   );
                                 })}
-                                <td style={{ textAlign: "center", fontWeight: "bold", color: totalLetters > 0 ? "#ca8a04" : undefined }}>{totalLetters}</td>
-                                <td style={{ textAlign: "center", fontWeight: "bold", color: totalNumbers > 0 ? "#16a34a" : undefined }}>{totalNumbers}</td>
-                                <td style={{ textAlign: "center" }}>{kpi?.daysAssigned ?? "—"}</td>
-                                <td style={{ textAlign: "center", fontWeight: "bold" }}>{kpi?.daysWorked ?? "—"}</td>
-                                <td style={{ textAlign: "center" }}>{kpi ? `${kpi.workPercent}%` : "—"}</td>
-                                <td style={{ textAlign: "center", fontWeight: "bold" }}>{kpi?.kpiFinal ?? "—"}</td>
+                                <td style={{ textAlign: "center", fontWeight: "bold", fontSize: "13px", padding: "5px 3px", borderLeft: "3px solid #475569", color: totalLetters > 0 ? "#b45309" : "#94a3b8", background: totalLetters > 0 ? "#fefce8" : undefined }}>{totalLetters}</td>
+                                <td style={{ textAlign: "center", fontWeight: "bold", fontSize: "13px", padding: "5px 3px", borderLeft: "1px solid #cbd5e1", color: totalNumbers > 0 ? "#15803d" : "#94a3b8", background: totalNumbers > 0 ? "#f0fdf4" : undefined }}>{totalNumbers}</td>
+                                <td style={{ textAlign: "center", fontWeight: "600", fontSize: "13px", padding: "5px 3px", borderLeft: "2px solid #94a3b8" }}>{kpi?.daysAssigned ?? "—"}</td>
+                                <td style={{ textAlign: "center", fontWeight: "bold", fontSize: "14px", padding: "5px 3px", borderLeft: "1px solid #cbd5e1", color: "#1e40af" }}>{kpi?.daysWorked ?? "—"}</td>
+                                <td style={{ textAlign: "center", fontWeight: "600", fontSize: "12px", padding: "5px 3px", borderLeft: "1px solid #cbd5e1" }}>{kpi ? `${kpi.workPercent}%` : "—"}</td>
+                                <td style={{ textAlign: "center", fontWeight: "bold", fontSize: "13px", padding: "5px 3px", borderLeft: "1px solid #cbd5e1", color: "#7c3aed" }}>{kpi?.kpiFinal ?? "—"}</td>
                               </tr>
                             );
                           })}
