@@ -17,6 +17,7 @@ import {
     Settings2,
     CalendarRange,
     BookOpen,
+    FileSignature,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuthStore, useUserRole } from "../store/authStore";
@@ -260,7 +261,7 @@ export default function AppLayout() {
             </a> */}
 
                         {/* Services — visible based on moduleAccess */}
-                        {(hasModuleAccess('conf') || hasModuleAccess('journal')) && (
+                        {(hasModuleAccess('conf') || hasModuleAccess('journal') || hasModuleAccess('signdoc')) && (
                             <div className='pt-4 pb-2'>
                                 <p className='px-3 text-xs font-medium text-slate-400 uppercase'>
                                     Сервисы
@@ -295,6 +296,21 @@ export default function AppLayout() {
                                 onClick={() => setSidebarOpen(false)}>
                                 <BookOpen className='w-5 h-5' />
                                 Журнал приёмной
+                            </NavLink>
+                        )}
+                        {hasModuleAccess('signdoc') && (
+                            <NavLink
+                                to="/app/signdoc"
+                                className={({ isActive }) =>
+                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                                        isActive
+                                            ? "bg-primary-50 text-primary-700 font-medium"
+                                            : "text-slate-600 hover:bg-slate-50"
+                                    }`
+                                }
+                                onClick={() => setSidebarOpen(false)}>
+                                <FileSignature className='w-5 h-5' />
+                                Документооборот
                             </NavLink>
                         )}
 

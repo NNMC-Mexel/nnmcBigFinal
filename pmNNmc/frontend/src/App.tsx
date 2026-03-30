@@ -36,6 +36,7 @@ import KpiItPage from './pages/app/KpiItPage';
 import KpiTimesheetPage from './pages/app/KpiTimesheetPage';
 import ConferenceRoomsPage from './pages/app/ConferenceRoomsPage';
 import JournalPage from './pages/app/JournalPage';
+import SignDocPage from './pages/app/SignDocPage';
 
 // Protected Route component — redirects to Keycloak SSO
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -274,6 +275,7 @@ function App() {
         />
         <Route path="rooms" element={<ConferenceRoomsPage />} />
         <Route path="journal" element={<JournalPage />} />
+        <Route path="signdoc/*" element={<SignDocPage />} />
       </Route>
 
       {/* Logged out page — not protected, prevents auto-redirect to Keycloak */}

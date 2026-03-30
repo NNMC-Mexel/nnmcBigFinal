@@ -1,0 +1,27 @@
+{
+  "kind": "collectionType",
+  "collectionName": "document_types",
+  "info": {
+    "singularName": "document-type",
+    "pluralName": "document-types",
+    "displayName": "Document Type",
+    "description": "Виды документов"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "documents": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::document.document",
+      "mappedBy": "documentType"
+    }
+  }
+}

@@ -93,6 +93,8 @@ export const useAuthStore = create<AuthState>()(
         localStorage.removeItem('kpi_cache_v1');
         localStorage.removeItem('conf_token');
         localStorage.removeItem('journal_token');
+        localStorage.removeItem('signdoc_token');
+        localStorage.removeItem('signdoc_user');
         set({
           user: null,
           token: null,

@@ -1,0 +1,25 @@
+{
+    "kind": "collectionType",
+    "collectionName": "subdivisions",
+    "info": {
+        "singularName": "subdivision",
+        "pluralName": "subdivisions",
+        "displayName": "Подразделение",
+        "description": "Подразделения внутри отделов"
+    },
+    "options": {
+        "draftAndPublish": false
+    },
+    "attributes": {
+        "name": {
+            "type": "string",
+            "required": true
+        },
+        "department": {
+            "type": "relation",
+            "relation": "manyToOne",
+            "target": "api::department.department",
+            "inversedBy": "subdivisions"
+        }
+    }
+}

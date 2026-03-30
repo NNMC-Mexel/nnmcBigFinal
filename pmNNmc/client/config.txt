@@ -1,0 +1,16 @@
+
+            // Добавляем ФИО (сразу после двоеточия)
+            lastPage.drawImage(nameTextImageEmbed, {
+                x: nameX - 80, // Оптимальная позиция
+                y: nameY - 3, // Оптимальная позиция
+                width: nameTextDims.width,
+                height: nameTextDims.height,
+            });
+
+            // Добавляем подпись (в графе "Подпись")
+            lastPage.drawImage(signatureImageEmbed, {
+                x: signatureX - 60,
+                y: signatureY - 7, // Выше (-12 было, стало -7)
+                width: signatureDims.width,
+                height: signatureDims.height,
+            });

@@ -14,6 +14,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   apiCalcKpiJson,
   apiCalcKpiExcel,
@@ -308,7 +309,10 @@ function AccessModal({ user, departments, onCancel, onSave }) {
 
 // ======================= Основной модуль =======================
 
+const MONTH_NAMES_RU = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+
 export default function KpiTimesheetModule({ user, onKpiLogout }) {
+  const navigate = useNavigate();
   const [cacheLoaded, setCacheLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState("calc");
   const [toast, setToast] = useState(null);
@@ -592,6 +596,32 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     }
   };
 
+  const handleSendToSignDoc = async () => {
+    if (!timesheetFile) { showToast("Выберите файл табеля текущего месяца", "error"); return; }
+    if (!timesheetFilePrev) { showToast("Выберите файл табеля прошлого месяца", "error"); return; }
+    if (!calcDepartment) { showToast("Выберите отдел для расчёта", "error"); return; }
+    try {
+      showToast("Формирование PDF для подписания…");
+      const fd = new FormData();
+      fd.append("timesheet", timesheetFile);
+      fd.append("timesheetPrev", timesheetFilePrev);
+      fd.append("nchDay", nchDay || "0");
+      fd.append("ndShift", ndShift || "0");
+      fd.append("year", year);
+      fd.append("month", month);
+      if (calcDepartment) fd.append("department", calcDepartment);
+      fd.append("holidays", JSON.stringify(holidays.map((h) => h.date || h).filter(Boolean)));
+      const blob = await apiCalcKpiBuhPdf(fd, { department: calcDepartment || "", debug: true });
+      const monthName = MONTH_NAMES_RU[parseInt(month, 10)] || month;
+      const fileName = `KPI_Протокол_${calcDepartment}_${monthName}_${year}.pdf`;
+      const title = `KPI Протокол ${calcDepartment} ${monthName} ${year}`;
+      const file = new File([blob], fileName, { type: "application/pdf" });
+      navigate("/app/signdoc/documents/new", { state: { pendingFile: file, pendingTitle: title } });
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : String(err) || "Ошибка формирования PDF", "error");
+    }
+  };
+
   const openAddForm = () => { setFormInitial(null); setFormMode("add"); };
   const openEditForm = (item) => { setFormInitial(item); setFormMode("edit"); };
   const openAccessModal = (accessUser) => setAccessModalUser(accessUser);
@@ -798,6 +828,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
               <button className="btn btn-outline" onClick={() => handleDownload("1c")}>Скачать для 1С</button>
               <button className="btn btn-outline" onClick={() => handleDownload("buh")}>Скачать для бухгалтерии</button>
               <button className="btn btn-outline" onClick={() => handleDownload("pdf")}>Скачать PDF</button>
+              <button className="btn btn-outline" onClick={handleSendToSignDoc}>Отправить на подпись</button>
             </div>
 
             {calcResults.length > 0 && (

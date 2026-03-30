@@ -1,0 +1,71 @@
+{
+  "kind": "collectionType",
+  "collectionName": "documents",
+  "info": {
+    "singularName": "document",
+    "pluralName": "documents",
+    "displayName": "Document",
+    "description": "Документы для подписания"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["pending", "in_progress", "completed", "cancelled", "revision"],
+      "default": "pending",
+      "required": true
+    },
+    "signatureType": {
+      "type": "enumeration",
+      "enum": ["eds", "simple"]
+    },
+    "signatureSequential": {
+      "type": "boolean",
+      "default": false
+    },
+    "creator": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "assigned_users": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user"
+    },
+    "originalFile": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["files"]
+    },
+    "currentFile": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["files"]
+    },
+    "signers": {
+      "type": "json"
+    },
+    "signatureHistory": {
+      "type": "json"
+    },
+    "documentType": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::document-type.document-type",
+      "inversedBy": "documents"
+    },
+    "subdivision": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::subdivision.subdivision"
+    }
+  }
+}
