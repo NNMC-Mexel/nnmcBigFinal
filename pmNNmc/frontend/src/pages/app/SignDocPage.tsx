@@ -68,15 +68,18 @@ export default function SignDocPage() {
     setLoginLoading(true);
     setLoginError('');
     try {
-      const data = await (apiLogin as (l: string, p: string) => Promise<SignDocUser & { jwt?: string }>)(
+      const data = await (apiLogin as (l: string, p: string) => Promise<{ jwt?: string; user?: SignDocUser }>)(
         loginForm.login,
         loginForm.password
       );
+      // apiLogin returns { jwt, user } — user info is in data.user
+      const u = data.user;
+      if (!u || !u.id) throw new Error('Не удалось получить данные пользователя');
       const user: SignDocUser = {
-        id: data.id,
-        username: data.username,
-        email: data.email,
-        fullName: data.fullName,
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        fullName: u.fullName,
       };
       localStorage.setItem(SIGNDOC_USER_KEY, JSON.stringify(user));
       setSdUser(user);
