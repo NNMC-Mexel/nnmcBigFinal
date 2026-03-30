@@ -7,6 +7,8 @@ const VITE_SIGNDOC_API_BASE =
     : "";
 const DEFAULT_API_BASE = `${window.location.protocol}//${window.location.hostname}:12015/api`;
 const API_BASE = VITE_SIGNDOC_API_BASE || DEFAULT_API_BASE;
+// Server root (without /api) for file URLs like /uploads/...
+const SERVER_BASE = API_BASE.replace(/\/api\/?$/, "");
 
 const TOKEN_KEY = "signdoc_token";
 const USER_KEY = "signdoc_user";
@@ -182,7 +184,10 @@ export async function getDocumentFileUrl(documentId, fileType = "current") {
     { headers: { ...getAuthHeader() } }
   );
   const json = await handleResponse(res);
-  return json.url;
+  const url = json.url;
+  // Prepend server base if URL is relative (e.g. /uploads/...)
+  if (url && !url.startsWith("http")) return `${SERVER_BASE}${url}`;
+  return url;
 }
 
 export async function presignDocumentFile(documentId, key) {
@@ -191,7 +196,9 @@ export async function presignDocumentFile(documentId, key) {
     { headers: { ...getAuthHeader() } }
   );
   const json = await handleResponse(res);
-  return json.url;
+  const url = json.url;
+  if (url && !url.startsWith("http")) return `${SERVER_BASE}${url}`;
+  return url;
 }
 
 // ─── Users ───────────────────────────────────────────────────
