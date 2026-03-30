@@ -84,7 +84,7 @@ export default function BatchSignPage() {
     useEffect(() => {
         if (documentIds.length === 0) {
             toast.error("Не выбраны документы для подписания");
-            navigate("/documents/pending");
+            navigate("/app/signdoc/documents/pending");
             return;
         }
         loadFonts();
@@ -120,7 +120,7 @@ export default function BatchSignPage() {
 
             if (selectedDocs.length === 0) {
                 toast.error("Документы не найдены");
-                navigate("/documents/pending");
+                navigate("/app/signdoc/documents/pending");
                 return;
             }
 
@@ -176,7 +176,7 @@ export default function BatchSignPage() {
 
             if (files.length === 0) {
                 toast.error("Не удалось загрузить файлы документов");
-                navigate("/documents/pending");
+                navigate("/app/signdoc/documents/pending");
             } else if (files.length < selectedDocs.length) {
                 toast.warning(
                     `Загружено ${files.length} из ${selectedDocs.length} документов`
@@ -185,7 +185,7 @@ export default function BatchSignPage() {
         } catch (error) {
             console.error("Ошибка загрузки документов:", error);
             toast.error("Ошибка загрузки документов");
-            navigate("/documents/pending");
+            navigate("/app/signdoc/documents/pending");
         } finally {
             setLoading(false);
         }
@@ -687,7 +687,7 @@ export default function BatchSignPage() {
                         ))}
                     </div>
                     <button
-                        onClick={() => navigate("/documents/pending")}
+                        onClick={() => navigate("/app/signdoc/documents/pending")}
                         className='w-full py-3 px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors'>
                         Вернуться к документам
                     </button>
@@ -700,7 +700,7 @@ export default function BatchSignPage() {
         <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8'>
             <div className='max-w-4xl mx-auto'>
                 <button
-                    onClick={() => navigate("/documents/pending")}
+                    onClick={() => navigate("/app/signdoc/documents/pending")}
                     className='mb-4 flex items-center gap-2 text-indigo-600 hover:text-indigo-700'>
                     <ArrowLeft className='w-5 h-5' />
                     Назад к документам
@@ -847,7 +847,7 @@ export default function BatchSignPage() {
                     {status === "error" && (
                         <div className='flex gap-3'>
                             <button
-                                onClick={() => navigate("/documents/pending")}
+                                onClick={() => navigate("/app/signdoc/documents/pending")}
                                 className='flex-1 py-3 px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-semibold'>
                                 Назад
                             </button>

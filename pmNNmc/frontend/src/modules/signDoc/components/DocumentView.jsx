@@ -117,7 +117,7 @@ export default function DocumentView() {
 
             if (!doc) {
                 toast.error("Документ не найден");
-                navigate("/documents");
+                navigate("/app/signdoc/documents");
                 return;
             }
 
@@ -219,7 +219,7 @@ export default function DocumentView() {
             });
 
             toast.success("Документ успешно подписан!");
-            navigate("/documents/pending");
+            navigate("/app/signdoc/documents/pending");
         } catch (error) {
             console.error("Ошибка подписания:", error);
             toast.error("Ошибка при подписании документа");

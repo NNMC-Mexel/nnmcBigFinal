@@ -375,7 +375,7 @@ export default function DocumentList({ type = "my" }) {
         }
 
         // Передаём выбранные документы в страницу подписания
-        navigate("/documents/batch-sign", {
+        navigate("/app/signdoc/documents/batch-sign", {
             state: {
                 documentIds: selectedDocs,
             },
@@ -1117,7 +1117,7 @@ export default function DocumentList({ type = "my" }) {
                                                     <button
                                                         onClick={() =>
                                                             navigate(
-                                                                `/documents/${doc.id}`
+                                                                `/app/signdoc/documents/${doc.id}`
                                                             )
                                                         }
                                                         className='p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors'

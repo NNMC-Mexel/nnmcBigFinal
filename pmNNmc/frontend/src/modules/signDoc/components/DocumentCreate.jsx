@@ -418,7 +418,7 @@ export default function DocumentCreate() {
                 );
             }
 
-            navigate("/documents");
+            navigate("/app/signdoc/documents");
         } catch (error) {
             console.error("Ошибка создания документов:", error);
             toast.error("Ошибка создания документов");
