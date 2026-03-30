@@ -1,37 +1,11 @@
 import { factories } from "@strapi/strapi";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-
-const makeS3Client = () =>
-    new S3Client({
-        credentials: {
-            accessKeyId: process.env.MINIO_ACCESS_KEY!,
-            secretAccessKey: process.env.MINIO_SECRET_KEY!,
-        },
-        region: "us-east-1",
-        endpoint: process.env.MINIO_ENDPOINT,
-        forcePathStyle: true,
-    });
-
-const checkMinioEnv = (ctx: any) => {
-    if (
-        !process.env.MINIO_ENDPOINT ||
-        !process.env.MINIO_BUCKET ||
-        !process.env.MINIO_ACCESS_KEY ||
-        !process.env.MINIO_SECRET_KEY
-    ) {
-        ctx.internalServerError("MinIO не настроен");
-        return false;
-    }
-    return true;
-};
 
 export default factories.createCoreController(
     "api::document.document",
     ({ strapi }) => ({
         /**
          * GET /api/documents/:id/file-url?file=current|original
-         * Returns a pre-signed MinIO URL for the document's main file (15 min TTL).
+         * Returns the public URL for the document's file.
          * Accessible only to the document creator or assigned users.
          */
         async getFileUrl(ctx) {
@@ -69,25 +43,13 @@ export default factories.createCoreController(
 
             if (!file) return ctx.notFound("Файл не найден");
 
-            if (!checkMinioEnv(ctx)) return;
-
-            const key = `${file.hash}${file.ext}`;
-            const command = new GetObjectCommand({
-                Bucket: process.env.MINIO_BUCKET,
-                Key: key,
-            });
-
-            const signedUrl = await getSignedUrl(makeS3Client(), command, {
-                expiresIn: 900,
-            });
-
-            return ctx.send({ url: signedUrl });
+            const url = (file as any).url;
+            return ctx.send({ url });
         },
 
         /**
          * GET /api/documents/:id/presign?key=<objectKey>
-         * Returns a pre-signed MinIO URL for any file associated with a document
-         * (e.g. CMS signature files stored in signatureHistory).
+         * Returns the file URL for a given key.
          * Accessible only to the document creator or assigned users.
          */
         async presignUrl(ctx) {
@@ -114,18 +76,9 @@ export default factories.createCoreController(
             if (!isCreator && !isAssigned)
                 return ctx.forbidden("Нет доступа к этому документу");
 
-            if (!checkMinioEnv(ctx)) return;
-
-            const command = new GetObjectCommand({
-                Bucket: process.env.MINIO_BUCKET,
-                Key: key,
-            });
-
-            const signedUrl = await getSignedUrl(makeS3Client(), command, {
-                expiresIn: 900,
-            });
-
-            return ctx.send({ url: signedUrl });
+            // For local storage, construct the URL from the key
+            const url = `/uploads/${key}`;
+            return ctx.send({ url });
         },
     })
 );
