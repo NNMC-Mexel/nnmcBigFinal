@@ -10,7 +10,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { FileText, LogIn, Eye, EyeOff } from 'lucide-react';
+import { FileText, LogIn, Eye, EyeOff, ShieldX } from 'lucide-react';
 // @ts-ignore — JS module, no types needed
 import SignDocModule from '../../modules/signDoc/SignDocModule';
 import { apiLogin, apiMe } from '../../modules/signDoc/api/signdocClient';
@@ -23,6 +23,7 @@ interface SignDocUser {
   username: string;
   email: string;
   fullName?: string;
+  signdocAccess?: boolean;
   [key: string]: unknown;
 }
 
@@ -104,6 +105,25 @@ export default function SignDocPage() {
     return (
       <div className='flex items-center justify-center min-h-64'>
         <div className='text-slate-500 text-sm'>Загрузка модуля документооборота…</div>
+      </div>
+    );
+  }
+
+  // Authenticated but no access
+  if (sdUser && !sdUser.signdocAccess) {
+    return (
+      <div className='flex items-center justify-center min-h-[60vh]'>
+        <div className='text-center'>
+          <div className='inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-100 mb-4'>
+            <ShieldX className='w-7 h-7 text-red-500' />
+          </div>
+          <h2 className='text-xl font-bold text-slate-800 mb-2'>Доступ ограничен</h2>
+          <p className='text-slate-500 text-sm max-w-sm'>
+            У вас нет доступа к модулю документооборота.
+            <br />
+            Обратитесь к администратору для получения доступа.
+          </p>
+        </div>
       </div>
     );
   }

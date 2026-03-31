@@ -73,6 +73,10 @@
       "relation": "manyToOne",
       "target": "api::department.department",
       "inversedBy": "users"
+    },
+    "signdocAccess": {
+      "type": "boolean",
+      "default": false
     }
   }
 }
