@@ -12,6 +12,7 @@ export default function KeycloakCallbackPage() {
     const kpiApiBase = import.meta.env.VITE_KPI_API_BASE;
     const confApiUrl = import.meta.env.VITE_CONF_API_URL;
     const journalApiUrl = import.meta.env.VITE_JOURNAL_API_URL;
+    const signdocApiBase = import.meta.env.VITE_SIGNDOC_API_BASE;
     const encoded = encodeURIComponent(accessToken);
 
     const kpiPromise = kpiApiBase
@@ -29,12 +30,21 @@ export default function KeycloakCallbackPage() {
           .then((res) => res.json())
           .catch(() => null)
       : Promise.resolve(null);
+    const signdocPromise = signdocApiBase
+      ? fetch(`${signdocApiBase}/auth/keycloak/callback?access_token=${encoded}`)
+          .then((res) => res.json())
+          .catch(() => null)
+      : Promise.resolve(null);
 
-    return Promise.all([kpiPromise, confPromise, journalPromise]).then(
-      ([kpiData, confData, journalData]) => {
+    return Promise.all([kpiPromise, confPromise, journalPromise, signdocPromise]).then(
+      ([kpiData, confData, journalData, signdocData]) => {
         if (kpiData?.jwt) localStorage.setItem('kpi_token', kpiData.jwt);
         if (confData?.jwt) localStorage.setItem('conf_token', confData.jwt);
         if (journalData?.jwt) localStorage.setItem('journal_token', journalData.jwt);
+        if (signdocData?.jwt) {
+          localStorage.setItem('signdoc_token', signdocData.jwt);
+          if (signdocData.user) localStorage.setItem('signdoc_user', JSON.stringify(signdocData.user));
+        }
       }
     );
   }
