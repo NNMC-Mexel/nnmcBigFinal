@@ -15,6 +15,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../../store/authStore";
+import EdsSignature from "../signDoc/components/EdsSignature";
 import {
   apiCalcKpiJson,
   apiCalcKpiExcel,
@@ -352,6 +354,13 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   const [accessModalUser, setAccessModalUser] = useState(null);
   const [accessLoading, setAccessLoading] = useState(false);
 
+  // EDS signing
+  const [showEdsModal, setShowEdsModal] = useState(false);
+  const [edsPdfFile, setEdsPdfFile] = useState(null);
+  const [edsTitle, setEdsTitle] = useState("");
+  const [edsResult, setEdsResult] = useState(null);
+  const { user: pmUser } = useAuthStore();
+
   const isAdmin =
     String(user?.role || "").toLowerCase().includes("admin") ||
     String(user?.login || "").toLowerCase().startsWith("admin");
@@ -622,6 +631,74 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     }
   };
 
+  // ---- EDS signing handlers ----
+  const handleSignEds = async () => {
+    if (!timesheetFile) { showToast("Выберите файл табеля текущего месяца", "error"); return; }
+    if (!timesheetFilePrev) { showToast("Выберите файл табеля прошлого месяца", "error"); return; }
+    if (!calcDepartment) { showToast("Выберите отдел для расчёта", "error"); return; }
+    try {
+      showToast("Формирование PDF для подписания…");
+      const fd = new FormData();
+      fd.append("timesheet", timesheetFile);
+      fd.append("timesheetPrev", timesheetFilePrev);
+      fd.append("nchDay", nchDay || "0");
+      fd.append("ndShift", ndShift || "0");
+      fd.append("year", year);
+      fd.append("month", month);
+      if (calcDepartment) fd.append("department", calcDepartment);
+      fd.append("holidays", JSON.stringify(holidays.map((h) => h.date || h).filter(Boolean)));
+      const blob = await apiCalcKpiBuhPdf(fd, { department: calcDepartment || "", debug: true });
+      const monthName = MONTH_NAMES_RU[parseInt(month, 10)] || month;
+      const fileName = `KPI_Протокол_${calcDepartment}_${monthName}_${year}.pdf`;
+      const title = `KPI Протокол ${calcDepartment} ${monthName} ${year}`;
+      const file = new File([blob], fileName, { type: "application/pdf" });
+      setEdsPdfFile(file);
+      setEdsTitle(title);
+      setEdsResult(null);
+      setShowEdsModal(true);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : String(err) || "Ошибка формирования PDF", "error");
+    }
+  };
+
+  const handleEdsComplete = (signedPdfBlob, cmsBlob, meta) => {
+    setEdsResult({ signedPdfBlob, cmsBlob, meta });
+  };
+
+  const handleDownloadSigned = () => {
+    if (!edsResult) return;
+    const url = URL.createObjectURL(edsResult.signedPdfBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = edsTitle.replace(/\s+/g, "_") + ".pdf";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("PDF скачан");
+  };
+
+  const handleSendSignedToSignDoc = () => {
+    if (!edsResult) return;
+    const signedFile = new File([edsResult.signedPdfBlob], edsTitle.replace(/\s+/g, "_") + ".pdf", { type: "application/pdf" });
+    setShowEdsModal(false);
+    navigate("/app/signdoc/documents/new", {
+      state: {
+        pendingFile: signedFile,
+        pendingTitle: edsTitle,
+        pendingCms: edsResult.cmsBlob,
+        pendingMeta: edsResult.meta,
+        pendingPreSigned: true,
+      },
+    });
+  };
+
+  const closeEdsModal = () => {
+    setShowEdsModal(false);
+    setEdsPdfFile(null);
+    setEdsResult(null);
+  };
+
   const openAddForm = () => { setFormInitial(null); setFormMode("add"); };
   const openEditForm = (item) => { setFormInitial(item); setFormMode("edit"); };
   const openAccessModal = (accessUser) => setAccessModalUser(accessUser);
@@ -829,6 +906,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
               <button className="btn btn-outline" onClick={() => handleDownload("buh")}>Скачать для бухгалтерии</button>
               <button className="btn btn-outline" onClick={() => handleDownload("pdf")}>Скачать PDF</button>
               <button className="btn btn-outline" onClick={handleSendToSignDoc}>Отправить на подпись</button>
+              <button className="btn btn-outline" onClick={handleSignEds}>Подписать ЭЦП</button>
             </div>
 
             {calcResults.length > 0 && (
@@ -1291,6 +1369,43 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       <DeleteConfirmModal employee={deleteModalEmployee} onCancel={() => setDeleteModalEmployee(null)} onConfirm={handleDeleteConfirm} />
       <EmployeeFormModal initial={formInitial} mode={formMode} onCancel={() => { setFormMode(null); setFormInitial(null); }} onSave={handleFormSave} />
       <AccessModal user={accessModalUser} departments={allDepartments} onCancel={() => setAccessModalUser(null)} onSave={handleAccessSave} />
+
+      {/* EDS signing modal */}
+      {showEdsModal && (
+        <div className="modal-overlay" onClick={closeEdsModal}>
+          <div className="modal modal-wide" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 720, maxHeight: "90vh", overflow: "auto" }}>
+            {!edsResult ? (
+              <>
+                <h3 className="modal-title">Подписание ЭЦП</h3>
+                <p className="modal-subtext">{edsTitle}</p>
+                <EdsSignature
+                  file={edsPdfFile}
+                  userFullName={pmUser?.firstName && pmUser?.lastName ? `${pmUser.lastName} ${pmUser.firstName}` : user?.login || ""}
+                  onSignatureComplete={handleEdsComplete}
+                  isCreatingDocument={true}
+                  signatureIndex={0}
+                />
+              </>
+            ) : (
+              <>
+                <h3 className="modal-title">Документ подписан ЭЦП</h3>
+                <div style={{ padding: "16px 0" }}>
+                  <p style={{ marginBottom: 8 }}><strong>ФИО:</strong> {edsResult.meta.name}</p>
+                  <p style={{ marginBottom: 8 }}><strong>ИИН:</strong> {edsResult.meta.iin}</p>
+                  <p style={{ marginBottom: 16 }}><strong>Дата:</strong> {edsResult.meta.date}</p>
+                </div>
+                <div className="modal-actions">
+                  <button className="btn btn-outline" onClick={handleDownloadSigned}>Скачать PDF</button>
+                  <button className="btn btn-primary" onClick={handleSendSignedToSignDoc}>Отправить в SignDoc</button>
+                </div>
+              </>
+            )}
+            <div style={{ marginTop: 12, textAlign: "right" }}>
+              <button className="btn btn-secondary" onClick={closeEdsModal}>Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

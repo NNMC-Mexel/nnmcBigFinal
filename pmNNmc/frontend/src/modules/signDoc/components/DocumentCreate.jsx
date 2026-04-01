@@ -44,6 +44,9 @@ export default function DocumentCreate() {
     const [subdivisions, setSubdivisions] = useState([]);
     const [subdivisionId, setSubdivisionId] = useState("");
 
+    // Pre-signed data from KPI or other modules (already signed with EDS before entering wizard)
+    const [preSignedData, setPreSignedData] = useState(null);
+
     // Массовое подписание ЭЦП
     const [currentSigningIndex, setCurrentSigningIndex] = useState(0);
     const [isSigningAll, setIsSigningAll] = useState(false);
@@ -67,10 +70,34 @@ export default function DocumentCreate() {
     // Accept pre-loaded file from KPI or other modules via route state
     useEffect(() => {
         const state = location.state;
-        if (state?.pendingFile) {
+        if (state?.pendingPreSigned && state?.pendingFile) {
+            // PDF already signed with EDS — skip to step 4 (select signers)
+            const file = state.pendingFile;
+            const title = state.pendingTitle || file.name.replace(/\.pdf$/i, "");
+            setFiles([file]);
+            setTitles([title]);
+            setSignatureType("eds");
+            setPreSignedData({
+                cmsBlob: state.pendingCms,
+                meta: state.pendingMeta,
+            });
+            setSignedFiles([{
+                pdf: file,
+                cms: state.pendingCms,
+                signature: {
+                    type: "eds",
+                    name: state.pendingMeta?.name || "",
+                    iin: state.pendingMeta?.iin || "",
+                    date: state.pendingMeta?.date || "",
+                    timestamp: state.pendingMeta?.timestamp || new Date().toISOString(),
+                },
+                title,
+            }]);
+            setStep(4);
+            navigate(location.pathname, { replace: true, state: {} });
+        } else if (state?.pendingFile) {
             setFiles([state.pendingFile]);
             setTitles([state.pendingTitle || state.pendingFile.name.replace(/\.pdf$/i, "")]);
-            // Clear state to prevent re-triggering
             navigate(location.pathname, { replace: true, state: {} });
         }
     }, []);
