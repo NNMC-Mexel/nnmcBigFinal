@@ -33,6 +33,7 @@ export interface User {
   canViewKpiTimesheet?: boolean;
   canDeleteProject?: boolean;
   canDragProjects?: boolean;
+  canManageNews?: boolean;
   moduleAccess?: string[];
   blocked: boolean;
   confirmed: boolean;
