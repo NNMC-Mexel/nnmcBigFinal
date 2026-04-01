@@ -21,39 +21,28 @@ export default async (policyContext: any, config: { feature?: FeatureKey } = {})
   const userWithRole = (await strapi.entityService.findOne(
     'plugin::users-permissions.user',
     user.id,
-    { populate: ['role', 'department'] }
+    { populate: ['role'] }
   )) as any;
 
   const { isAdmin, isSuperAdmin } = getRoleFlags(userWithRole?.role);
-  const departmentKey = userWithRole?.department?.key || null;
 
-  const projectDepartments = ['IT', 'DIGITALIZATION'];
-  const helpdeskDepartments = ['IT', 'MEDICAL_EQUIPMENT', 'ENGINEERING'];
+  // Admins and SuperAdmins always have access
+  if (isSuperAdmin || isAdmin) {
+    return true;
+  }
 
   if (feature === 'dashboard') {
-    const hasFeature = resolveFeatureFlag(userWithRole?.canViewDashboard, true);
-    const hasDepartmentAccess = isSuperAdmin || isAdmin || projectDepartments.includes(departmentKey);
-    if (!hasFeature || !hasDepartmentAccess) {
-      return false;
-    }
+    return resolveFeatureFlag(userWithRole?.canViewDashboard, true);
   }
 
   if (feature === 'projects') {
     const canViewBoard = resolveFeatureFlag(userWithRole?.canViewBoard, true);
     const canViewTable = resolveFeatureFlag(userWithRole?.canViewTable, true);
-    const hasFeature = canViewBoard || canViewTable;
-    const hasDepartmentAccess = isSuperAdmin || isAdmin || projectDepartments.includes(departmentKey);
-    if (!hasFeature || !hasDepartmentAccess) {
-      return false;
-    }
+    return canViewBoard || canViewTable;
   }
 
   if (feature === 'helpdesk') {
-    const hasFeature = resolveFeatureFlag(userWithRole?.canViewHelpdesk, true);
-    const hasDepartmentAccess = isSuperAdmin || isAdmin || helpdeskDepartments.includes(departmentKey);
-    if (!hasFeature || !hasDepartmentAccess) {
-      return false;
-    }
+    return resolveFeatureFlag(userWithRole?.canViewHelpdesk, true);
   }
 
   return true;
