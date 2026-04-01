@@ -14,6 +14,7 @@ import { FileText, LogIn, Eye, EyeOff, ShieldX } from 'lucide-react';
 // @ts-ignore — JS module, no types needed
 import SignDocModule from '../../modules/signDoc/SignDocModule';
 import { apiLogin, apiMe } from '../../modules/signDoc/api/signdocClient';
+import { useAuthStore } from '../../store/authStore';
 
 const SIGNDOC_TOKEN_KEY = 'signdoc_token';
 const SIGNDOC_USER_KEY = 'signdoc_user';
@@ -23,17 +24,22 @@ interface SignDocUser {
   username: string;
   email: string;
   fullName?: string;
-  signdocAccess?: boolean;
   [key: string]: unknown;
 }
 
 export default function SignDocPage() {
+  const { user: pmUser } = useAuthStore();
   const [sdUser, setSdUser] = useState<SignDocUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [loginForm, setLoginForm] = useState({ login: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Check moduleAccess from main user
+  const moduleAccess: string[] = Array.isArray((pmUser as any)?.moduleAccess) ? (pmUser as any).moduleAccess : [];
+  const role = (pmUser as any)?.role?.type || (pmUser as any)?.role;
+  const hasAccess = role === 'superadmin' || role === 'admin' || moduleAccess.includes('signdoc');
 
   // Restore session on mount
   useEffect(() => {
@@ -110,7 +116,7 @@ export default function SignDocPage() {
   }
 
   // Authenticated but no access
-  if (sdUser && !sdUser.signdocAccess) {
+  if (sdUser && !hasAccess) {
     return (
       <div className='flex items-center justify-center min-h-[60vh]'>
         <div className='text-center'>

@@ -1076,6 +1076,7 @@ export default function AdminPanelPage() {
               {([
                 { mod: 'conf', label: 'Конференц-залы' },
                 { mod: 'journal', label: 'Журнал приёмной' },
+                { mod: 'signdoc', label: 'Подписи' },
               ] as const).map(({ mod, label }) => (
                 <label key={mod} className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -1186,6 +1187,7 @@ export default function AdminPanelPage() {
               {([
                 { mod: 'conf', label: 'Конференц-залы' },
                 { mod: 'journal', label: 'Журнал приёмной' },
+                { mod: 'signdoc', label: 'Подписи' },
               ] as const).map(({ mod, label }) => (
                 <label key={mod} className="flex items-center gap-2 cursor-pointer">
                   <input
