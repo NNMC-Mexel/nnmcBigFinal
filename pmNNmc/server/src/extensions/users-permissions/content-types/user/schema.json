@@ -106,6 +106,9 @@
     "canDragProjects": {
       "type": "boolean"
     },
+    "canManageNews": {
+      "type": "boolean"
+    },
     "moduleAccess": {
       "type": "json",
       "default": []

@@ -31,6 +31,7 @@ export interface AdminUser {
   canViewKpiTimesheet?: boolean;
   canDeleteProject?: boolean;
   canDragProjects?: boolean;
+  canManageNews?: boolean;
 }
 
 export interface RoleConfig {
@@ -111,6 +112,7 @@ export const adminUsersApi = {
     canViewKpiTimesheet?: boolean;
     canDeleteProject?: boolean;
     canDragProjects?: boolean;
+    canManageNews?: boolean;
   }): Promise<AdminUser> => {
     const response = await client.put(`/admin-users/${id}`, data);
     return response.data.data;

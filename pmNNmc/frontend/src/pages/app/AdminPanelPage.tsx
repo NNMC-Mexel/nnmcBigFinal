@@ -81,6 +81,7 @@ export default function AdminPanelPage() {
     canViewKpiTimesheet: false,
     canDeleteProject: true,
     canDragProjects: true,
+    canManageNews: false,
   });
 
   useEffect(() => {
@@ -180,6 +181,7 @@ export default function AdminPanelPage() {
         canViewKpiTimesheet: formData.canViewKpiTimesheet,
         canDeleteProject: formData.canDeleteProject,
         canDragProjects: formData.canDragProjects,
+        canManageNews: formData.canManageNews,
       };
 
       if (formData.createInKeycloak) {
@@ -241,6 +243,7 @@ export default function AdminPanelPage() {
         canViewKpiTimesheet: formData.canViewKpiTimesheet,
         canDeleteProject: formData.canDeleteProject,
         canDragProjects: formData.canDragProjects,
+        canManageNews: formData.canManageNews,
       });
 
       setShowEditModal(false);
@@ -339,6 +342,7 @@ export default function AdminPanelPage() {
       canViewKpiTimesheet: false,
       canDeleteProject: true,
       canDragProjects: true,
+      canManageNews: false,
     });
   };
 
@@ -364,6 +368,7 @@ export default function AdminPanelPage() {
       canViewKpiTimesheet: user.canViewKpiTimesheet === true,
       canDeleteProject: user.canDeleteProject !== false,
       canDragProjects: user.canDragProjects !== false,
+      canManageNews: user.canManageNews === true,
     });
     setShowEditModal(true);
   };
@@ -668,6 +673,7 @@ export default function AdminPanelPage() {
                 <th className="px-2 py-2 font-medium text-center">KPI Табель</th>
                 <th className="px-2 py-2 font-medium text-center">Удаление</th>
                 <th className="px-2 py-2 font-medium text-center">Перетаск.</th>
+                <th className="px-2 py-2 font-medium text-center">Новости</th>
                 <th className="px-2 py-2 font-medium text-center">Конф-залы</th>
                 <th className="px-2 py-2 font-medium text-center">Журнал</th>
               </tr>
@@ -734,6 +740,7 @@ export default function AdminPanelPage() {
                         { field: 'canViewKpiTimesheet', val: u.canViewKpiTimesheet },
                         { field: 'canDeleteProject', val: u.canDeleteProject },
                         { field: 'canDragProjects', val: u.canDragProjects },
+                        { field: 'canManageNews', val: u.canManageNews },
                       ] as const).map(({ field, val }) => (
                         <td key={field} className="px-2 py-2 text-center">
                           <input
@@ -1056,6 +1063,7 @@ export default function AdminPanelPage() {
                 { key: 'canViewKpiTimesheet', label: 'KPI Табель' },
                 { key: 'canDeleteProject', label: 'Удаление проектов' },
                 { key: 'canDragProjects', label: 'Перетаскивание' },
+                { key: 'canManageNews', label: 'Управление новостями' },
               ] as const).map(({ key, label }) => (
                 <label key={key} className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -1166,6 +1174,7 @@ export default function AdminPanelPage() {
                 { key: 'canViewKpiTimesheet', label: 'KPI Табель' },
                 { key: 'canDeleteProject', label: 'Удаление проектов' },
                 { key: 'canDragProjects', label: 'Перетаскивание' },
+                { key: 'canManageNews', label: 'Управление новостями' },
               ] as const).map(({ key, label }) => (
                 <label key={key} className="flex items-center gap-2 cursor-pointer">
                   <input

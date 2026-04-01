@@ -127,21 +127,19 @@ export default function AppLayout() {
     const navItems = [...projectNavItems, ...helpdeskNavItems];
 
     // Страницы для администраторов (admin + superadmin)
-    const adminNavItems =
-        isAdmin || isSuperAdmin
-            ? [
-                  {
-                      to: "/app/news-admin",
-                      icon: Settings2,
-                      label: "Управление новостями",
-                  },
-                  {
-                      to: "/app/activity",
-                      icon: Activity,
-                      label: t("nav.activity", "История действий"),
-                  },
-              ]
-            : [];
+    const canManageNews = isSuperAdmin || isAdmin || user?.canManageNews === true;
+    const adminNavItems = [
+        ...(canManageNews ? [{
+            to: "/app/news-admin",
+            icon: Settings2,
+            label: "Управление новостями",
+        }] : []),
+        ...((isAdmin || isSuperAdmin) ? [{
+            to: "/app/activity",
+            icon: Activity,
+            label: t("nav.activity", "История действий"),
+        }] : []),
+    ];
 
     // Панель только для супер-админа
     const superAdminItems = isSuperAdmin

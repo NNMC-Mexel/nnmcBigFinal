@@ -132,7 +132,7 @@ export default {
     
     const {
       email, username, firstName, lastName, role, department, blocked, generatePasswordAuto,
-      canViewDashboard, canViewBoard, canViewTable, canViewHelpdesk, canViewKpi, canViewKpiTimesheet,
+      canViewDashboard, canViewBoard, canViewTable, canViewHelpdesk, canViewKpi, canViewKpiTimesheet, canManageNews,
     } = ctx.request.body as any;
     
     if (!email || !username) {
@@ -186,9 +186,10 @@ export default {
           ...(canViewHelpdesk !== undefined && { canViewHelpdesk }),
           ...(canViewKpi !== undefined && { canViewKpi }),
           ...(canViewKpiTimesheet !== undefined && { canViewKpiTimesheet }),
+          ...(canManageNews !== undefined && { canManageNews }),
         },
       });
-      
+
       const { password: _, ...safeUser } = user;
       
       ctx.body = {
@@ -212,7 +213,7 @@ export default {
     const {
       firstName, lastName, role, department, blocked, moduleAccess,
       canViewDashboard, canViewBoard, canViewTable, canViewHelpdesk, canViewKpi, canViewKpiTimesheet,
-      canDeleteProject, canDragProjects,
+      canDeleteProject, canDragProjects, canManageNews,
     } = ctx.request.body as any;
 
     try {
@@ -232,7 +233,8 @@ export default {
       if (canViewKpiTimesheet !== undefined) updateData.canViewKpiTimesheet = canViewKpiTimesheet;
       if (canDeleteProject !== undefined) updateData.canDeleteProject = canDeleteProject;
       if (canDragProjects !== undefined) updateData.canDragProjects = canDragProjects;
-      
+      if (canManageNews !== undefined) updateData.canManageNews = canManageNews;
+
       const user = await strapi.entityService.update('plugin::users-permissions.user', id, {
         data: updateData,
         populate: ['role', 'department'],
@@ -332,7 +334,7 @@ export default {
     const {
       username, email, firstName, lastName,
       password, role, department, moduleAccess,
-      canViewDashboard, canViewBoard, canViewTable, canViewHelpdesk, canViewKpi, canViewKpiTimesheet,
+      canViewDashboard, canViewBoard, canViewTable, canViewHelpdesk, canViewKpi, canViewKpiTimesheet, canManageNews,
     } = ctx.request.body as any;
 
     if (!username || !email) {
@@ -448,6 +450,7 @@ export default {
             ...(canViewHelpdesk !== undefined && { canViewHelpdesk }),
             ...(canViewKpi !== undefined && { canViewKpi }),
             ...(canViewKpiTimesheet !== undefined && { canViewKpiTimesheet }),
+            ...(canManageNews !== undefined && { canManageNews }),
           },
         });
       }
