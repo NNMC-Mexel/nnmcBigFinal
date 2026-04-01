@@ -343,13 +343,12 @@ export default function ProjectFormModal({
       size="lg"
     >
       <form onSubmit={handleSubmit} className="flex flex-col h-full -m-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {error && (
-          <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <div ref={(el) => el?.scrollIntoView({ behavior: 'smooth', block: 'center' })} className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
             {error}
           </div>
         )}
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <Input
           label={t('project.title')}
           value={formData.title}
