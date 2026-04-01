@@ -132,7 +132,7 @@ export default function ProjectFormModal({
         }
       } catch (err) {
         if (isMounted) {
-          setUsersError(t('project.assignableUsersLoadError'));
+          setAssignableUsers([]);
         }
       } finally {
         if (isMounted) {
