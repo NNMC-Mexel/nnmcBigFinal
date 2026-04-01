@@ -34,7 +34,6 @@ export default async (policyContext: any, config: { feature?: FeatureKey } = {})
     const hasFeature = resolveFeatureFlag(userWithRole?.canViewDashboard, true);
     const hasDepartmentAccess = isSuperAdmin || isAdmin || projectDepartments.includes(departmentKey);
     if (!hasFeature || !hasDepartmentAccess) {
-      policyContext.throw(403, 'Dashboard access denied');
       return false;
     }
   }
@@ -45,7 +44,6 @@ export default async (policyContext: any, config: { feature?: FeatureKey } = {})
     const hasFeature = canViewBoard || canViewTable;
     const hasDepartmentAccess = isSuperAdmin || isAdmin || projectDepartments.includes(departmentKey);
     if (!hasFeature || !hasDepartmentAccess) {
-      policyContext.throw(403, 'Projects access denied');
       return false;
     }
   }
@@ -54,7 +52,6 @@ export default async (policyContext: any, config: { feature?: FeatureKey } = {})
     const hasFeature = resolveFeatureFlag(userWithRole?.canViewHelpdesk, true);
     const hasDepartmentAccess = isSuperAdmin || isAdmin || helpdeskDepartments.includes(departmentKey);
     if (!hasFeature || !hasDepartmentAccess) {
-      policyContext.throw(403, 'Helpdesk access denied');
       return false;
     }
   }
