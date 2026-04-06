@@ -1,4 +1,5 @@
 import client from './client';
+import type { Department } from '../types';
 
 export interface AdminUser {
   id: number;
@@ -11,56 +12,20 @@ export interface AdminUser {
   confirmed: boolean;
   createdAt: string;
   updatedAt: string;
-  role?: {
-    id: number;
-    name: string;
-    type: string;
-  };
   department?: {
     id: number;
     key: string;
     name_ru: string;
     name_kz: string;
   };
-  moduleAccess?: string[];
-  canViewDashboard?: boolean;
-  canViewBoard?: boolean;
-  canViewTable?: boolean;
-  canViewHelpdesk?: boolean;
-  canViewKpi?: boolean;
-  canViewKpiTimesheet?: boolean;
-  canDeleteProject?: boolean;
-  canDragProjects?: boolean;
-  canManageNews?: boolean;
-}
-
-export interface RoleConfig {
-  id: number;
-  roleName: string;
-  roleId?: number;
-  canViewDashboard: boolean;
-  canViewBoard: boolean;
-  canViewTable: boolean;
-  canViewHelpdesk: boolean;
-  canViewKpi: boolean;
-  canViewKpiTimesheet: boolean;
-  canDeleteProject: boolean;
-  canDragProjects: boolean;
-  defaultModuleAccess: string[];
-}
-
-export interface Role {
-  id: number;
-  name: string;
-  type: string;
-  description?: string;
+  isSuperAdmin?: boolean;
 }
 
 export const adminUsersApi = {
-  // Получить всех пользователей
+  // ─── Users ────────────────────────────────────────────
+
   getAll: async (params?: {
-    department?: string;
-    role?: number;
+    department?: number;
     search?: string;
     blocked?: boolean;
   }): Promise<AdminUser[]> => {
@@ -68,57 +33,37 @@ export const adminUsersApi = {
     return response.data.data;
   },
 
-  // Получить одного пользователя
   getOne: async (id: number): Promise<AdminUser> => {
     const response = await client.get(`/admin-users/${id}`);
     return response.data.data;
   },
 
-  // Создать пользователя
   create: async (data: {
     email: string;
     username: string;
     password?: string;
     firstName?: string;
     lastName?: string;
-    role?: number;
     department?: number | null;
     blocked?: boolean;
     generatePasswordAuto?: boolean;
-    canViewDashboard?: boolean;
-    canViewBoard?: boolean;
-    canViewTable?: boolean;
-    canViewHelpdesk?: boolean;
-    canViewKpi?: boolean;
-    canViewKpiTimesheet?: boolean;
+    isSuperAdmin?: boolean;
   }): Promise<{ data: AdminUser; generatedPassword?: string }> => {
     const response = await client.post('/admin-users', data);
     return response.data;
   },
 
-  // Обновить пользователя
   update: async (id: number, data: {
     firstName?: string;
     lastName?: string;
-    role?: number;
     department?: number | null;
     blocked?: boolean;
-    moduleAccess?: string[];
-    canViewDashboard?: boolean;
-    canViewBoard?: boolean;
-    canViewTable?: boolean;
-    canViewHelpdesk?: boolean;
-    canViewKpi?: boolean;
-    canViewKpiTimesheet?: boolean;
-    canDeleteProject?: boolean;
-    canDragProjects?: boolean;
-    canManageNews?: boolean;
+    isSuperAdmin?: boolean;
   }): Promise<AdminUser> => {
     const response = await client.put(`/admin-users/${id}`, data);
     return response.data.data;
   },
 
-  // Сброс пароля
   resetPassword: async (id: number, data: {
     newPassword?: string;
     generateNew?: boolean;
@@ -127,46 +72,50 @@ export const adminUsersApi = {
     return response.data;
   },
 
-  // Удалить пользователя
   delete: async (id: number): Promise<void> => {
     await client.delete(`/admin-users/${id}`);
   },
 
-  // Получить роли
-  getRoles: async (): Promise<Role[]> => {
-    const response = await client.get('/admin-users/roles/list');
-    return response.data.data;
-  },
-
-  // Создать пользователя в Keycloak + Strapi
   createKeycloakUser: async (data: {
     username: string;
     email: string;
     firstName?: string;
     lastName?: string;
     password?: string;
-    role?: number;
     department?: number | null;
-    moduleAccess?: string[];
-    canViewDashboard?: boolean;
-    canViewBoard?: boolean;
-    canViewTable?: boolean;
-    canViewHelpdesk?: boolean;
-    canViewKpi?: boolean;
-    canViewKpiTimesheet?: boolean;
+    isSuperAdmin?: boolean;
   }): Promise<{ data: AdminUser; generatedPassword?: string; message: string }> => {
     const response = await client.post('/admin-users/create-keycloak', data);
     return response.data;
   },
 
-  // Role configs
-  getRoleConfigs: async (): Promise<RoleConfig[]> => {
-    const response = await client.get('/role-configs');
+  // ─── Departments ──────────────────────────────────────
+
+  getDepartments: async (): Promise<Department[]> => {
+    const response = await client.get('/admin-users/departments');
     return response.data.data;
   },
 
-  updateRoleConfig: async (id: number, data: Partial<Omit<RoleConfig, 'id' | 'roleName' | 'roleId'>>): Promise<RoleConfig> => {
-    const response = await client.put(`/role-configs/${id}`, data);
-    return response.data.data;
+  createDepartment: async (data: Partial<Department> & {
+    key: string;
+    name_ru: string;
+    name_kz: string;
+  }): Promise<{ data: Department; message: string }> => {
+    const response = await client.post('/admin-users/departments', data);
+    return response.data;
+  },
+
+  updateDepartment: async (id: number, data: Partial<Department>): Promise<{ data: Department; message: string }> => {
+    const response = await client.put(`/admin-users/departments/${id}`, data);
+    return response.data;
+  },
+
+  deleteDepartment: async (id: number): Promise<void> => {
+    await client.delete(`/admin-users/departments/${id}`);
+  },
+
+  updateDepartmentPermissions: async (departments: Array<{ id: number } & Partial<Department>>): Promise<{ data: Department[]; message: string }> => {
+    const response = await client.put('/admin-users/departments/permissions', { departments });
+    return response.data;
   },
 };

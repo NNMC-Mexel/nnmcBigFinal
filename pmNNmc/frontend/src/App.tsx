@@ -120,6 +120,11 @@ function App() {
     canViewKpiMedical,
     canViewKpiEngineering,
     canViewKpiTimesheet,
+    canManageNews,
+    canViewActivityLog,
+    canAccessConf,
+    canAccessJournal,
+    canAccessSigndoc,
   } = useUserRole();
 
   useEffect(() => {
@@ -170,9 +175,9 @@ function App() {
         <Route
           path="news-admin"
           element={
-            <AdminRoute>
+            <FeatureRoute allow={canManageNews}>
               <NewsAdminPage />
-            </AdminRoute>
+            </FeatureRoute>
           }
         />
 
@@ -211,9 +216,9 @@ function App() {
         <Route
           path="activity"
           element={
-            <AdminRoute>
+            <FeatureRoute allow={canViewActivityLog}>
               <ActivityLogPage />
-            </AdminRoute>
+            </FeatureRoute>
           }
         />
         <Route path="profile" element={<ProfilePage />} />
@@ -273,9 +278,9 @@ function App() {
             </FeatureRoute>
           }
         />
-        <Route path="rooms" element={<ConferenceRoomsPage />} />
-        <Route path="journal" element={<JournalPage />} />
-        <Route path="signdoc/*" element={<SignDocPage />} />
+        <Route path="rooms" element={<FeatureRoute allow={canAccessConf}><ConferenceRoomsPage /></FeatureRoute>} />
+        <Route path="journal" element={<FeatureRoute allow={canAccessJournal}><JournalPage /></FeatureRoute>} />
+        <Route path="signdoc/*" element={<FeatureRoute allow={canAccessSigndoc}><SignDocPage /></FeatureRoute>} />
       </Route>
 
       {/* Logged out page — not protected, prevents auto-redirect to Keycloak */}

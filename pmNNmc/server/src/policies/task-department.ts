@@ -1,4 +1,4 @@
-import { extractIdsFromValue, getRoleFlags } from '../utils/project-assignments';
+import { extractIdsFromValue, getUserFlags } from '../utils/project-assignments';
 
 const parseNumericId = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -89,20 +89,20 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
     return false;
   }
 
-  const userWithRole = (await strapi.entityService.findOne(
+  const userWithDept = (await strapi.entityService.findOne(
     'plugin::users-permissions.user',
     currentUser.id,
     {
-      populate: ['role', 'department'],
+      populate: ['department'],
     }
   )) as any;
 
-  const { isSuperAdmin } = getRoleFlags(userWithRole?.role);
+  const { isSuperAdmin } = getUserFlags(userWithDept);
   if (isSuperAdmin) {
     return true;
   }
 
-  const requesterDepartmentKey = userWithRole?.department?.key ?? null;
+  const requesterDepartmentKey = userWithDept?.department?.key ?? null;
   if (!requesterDepartmentKey) {
     ctx.throw(403, 'User department is required');
     return false;

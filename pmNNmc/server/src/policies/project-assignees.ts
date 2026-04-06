@@ -2,7 +2,7 @@ import { errors } from '@strapi/utils';
 import {
   extractIdsFromValue,
   getOwnerIds,
-  getRoleFlags,
+  getUserFlags,
 } from '../utils/project-assignments';
 
 const { UnauthorizedError, ForbiddenError, ValidationError } = errors;
@@ -96,16 +96,17 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
     throw new UnauthorizedError('Not authenticated');
   }
 
-  const userWithRole = (await strapi.entityService.findOne(
+  const userWithDept = (await strapi.entityService.findOne(
     'plugin::users-permissions.user',
     currentUser.id,
     {
-      populate: ['role', 'department'],
+      populate: ['department'],
     }
   )) as any;
 
-  const { isSuperAdmin, isAdmin, isLead } = getRoleFlags(userWithRole?.role);
-  const canManageOwner = isSuperAdmin || isAdmin || isLead;
+  const { isSuperAdmin } = getUserFlags(userWithDept);
+  const dept = userWithDept?.department;
+  const canManageOwner = isSuperAdmin || dept?.canManageProjectAssignments === true;
   const ownerIds = getOwnerIds(data);
   const hasOwnerField = Object.prototype.hasOwnProperty.call(data, 'owner');
   const isCreate = ctx.request?.method === 'POST';
@@ -128,7 +129,7 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
     return true;
   }
 
-  const requesterDepartmentKey = userWithRole?.department?.key ?? null;
+  const requesterDepartmentKey = userWithDept?.department?.key ?? null;
   if (!requesterDepartmentKey) {
     throw new ForbiddenError('User department is required to assign project users');
   }

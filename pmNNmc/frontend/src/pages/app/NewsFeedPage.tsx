@@ -456,8 +456,8 @@ function PinnedHeroCard({ post, onClick }: { post: NewsPost; onClick: () => void
 
 export default function NewsFeedPage() {
   const navigate = useNavigate();
-  const { isAdmin, isSuperAdmin } = useUserRole();
-  const canManage = isAdmin || isSuperAdmin;
+  const { canManageNews } = useUserRole();
+  const canManage = canManageNews;
 
   const [posts, setPosts] = useState<NewsPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);

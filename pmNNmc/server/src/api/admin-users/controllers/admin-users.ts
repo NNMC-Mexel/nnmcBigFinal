@@ -1,5 +1,4 @@
 import { Context } from 'koa';
-import crypto from 'crypto';
 
 // Генерация случайного пароля
 function generatePassword(length = 12): string {
@@ -11,63 +10,47 @@ function generatePassword(length = 12): string {
   return password;
 }
 
-// Проверка что пользователь - супер админ
+// Проверка что пользователь - супер админ (по флагу isSuperAdmin)
 async function checkSuperAdmin(ctx: Context, strapi: any): Promise<boolean> {
   const user = ctx.state.user;
   if (!user) {
     ctx.throw(401, 'Not authenticated');
     return false;
   }
-  
-  // Проверяем роль пользователя
-  const userWithRole = await strapi.entityService.findOne('plugin::users-permissions.user', user.id, {
-    populate: ['role'],
+
+  const fullUser = await strapi.entityService.findOne('plugin::users-permissions.user', user.id, {
+    fields: ['isSuperAdmin'],
   });
-  
-  const roleName = (userWithRole?.role?.name || '').toLowerCase().replace(/\s+/g, '');
-  const roleType = (userWithRole?.role?.type || '').toLowerCase().replace(/\s+/g, '');
-  
-  console.log('User role check:', { userId: user.id, roleName, roleType, originalName: userWithRole?.role?.name });
-  
-  // Список разрешенных ролей (без пробелов, lowercase)
-  const allowedRoles = ['admin', 'superadmin', 'super_admin', 'суперадмин'];
-  
-  const isAllowed = allowedRoles.some(role => 
-    roleName.includes(role) || roleType.includes(role)
-  );
-  
-  if (!isAllowed) {
-    ctx.throw(403, `Access denied. Only Super Admin can manage users. Your role: ${userWithRole?.role?.name || 'none'}`);
+
+  if (!fullUser?.isSuperAdmin) {
+    ctx.throw(403, 'Access denied. Only SuperAdmin can manage users.');
     return false;
   }
-  
+
   return true;
 }
 
 export default {
+  // ─── Users ────────────────────────────────────────────
+
   // Получить список всех пользователей
   async find(ctx: Context) {
     const strapi = (global as any).strapi;
-    
     await checkSuperAdmin(ctx, strapi);
-    
+
     try {
-      const { department, role, search, blocked } = ctx.query;
-      
+      const { department, search, blocked } = ctx.query;
+
       const filters: any = {};
-      
+
       if (department) {
-        filters.department = { key: department };
+        filters.department = { id: department };
       }
-      
-      if (role) {
-        filters.role = { id: role };
-      }
-      
+
       if (blocked !== undefined) {
         filters.blocked = blocked === 'true';
       }
-      
+
       if (search) {
         filters.$or = [
           { username: { $containsi: search } },
@@ -76,19 +59,18 @@ export default {
           { lastName: { $containsi: search } },
         ];
       }
-      
+
       const users = await strapi.entityService.findMany('plugin::users-permissions.user', {
         filters,
-        populate: ['role', 'department'],
+        populate: ['department'],
         sort: { createdAt: 'desc' },
       });
-      
-      // Убираем пароли из ответа
+
       const safeUsers = users.map((user: any) => {
         const { password, resetPasswordToken, confirmationToken, ...safeUser } = user;
         return safeUser;
       });
-      
+
       ctx.body = { data: safeUsers };
     } catch (error) {
       console.error('Error fetching users:', error);
@@ -99,24 +81,21 @@ export default {
   // Получить одного пользователя
   async findOne(ctx: Context) {
     const strapi = (global as any).strapi;
-    
     await checkSuperAdmin(ctx, strapi);
-    
+
     const { id } = ctx.params;
-    
+
     try {
       const user = await strapi.entityService.findOne('plugin::users-permissions.user', id, {
-        populate: ['role', 'department'],
+        populate: ['department'],
       });
-      
+
       if (!user) {
         ctx.throw(404, 'User not found');
         return;
       }
-      
-      // Убираем пароль
+
       const { password, resetPasswordToken, confirmationToken, ...safeUser } = user;
-      
       ctx.body = { data: safeUser };
     } catch (error) {
       console.error('Error fetching user:', error);
@@ -127,47 +106,41 @@ export default {
   // Создать пользователя
   async create(ctx: Context) {
     const strapi = (global as any).strapi;
-    
     await checkSuperAdmin(ctx, strapi);
-    
+
     const {
-      email, username, firstName, lastName, role, department, blocked, generatePasswordAuto,
-      canViewDashboard, canViewBoard, canViewTable, canViewHelpdesk, canViewKpi, canViewKpiTimesheet, canManageNews,
+      email, username, firstName, lastName, department, blocked, generatePasswordAuto, isSuperAdmin,
     } = ctx.request.body as any;
-    
+
     if (!email || !username) {
       ctx.throw(400, 'Email and username are required');
       return;
     }
-    
+
     try {
-      // Проверяем уникальность
       const existingEmail = await strapi.entityService.findMany('plugin::users-permissions.user', {
         filters: { email },
       });
-      
       if (existingEmail.length > 0) {
         ctx.throw(400, 'Email already exists');
         return;
       }
-      
+
       const existingUsername = await strapi.entityService.findMany('plugin::users-permissions.user', {
         filters: { username },
       });
-      
       if (existingUsername.length > 0) {
         ctx.throw(400, 'Username already exists');
         return;
       }
-      
-      // Генерируем или используем переданный пароль
+
       const password = generatePasswordAuto ? generatePassword() : (ctx.request.body as any).password;
-      
       if (!password) {
         ctx.throw(400, 'Password is required');
         return;
       }
-      
+
+      // Use the default "Authenticated" role (id=1)
       const user = await strapi.entityService.create('plugin::users-permissions.user', {
         data: {
           email,
@@ -175,23 +148,17 @@ export default {
           firstName: firstName || '',
           lastName: lastName || '',
           password,
-          role: role || 1,
+          role: 1,
           department: department || null,
           blocked: blocked || false,
           confirmed: true,
           provider: 'local',
-          ...(canViewDashboard !== undefined && { canViewDashboard }),
-          ...(canViewBoard !== undefined && { canViewBoard }),
-          ...(canViewTable !== undefined && { canViewTable }),
-          ...(canViewHelpdesk !== undefined && { canViewHelpdesk }),
-          ...(canViewKpi !== undefined && { canViewKpi }),
-          ...(canViewKpiTimesheet !== undefined && { canViewKpiTimesheet }),
-          ...(canManageNews !== undefined && { canManageNews }),
+          isSuperAdmin: isSuperAdmin || false,
         },
       });
 
       const { password: _, ...safeUser } = user;
-      
+
       ctx.body = {
         data: safeUser,
         generatedPassword: generatePasswordAuto ? password : null,
@@ -206,42 +173,27 @@ export default {
   // Обновить пользователя
   async update(ctx: Context) {
     const strapi = (global as any).strapi;
-    
     await checkSuperAdmin(ctx, strapi);
-    
+
     const { id } = ctx.params;
-    const {
-      firstName, lastName, role, department, blocked, moduleAccess,
-      canViewDashboard, canViewBoard, canViewTable, canViewHelpdesk, canViewKpi, canViewKpiTimesheet,
-      canDeleteProject, canDragProjects, canManageNews,
-    } = ctx.request.body as any;
+    const { firstName, lastName, department, blocked, isSuperAdmin } = ctx.request.body as any;
 
     try {
       const updateData: any = {};
 
       if (firstName !== undefined) updateData.firstName = firstName;
       if (lastName !== undefined) updateData.lastName = lastName;
-      if (role !== undefined) updateData.role = role;
       if (department !== undefined) updateData.department = department;
       if (blocked !== undefined) updateData.blocked = blocked;
-      if (moduleAccess !== undefined) updateData.moduleAccess = moduleAccess;
-      if (canViewDashboard !== undefined) updateData.canViewDashboard = canViewDashboard;
-      if (canViewBoard !== undefined) updateData.canViewBoard = canViewBoard;
-      if (canViewTable !== undefined) updateData.canViewTable = canViewTable;
-      if (canViewHelpdesk !== undefined) updateData.canViewHelpdesk = canViewHelpdesk;
-      if (canViewKpi !== undefined) updateData.canViewKpi = canViewKpi;
-      if (canViewKpiTimesheet !== undefined) updateData.canViewKpiTimesheet = canViewKpiTimesheet;
-      if (canDeleteProject !== undefined) updateData.canDeleteProject = canDeleteProject;
-      if (canDragProjects !== undefined) updateData.canDragProjects = canDragProjects;
-      if (canManageNews !== undefined) updateData.canManageNews = canManageNews;
+      if (isSuperAdmin !== undefined) updateData.isSuperAdmin = isSuperAdmin;
 
       const user = await strapi.entityService.update('plugin::users-permissions.user', id, {
         data: updateData,
-        populate: ['role', 'department'],
+        populate: ['department'],
       });
-      
+
       const { password, resetPasswordToken, confirmationToken, ...safeUser } = user;
-      
+
       ctx.body = {
         data: safeUser,
         message: 'User updated successfully',
@@ -255,27 +207,26 @@ export default {
   // Сброс пароля
   async resetPassword(ctx: Context) {
     const strapi = (global as any).strapi;
-    
     await checkSuperAdmin(ctx, strapi);
-    
+
     const { id } = ctx.params;
     const { newPassword, generateNew } = ctx.request.body as any;
-    
+
     try {
       const password = generateNew ? generatePassword() : newPassword;
-      
+
       if (!password) {
         ctx.throw(400, 'Password is required');
         return;
       }
-      
+
       await strapi.entityService.update('plugin::users-permissions.user', id, {
         data: { password },
       });
-      
+
       ctx.body = {
         message: 'Password reset successfully',
-        newPassword: password, // Показываем новый пароль админу
+        newPassword: password,
       };
     } catch (error) {
       console.error('Error resetting password:', error);
@@ -286,55 +237,165 @@ export default {
   // Удалить пользователя
   async delete(ctx: Context) {
     const strapi = (global as any).strapi;
-    
     await checkSuperAdmin(ctx, strapi);
-    
+
     const { id } = ctx.params;
-    
+
     try {
-      // Не позволяем удалить самого себя
       if (ctx.state.user.id === parseInt(id)) {
         ctx.throw(400, 'Cannot delete yourself');
         return;
       }
-      
+
       await strapi.entityService.delete('plugin::users-permissions.user', id);
-      
-      ctx.body = {
-        message: 'User deleted successfully',
-      };
+
+      ctx.body = { message: 'User deleted successfully' };
     } catch (error) {
       console.error('Error deleting user:', error);
       ctx.throw(500, 'Error deleting user');
     }
   },
 
-  // Получить список ролей
-  async getRoles(ctx: Context) {
-    const strapi = (global as any).strapi;
+  // ─── Departments ──────────────────────────────────────
 
+  // Получить все отделы
+  async getDepartments(ctx: Context) {
+    const strapi = (global as any).strapi;
     await checkSuperAdmin(ctx, strapi);
 
     try {
-      const roles = await strapi.entityService.findMany('plugin::users-permissions.role', {});
+      const departments = await strapi.entityService.findMany('api::department.department', {
+        sort: { name_ru: 'asc' },
+      });
 
-      ctx.body = { data: roles };
+      ctx.body = { data: departments };
     } catch (error) {
-      console.error('Error fetching roles:', error);
-      ctx.throw(500, 'Error fetching roles');
+      console.error('Error fetching departments:', error);
+      ctx.throw(500, 'Error fetching departments');
+    }
+  },
+
+  // Создать отдел
+  async createDepartment(ctx: Context) {
+    const strapi = (global as any).strapi;
+    await checkSuperAdmin(ctx, strapi);
+
+    const body = ctx.request.body as any;
+    const { key, name_ru, name_kz, description, ...permissionFlags } = body;
+
+    if (!key || !name_ru || !name_kz) {
+      ctx.throw(400, 'key, name_ru and name_kz are required');
+      return;
+    }
+
+    try {
+      const existing = await strapi.entityService.findMany('api::department.department', {
+        filters: { key },
+      });
+      if (existing.length > 0) {
+        ctx.throw(400, 'Department with this key already exists');
+        return;
+      }
+
+      const department = await strapi.entityService.create('api::department.department', {
+        data: { key, name_ru, name_kz, description: description || null, ...permissionFlags },
+      });
+
+      ctx.body = { data: department, message: 'Department created successfully' };
+    } catch (error: any) {
+      if (error.status) throw error;
+      console.error('Error creating department:', error);
+      ctx.throw(500, error.message || 'Error creating department');
+    }
+  },
+
+  // Обновить отдел
+  async updateDepartment(ctx: Context) {
+    const strapi = (global as any).strapi;
+    await checkSuperAdmin(ctx, strapi);
+
+    const { id } = ctx.params;
+    const body = ctx.request.body as any;
+
+    try {
+      const department = await strapi.entityService.update('api::department.department', id, {
+        data: body,
+      });
+
+      ctx.body = { data: department, message: 'Department updated successfully' };
+    } catch (error) {
+      console.error('Error updating department:', error);
+      ctx.throw(500, 'Error updating department');
+    }
+  },
+
+  // Удалить отдел
+  async deleteDepartment(ctx: Context) {
+    const strapi = (global as any).strapi;
+    await checkSuperAdmin(ctx, strapi);
+
+    const { id } = ctx.params;
+
+    try {
+      // Проверяем, нет ли пользователей в этом отделе
+      const usersInDept = await strapi.entityService.findMany('plugin::users-permissions.user', {
+        filters: { department: { id } },
+        fields: ['id'],
+      });
+
+      if (usersInDept.length > 0) {
+        ctx.throw(400, `Cannot delete department: ${usersInDept.length} users are assigned to it`);
+        return;
+      }
+
+      await strapi.entityService.delete('api::department.department', id);
+
+      ctx.body = { message: 'Department deleted successfully' };
+    } catch (error: any) {
+      if (error.status) throw error;
+      console.error('Error deleting department:', error);
+      ctx.throw(500, 'Error deleting department');
+    }
+  },
+
+  // Массовое обновление прав отделов (permission matrix)
+  async updateDepartmentPermissions(ctx: Context) {
+    const strapi = (global as any).strapi;
+    await checkSuperAdmin(ctx, strapi);
+
+    const { departments } = ctx.request.body as any;
+
+    if (!Array.isArray(departments)) {
+      ctx.throw(400, 'departments array is required');
+      return;
+    }
+
+    try {
+      const results = [];
+      for (const dept of departments) {
+        const { id, ...permissions } = dept;
+        if (!id) continue;
+        const updated = await strapi.entityService.update('api::department.department', id, {
+          data: permissions,
+        });
+        results.push(updated);
+      }
+
+      ctx.body = { data: results, message: 'Permissions updated successfully' };
+    } catch (error) {
+      console.error('Error updating department permissions:', error);
+      ctx.throw(500, 'Error updating department permissions');
     }
   },
 
   // Создать пользователя в Keycloak + Strapi
   async createKeycloakUser(ctx: Context) {
     const strapi = (global as any).strapi;
-
     await checkSuperAdmin(ctx, strapi);
 
     const {
       username, email, firstName, lastName,
-      password, role, department, moduleAccess,
-      canViewDashboard, canViewBoard, canViewTable, canViewHelpdesk, canViewKpi, canViewKpiTimesheet, canManageNews,
+      password, department, isSuperAdmin,
     } = ctx.request.body as any;
 
     if (!username || !email) {
@@ -390,7 +451,7 @@ export default {
         userPayload.credentials = [{
           type: 'password',
           value: password,
-          temporary: true, // User must change on first login
+          temporary: true,
         }];
       }
 
@@ -414,10 +475,9 @@ export default {
         return;
       }
 
-      // 3. Also create user in Strapi (so they have a local account for module access, etc.)
+      // 3. Create user in Strapi
       const tempPassword = password || generatePassword();
 
-      // Check if user already exists in Strapi
       const existingUsers = await strapi.entityService.findMany('plugin::users-permissions.user', {
         filters: { $or: [{ email }, { username }] },
       });
@@ -425,12 +485,12 @@ export default {
       let strapiUser;
       if (existingUsers.length > 0) {
         strapiUser = existingUsers[0];
-        // Update moduleAccess if provided
-        if (moduleAccess) {
-          await strapi.entityService.update('plugin::users-permissions.user', strapiUser.id, {
-            data: { moduleAccess },
-          });
-        }
+        await strapi.entityService.update('plugin::users-permissions.user', strapiUser.id, {
+          data: {
+            department: department || null,
+            isSuperAdmin: isSuperAdmin || false,
+          },
+        });
       } else {
         strapiUser = await strapi.entityService.create('plugin::users-permissions.user', {
           data: {
@@ -439,18 +499,11 @@ export default {
             firstName: firstName || '',
             lastName: lastName || '',
             password: tempPassword,
-            role: role || 1,
+            role: 1,
             department: department || null,
-            moduleAccess: moduleAccess || [],
             confirmed: true,
             provider: 'keycloak',
-            ...(canViewDashboard !== undefined && { canViewDashboard }),
-            ...(canViewBoard !== undefined && { canViewBoard }),
-            ...(canViewTable !== undefined && { canViewTable }),
-            ...(canViewHelpdesk !== undefined && { canViewHelpdesk }),
-            ...(canViewKpi !== undefined && { canViewKpi }),
-            ...(canViewKpiTimesheet !== undefined && { canViewKpiTimesheet }),
-            ...(canManageNews !== undefined && { canManageNews }),
+            isSuperAdmin: isSuperAdmin || false,
           },
         });
       }
@@ -463,7 +516,7 @@ export default {
         generatedPassword: !password ? tempPassword : null,
       };
     } catch (error: any) {
-      if (error.status) throw error; // Re-throw ctx.throw errors
+      if (error.status) throw error;
       strapi.log.error('[keycloak-admin] Error:', error);
       ctx.throw(500, error.message || 'Error creating Keycloak user');
     }

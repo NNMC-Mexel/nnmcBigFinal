@@ -16,6 +16,35 @@ export interface StrapiData<T> {
   attributes: T;
 }
 
+// Department with permission flags
+export interface Department {
+  id: number;
+  documentId: string;
+  key: string;
+  name_ru: string;
+  name_kz: string;
+  description?: string;
+  // Permission flags
+  canViewNews?: boolean;
+  canViewDashboard?: boolean;
+  canViewBoard?: boolean;
+  canViewTable?: boolean;
+  canViewHelpdesk?: boolean;
+  canViewKpiIt?: boolean;
+  canViewKpiMedical?: boolean;
+  canViewKpiEngineering?: boolean;
+  canViewKpiTimesheet?: boolean;
+  canAccessConf?: boolean;
+  canAccessJournal?: boolean;
+  canAccessSigndoc?: boolean;
+  canManageNews?: boolean;
+  canDeleteProject?: boolean;
+  canDragProjects?: boolean;
+  canManageProjectAssignments?: boolean;
+  canManageTickets?: boolean;
+  canViewActivityLog?: boolean;
+}
+
 // User types
 export interface User {
   id: number;
@@ -25,16 +54,7 @@ export interface User {
   lastName?: string;
   role?: UserRole;
   department?: Department;
-  canViewDashboard?: boolean;
-  canViewBoard?: boolean;
-  canViewTable?: boolean;
-  canViewHelpdesk?: boolean;
-  canViewKpi?: boolean;
-  canViewKpiTimesheet?: boolean;
-  canDeleteProject?: boolean;
-  canDragProjects?: boolean;
-  canManageNews?: boolean;
-  moduleAccess?: string[];
+  isSuperAdmin?: boolean;
   blocked: boolean;
   confirmed: boolean;
 }
@@ -52,15 +72,6 @@ export interface AssignableUser {
   firstName?: string;
   lastName?: string;
   department?: Department | null;
-}
-
-// Department
-export interface Department {
-  id: number;
-  documentId: string;
-  key: 'IT' | 'DIGITALIZATION' | 'MEDICAL_EQUIPMENT' | 'ENGINEERING';
-  name_ru: string;
-  name_kz: string;
 }
 
 // Board Stage

@@ -1,9 +1,6 @@
-import { getRoleFlags } from '../utils/project-assignments';
+import { getUserFlags } from '../utils/project-assignments';
 
 type FeatureKey = 'dashboard' | 'projects' | 'helpdesk';
-
-const resolveFeatureFlag = (value: unknown, fallback = true) =>
-  typeof value === 'boolean' ? value : fallback;
 
 export default async (policyContext: any, config: { feature?: FeatureKey } = {}) => {
   const strapi = (global as any).strapi;
@@ -18,31 +15,31 @@ export default async (policyContext: any, config: { feature?: FeatureKey } = {})
     return true;
   }
 
-  const userWithRole = (await strapi.entityService.findOne(
+  const userWithDept = (await strapi.entityService.findOne(
     'plugin::users-permissions.user',
     user.id,
-    { populate: ['role'] }
+    { populate: ['department'] }
   )) as any;
 
-  const { isAdmin, isSuperAdmin } = getRoleFlags(userWithRole?.role);
+  const { isSuperAdmin } = getUserFlags(userWithDept);
 
-  // Admins and SuperAdmins always have access
-  if (isSuperAdmin || isAdmin) {
+  // SuperAdmins always have access
+  if (isSuperAdmin) {
     return true;
   }
 
+  const dept = userWithDept?.department;
+
   if (feature === 'dashboard') {
-    return resolveFeatureFlag(userWithRole?.canViewDashboard, true);
+    return dept?.canViewDashboard === true;
   }
 
   if (feature === 'projects') {
-    const canViewBoard = resolveFeatureFlag(userWithRole?.canViewBoard, true);
-    const canViewTable = resolveFeatureFlag(userWithRole?.canViewTable, true);
-    return canViewBoard || canViewTable;
+    return dept?.canViewBoard === true || dept?.canViewTable === true;
   }
 
   if (feature === 'helpdesk') {
-    return resolveFeatureFlag(userWithRole?.canViewHelpdesk, true);
+    return dept?.canViewHelpdesk === true;
   }
 
   return true;

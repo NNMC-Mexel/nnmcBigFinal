@@ -31,7 +31,6 @@ export default function AppLayout() {
     const {
         role,
         canEdit,
-        isAdmin,
         isSuperAdmin,
         canViewDashboard,
         canViewBoard,
@@ -41,6 +40,11 @@ export default function AppLayout() {
         canViewKpiMedical,
         canViewKpiEngineering,
         canViewKpiTimesheet,
+        canAccessConf,
+        canAccessJournal,
+        canAccessSigndoc,
+        canManageNews,
+        canViewActivityLog,
     } = useUserRole();
 
     const handleLogout = () => {
@@ -54,8 +58,7 @@ export default function AppLayout() {
         window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout?client_id=${clientId}&post_logout_redirect_uri=${redirectUri}`;
     };
 
-    const moduleAccess: string[] = Array.isArray(user?.moduleAccess) ? user.moduleAccess : [];
-    const hasModuleAccess = (mod: string) => isSuperAdmin || isAdmin || moduleAccess.includes(mod);
+    // No longer needed — services use department flags directly
 
     // News feed — always visible to all authenticated users
     const newsNavItems = [
@@ -126,15 +129,13 @@ export default function AppLayout() {
 
     const navItems = [...projectNavItems, ...helpdeskNavItems];
 
-    // Страницы для администраторов (admin + superadmin)
-    const canManageNews = isSuperAdmin || isAdmin || user?.canManageNews === true;
     const adminNavItems = [
         ...(canManageNews ? [{
             to: "/app/news-admin",
             icon: Settings2,
             label: "Управление новостями",
         }] : []),
-        ...((isAdmin || isSuperAdmin) ? [{
+        ...(canViewActivityLog ? [{
             to: "/app/activity",
             icon: Activity,
             label: t("nav.activity", "История действий"),
@@ -258,15 +259,15 @@ export default function AppLayout() {
               KPI расчет
             </a> */}
 
-                        {/* Services — visible based on moduleAccess */}
-                        {(hasModuleAccess('conf') || hasModuleAccess('journal') || hasModuleAccess('signdoc')) && (
+                        {/* Services — visible based on department flags */}
+                        {(canAccessConf || canAccessJournal || canAccessSigndoc) && (
                             <div className='pt-4 pb-2'>
                                 <p className='px-3 text-xs font-medium text-slate-400 uppercase'>
                                     Сервисы
                                 </p>
                             </div>
                         )}
-                        {hasModuleAccess('conf') && (
+                        {canAccessConf && (
                             <NavLink
                                 to="/app/rooms"
                                 className={({ isActive }) =>
@@ -281,7 +282,7 @@ export default function AppLayout() {
                                 Конференц-залы
                             </NavLink>
                         )}
-                        {hasModuleAccess('journal') && (
+                        {canAccessJournal && (
                             <NavLink
                                 to="/app/journal"
                                 className={({ isActive }) =>
@@ -296,7 +297,7 @@ export default function AppLayout() {
                                 Журнал приёмной
                             </NavLink>
                         )}
-                        {hasModuleAccess('signdoc') && (
+                        {canAccessSigndoc && (
                             <NavLink
                                 to="/app/signdoc"
                                 className={({ isActive }) =>

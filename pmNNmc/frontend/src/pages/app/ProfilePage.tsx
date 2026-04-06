@@ -88,11 +88,8 @@ export default function ProfilePage() {
   };
 
   const getRoleName = () => {
-    switch (role) {
-      case 'admin': return 'Администратор';
-      case 'lead': return 'Руководитель';
-      default: return 'Сотрудник';
-    }
+    if (role === 'superadmin') return 'СуперАдмин';
+    return 'Сотрудник';
   };
 
   const getFullName = () => {
@@ -174,7 +171,7 @@ export default function ProfilePage() {
             )}
 
             <div className="flex flex-wrap gap-2">
-              <Badge variant={role === 'admin' ? 'danger' : role === 'lead' ? 'warning' : 'default'}>
+              <Badge variant={role === 'superadmin' ? 'danger' : 'default'}>
                 <Shield className="w-3 h-3 mr-1" />
                 {getRoleName()}
               </Badge>

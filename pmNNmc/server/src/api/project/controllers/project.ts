@@ -1,5 +1,5 @@
 import { factories } from '@strapi/strapi';
-import { getAssignableUserFilters, getRoleFlags } from '../../../utils/project-assignments';
+import { getAssignableUserFilters, getUserFlags } from '../../../utils/project-assignments';
 import { computeProjectProgressFromTasks } from '../../../utils/task-workflow';
 
 async function checkSuperAdmin(
@@ -16,19 +16,15 @@ async function checkSuperAdmin(
     return false;
   }
 
-  const userWithRole = (await strapi.entityService.findOne('plugin::users-permissions.user', user.id, {
-    populate: ['role'],
+  const fullUser = (await strapi.entityService.findOne('plugin::users-permissions.user', user.id, {
+    fields: ['isSuperAdmin'],
   })) as any;
 
-  const roleName = (userWithRole?.role?.name || '').toLowerCase().replace(/\s+/g, '');
-  const roleType = (userWithRole?.role?.type || '').toLowerCase().replace(/\s+/g, '');
+  const { isSuperAdmin } = getUserFlags(fullUser);
 
-  const allowedRoles = ['admin', 'superadmin', 'super_admin', 'суперадмин'];
-  const isAllowed = allowedRoles.some((role) => roleName.includes(role) || roleType.includes(role));
-
-  if (!isAllowed) {
+  if (!isSuperAdmin) {
     if (throwOnFail) {
-      ctx.throw(403, 'Access denied. Only Super Admin can delete projects.');
+      ctx.throw(403, 'Access denied. Only SuperAdmin can delete projects.');
     }
     return false;
   }
@@ -43,28 +39,23 @@ export default factories.createCoreController('api::project.project', ({ strapi 
     const visibleData = isSuperAdmin
       ? data
       : data.filter((project: any) => project?.status !== 'DELETED');
-    
-    // Добавляем вычисляемые поля
+
     const enrichedData = await Promise.all(
       visibleData.map(async (project: any) => {
         return enrichProjectWithComputedFields(project);
       })
     );
-    
+
     return { data: enrichedData, meta };
   },
 
   async findOne(ctx) {
-    // Ensure author is populated for meetings
-    // In Strapi v5, populate can be an array or object
     if (ctx.query.populate) {
       if (Array.isArray(ctx.query.populate)) {
-        // If it's an array, add meetings.author if not already present
         if (!ctx.query.populate.includes('meetings.author')) {
           ctx.query.populate.push('meetings.author');
         }
       } else if (typeof ctx.query.populate === 'object' && ctx.query.populate !== null) {
-        // If it's an object, ensure meetings.author is populated
         const populateObj = ctx.query.populate as any;
         if (!populateObj.meetings) {
           populateObj.meetings = {};
@@ -77,7 +68,7 @@ export default factories.createCoreController('api::project.project', ({ strapi 
         }
       }
     }
-    
+
     const response = await super.findOne(ctx);
     if (response?.data) {
       const isSuperAdmin = await checkSuperAdmin(ctx, strapi, { throwOnFail: false });
@@ -97,16 +88,16 @@ export default factories.createCoreController('api::project.project', ({ strapi 
       return;
     }
 
-    const userWithRole = (await strapi.entityService.findOne(
+    const userWithDept = (await strapi.entityService.findOne(
       'plugin::users-permissions.user',
       currentUser.id,
       {
-        populate: ['role', 'department'],
+        populate: ['department'],
       }
     )) as any;
 
-    const { isSuperAdmin } = getRoleFlags(userWithRole?.role);
-    const requesterDepartmentKey = userWithRole?.department?.key ?? null;
+    const { isSuperAdmin } = getUserFlags(userWithDept);
+    const requesterDepartmentKey = userWithDept?.department?.key ?? null;
     const requestedDepartmentKey = typeof ctx.query?.department === 'string' ? ctx.query.department : undefined;
     if (
       !isSuperAdmin &&
@@ -172,7 +163,7 @@ function enrichProjectWithComputedFields(project: any) {
   if (dueDate && project.status === 'ACTIVE') {
     dueDate.setHours(0, 0, 0, 0);
     overdue = today > dueDate;
-    
+
     if (!overdue) {
       const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       dueSoon = diffDays <= 3 && diffDays >= 0;

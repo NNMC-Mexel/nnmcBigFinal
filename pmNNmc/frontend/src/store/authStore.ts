@@ -10,7 +10,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   rememberMe: boolean;
-  
+
   login: (identifier: string, password: string, rememberMe?: boolean) => Promise<void>;
   register: (data: { username: string; email: string; password: string; firstName?: string; lastName?: string }) => Promise<void>;
   logout: () => void;
@@ -32,17 +32,15 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null, rememberMe });
         try {
           const response = await authApi.login({ identifier, password });
-          
-          // Сохраняем токен
+
           if (rememberMe) {
             localStorage.setItem('jwt', response.jwt);
           } else {
             sessionStorage.setItem('jwt', response.jwt);
           }
-          
-          // Fetch full user with role and department
+
           const userWithDetails = await authApi.getMe();
-          
+
           set({
             user: userWithDetails,
             token: response.jwt,
@@ -64,10 +62,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           const response = await authApi.register(data);
           localStorage.setItem('jwt', response.jwt);
-          
-          // Fetch full user with role and department
+
           const userWithDetails = await authApi.getMe();
-          
+
           set({
             user: userWithDetails,
             token: response.jwt,
@@ -87,7 +84,6 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         localStorage.removeItem('jwt');
         sessionStorage.removeItem('jwt');
-        // Очищаем все sub-service сессии при выходе
         localStorage.removeItem('kpi_token');
         localStorage.removeItem('kpi_user_cache_v1');
         localStorage.removeItem('kpi_cache_v1');
@@ -103,7 +99,6 @@ export const useAuthStore = create<AuthState>()(
       },
 
       checkAuth: async () => {
-        // Проверяем оба хранилища
         const token = localStorage.getItem('jwt') || sessionStorage.getItem('jwt');
         if (!token) {
           set({ isAuthenticated: false, user: null, isLoading: false });
@@ -145,103 +140,62 @@ export const useAuthStore = create<AuthState>()(
   )
 );
 
-// Helper to get user's department and role info
+// Department-based permission hook
+// All permissions come from user.isSuperAdmin + user.department flags
 export const useUserRole = () => {
   const user = useAuthStore((state) => state.user);
 
-  const roleType = (user?.role?.type || '').toLowerCase().replace(/\s+/g, '');
-  const roleName = (user?.role?.name || '').toLowerCase().replace(/\s+/g, '');
+  const isSuperAdmin = user?.isSuperAdmin === true;
+  // Backward compatibility alias
+  const isAdmin = isSuperAdmin;
 
-  // Debug: log role info
-  if (user?.role) {
-    console.log('User role:', { type: user.role.type, name: user.role.name, roleType, roleName });
-  }
+  const dept = user?.department as Department | undefined;
+  const userDepartment = dept;
+  const departmentKey = dept?.key;
 
-  // Проверяем на admin/superadmin роли
-  const superAdminRoles = ['superadmin', 'super_admin', 'суперадмин'];
-  const isSuperAdmin = superAdminRoles.some(role => roleName.includes(role) || roleType.includes(role));
+  // Helper: SuperAdmin gets everything, otherwise check department flag
+  const deptFlag = (flag: boolean | undefined) => isSuperAdmin || flag === true;
 
-  const adminRoles = ['admin', ...superAdminRoles];
-  const isAdmin = adminRoles.some(role => roleName.includes(role) || roleType.includes(role));
+  // Feature visibility — from department
+  const canViewNews = deptFlag(dept?.canViewNews);
+  const canViewDashboard = deptFlag(dept?.canViewDashboard);
+  const canViewBoard = deptFlag(dept?.canViewBoard);
+  const canViewTable = deptFlag(dept?.canViewTable);
+  const canViewHelpdesk = deptFlag(dept?.canViewHelpdesk);
+  const canViewKpiIt = deptFlag(dept?.canViewKpiIt);
+  const canViewKpiMedical = deptFlag(dept?.canViewKpiMedical);
+  const canViewKpiEngineering = deptFlag(dept?.canViewKpiEngineering);
+  const canViewKpiTimesheet = deptFlag(dept?.canViewKpiTimesheet);
+  const canAccessConf = deptFlag(dept?.canAccessConf);
+  const canAccessJournal = deptFlag(dept?.canAccessJournal);
+  const canAccessSigndoc = deptFlag(dept?.canAccessSigndoc);
+  const canManageNews = deptFlag(dept?.canManageNews);
+  const canDeleteProject = deptFlag(dept?.canDeleteProject);
+  const canDragProjects = deptFlag(dept?.canDragProjects);
+  const canManageProjectAssignments = deptFlag(dept?.canManageProjectAssignments);
+  const canManageTickets = deptFlag(dept?.canManageTickets);
+  const canViewActivityLog = deptFlag(dept?.canViewActivityLog);
 
-  const leadRoles = ['lead', 'руководитель'];
-  const isLead = leadRoles.some(role => roleName.includes(role) || roleType.includes(role));
-
-  const isMember = !isAdmin && !isLead;
-
-  let role: 'superadmin' | 'admin' | 'lead' | 'member' = 'member';
-  if (isSuperAdmin) role = 'superadmin';
-  else if (isAdmin) role = 'admin';
-  else if (isLead) role = 'lead';
-  else if (isMember) role = 'member';
-  
-  // Отдел пользователя
-  const userDepartment = user?.department as Department | undefined;
-  const departmentKey = userDepartment?.key;
-  
-  // === ПРАВА ДОСТУПА ===
-
-  // Если флаг явно задан (true/false) — он имеет приоритет.
-  // Если флаг не задан (undefined/null) — используем fallback.
-  const resolveAccess = (flag: boolean | undefined, fallback: boolean) =>
-    typeof flag === 'boolean' ? flag : fallback;
-
-  // Может редактировать проект (описание, даты, приоритет, статус)
-  const canEditProject = isSuperAdmin || isAdmin || isLead || isMember;
-  const canDeleteProject = resolveAccess(user?.canDeleteProject, isSuperAdmin || isAdmin || isLead);
-
-  // Может назначать ответственных пользователей
-  const canAssignResponsible = isSuperAdmin || isAdmin || isLead || isMember;
-
-  // Может создавать и редактировать задачи
-  const canManageTasks = isSuperAdmin || isAdmin || isLead || isMember;
-
-  // Может удалять задачи
-  const canDeleteTasks = isSuperAdmin || isAdmin || isLead || isMember;
-
-  // Может менять статус задач
-  const canChangeTaskStatus = true;
-
-  // Может добавлять записи совещаний
-  const canAddMeetingNotes = true;
-
-  // Может редактировать/удалять записи совещаний
-  const canManageMeetingNotes = isSuperAdmin || isAdmin || isLead || isMember;
-
-  // Может перетаскивать проекты на канбане
-  const canDragProjects = resolveAccess(user?.canDragProjects, isSuperAdmin || isAdmin || isLead);
-
-  // Может работать с документами
-  const canManageDocuments = isSuperAdmin || isAdmin || isLead || isMember;
-
-  // Может создавать анкеты
-  const canManageSurveys = isSuperAdmin || isAdmin || isLead || isMember;
-
-  // Обратная совместимость - общий canEdit (для Lead и Admin)
-  const canEdit = isSuperAdmin || isAdmin || isLead;
-
-  // Helpdesk: IT, MEDICAL_EQUIPMENT, ENGINEERING видят заявки
-  const HELPDESK_DEPARTMENTS = ['IT', 'MEDICAL_EQUIPMENT', 'ENGINEERING'];
-  const hasHelpdeskDepartmentAccess =
-    isSuperAdmin || isAdmin || HELPDESK_DEPARTMENTS.includes(departmentKey || '');
-
-  // Projects: IT, DIGITALIZATION видят проекты
-  const PROJECT_DEPARTMENTS = ['IT', 'DIGITALIZATION'];
-  const hasProjectDepartmentAccess =
-    isSuperAdmin || isAdmin || PROJECT_DEPARTMENTS.includes(departmentKey || '');
-
-  const canViewDashboard = resolveAccess(user?.canViewDashboard, hasProjectDepartmentAccess);
-  const canViewBoard = resolveAccess(user?.canViewBoard, hasProjectDepartmentAccess);
-  const canViewTable = resolveAccess(user?.canViewTable, hasProjectDepartmentAccess);
-  const canViewHelpdesk = resolveAccess(user?.canViewHelpdesk, hasHelpdeskDepartmentAccess);
-  const canViewKpi = resolveAccess(user?.canViewKpi, hasHelpdeskDepartmentAccess);
-  const canViewKpiIt = canViewKpi && (isSuperAdmin || isAdmin || departmentKey === 'IT' || user?.canViewKpi === true);
-  const canViewKpiMedical = canViewKpi && (isSuperAdmin || isAdmin || departmentKey === 'MEDICAL_EQUIPMENT' || user?.canViewKpi === true);
-  const canViewKpiEngineering = canViewKpi && (isSuperAdmin || isAdmin || departmentKey === 'ENGINEERING' || user?.canViewKpi === true);
+  // Composite
+  const canViewKpi = canViewKpiIt || canViewKpiMedical || canViewKpiEngineering;
   const canViewProjects = canViewDashboard || canViewBoard || canViewTable;
 
-  // KPI Табель — явный флаг или Admin/SuperAdmin
-  const canViewKpiTimesheet = isSuperAdmin || isAdmin || user?.canViewKpiTimesheet === true;
+  // Project capabilities — everyone with access can do these
+  const canEditProject = canViewProjects;
+  const canAssignResponsible = canViewProjects;
+  const canManageTasks = canViewProjects;
+  const canDeleteTasks = canViewProjects;
+  const canChangeTaskStatus = true;
+  const canAddMeetingNotes = true;
+  const canManageMeetingNotes = canViewProjects;
+  const canManageDocuments = canViewProjects;
+  const canManageSurveys = canViewProjects;
+
+  // Backward compat
+  const isLead = false; // No more lead role
+  const isMember = !isSuperAdmin;
+  const role: 'superadmin' | 'admin' | 'lead' | 'member' = isSuperAdmin ? 'superadmin' : 'member';
+  const canEdit = isSuperAdmin;
 
   return {
     isAdmin,
@@ -251,19 +205,8 @@ export const useUserRole = () => {
     role,
     userDepartment,
     departmentKey,
-    // Детальные права
-    canEditProject,
-    canDeleteProject,
-    canAssignResponsible,
-    canManageTasks,
-    canDeleteTasks,
-    canChangeTaskStatus,
-    canAddMeetingNotes,
-    canManageMeetingNotes,
-    canDragProjects,
-    canManageDocuments,
-    canManageSurveys,
     // Feature visibility
+    canViewNews,
     canViewDashboard,
     canViewBoard,
     canViewTable,
@@ -274,7 +217,26 @@ export const useUserRole = () => {
     canViewKpiEngineering,
     canViewKpiTimesheet,
     canViewProjects,
-    // Общий флаг (для обратной совместимости)
+    canAccessConf,
+    canAccessJournal,
+    canAccessSigndoc,
+    canManageNews,
+    canDeleteProject,
+    canDragProjects,
+    canManageProjectAssignments,
+    canManageTickets,
+    canViewActivityLog,
+    // Project capabilities
+    canEditProject,
+    canAssignResponsible,
+    canManageTasks,
+    canDeleteTasks,
+    canChangeTaskStatus,
+    canAddMeetingNotes,
+    canManageMeetingNotes,
+    canManageDocuments,
+    canManageSurveys,
+    // Backward compat
     canEdit,
   };
 };

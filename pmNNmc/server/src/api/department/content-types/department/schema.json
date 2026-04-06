@@ -13,8 +13,7 @@
   "pluginOptions": {},
   "attributes": {
     "key": {
-      "type": "enumeration",
-      "enum": ["IT", "DIGITALIZATION", "MEDICAL_EQUIPMENT", "ENGINEERING"],
+      "type": "string",
       "required": true
     },
     "name_ru": {
@@ -25,11 +24,32 @@
       "type": "string",
       "required": true
     },
+    "description": {
+      "type": "text"
+    },
     "projects": {
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::project.project",
       "mappedBy": "department"
-    }
+    },
+    "canViewNews": { "type": "boolean", "default": false },
+    "canViewDashboard": { "type": "boolean", "default": false },
+    "canViewBoard": { "type": "boolean", "default": false },
+    "canViewTable": { "type": "boolean", "default": false },
+    "canViewHelpdesk": { "type": "boolean", "default": false },
+    "canViewKpiIt": { "type": "boolean", "default": false },
+    "canViewKpiMedical": { "type": "boolean", "default": false },
+    "canViewKpiEngineering": { "type": "boolean", "default": false },
+    "canViewKpiTimesheet": { "type": "boolean", "default": false },
+    "canAccessConf": { "type": "boolean", "default": false },
+    "canAccessJournal": { "type": "boolean", "default": false },
+    "canAccessSigndoc": { "type": "boolean", "default": false },
+    "canManageNews": { "type": "boolean", "default": false },
+    "canDeleteProject": { "type": "boolean", "default": false },
+    "canDragProjects": { "type": "boolean", "default": false },
+    "canManageProjectAssignments": { "type": "boolean", "default": false },
+    "canManageTickets": { "type": "boolean", "default": false },
+    "canViewActivityLog": { "type": "boolean", "default": false }
   }
 }

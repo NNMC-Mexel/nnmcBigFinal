@@ -112,6 +112,10 @@
     "moduleAccess": {
       "type": "json",
       "default": []
+    },
+    "isSuperAdmin": {
+      "type": "boolean",
+      "default": false
     }
   }
 }

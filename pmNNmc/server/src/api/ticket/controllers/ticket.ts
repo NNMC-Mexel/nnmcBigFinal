@@ -1,4 +1,5 @@
 import { factories } from '@strapi/strapi';
+import { getUserFlags } from '../../../utils/project-assignments';
 
 export default factories.createCoreController('api::ticket.ticket', ({ strapi }) => ({
   async formatAssigneesForClient(assigneeInput: any) {
@@ -65,7 +66,6 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       return;
     }
 
-    // Parse query params directly
     const query = ctx.query as any;
     const myTicketsOnly = query.myTickets === 'true' || query.myTickets === true;
     const assigneeId = query.assigneeId ? parseInt(query.assigneeId) : undefined;
@@ -74,29 +74,22 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     const page = parseInt(query.page) || 1;
     const pageSize = parseInt(query.pageSize) || 100;
 
-    // Get user info with role and department
     const userWithDept = (await strapi.entityService.findOne(
       'plugin::users-permissions.user',
       user.id,
-      { populate: ['role', 'department'] }
+      { populate: ['department'] }
     )) as any;
 
-    const roleName = (userWithDept?.role?.name || '').toLowerCase().replace(/\s+/g, '');
-    const roleType = (userWithDept?.role?.type || '').toLowerCase().replace(/\s+/g, '');
-    const adminRoles = ['admin', 'superadmin', 'super_admin', 'суперадмин'];
-    const leadRoles = ['lead', 'руководитель'];
-    const isAdmin = adminRoles.some((r) => roleName.includes(r) || roleType.includes(r));
-    const isLead = leadRoles.some((r) => roleName.includes(r) || roleType.includes(r));
+    const { isSuperAdmin } = getUserFlags(userWithDept);
+    const dept = userWithDept?.department;
+    const canManageTickets = isSuperAdmin || dept?.canManageTickets === true;
 
-    // Build filters
     const filters: any = {};
 
-    // Status filter
     if (status && status !== 'ALL') {
       filters.status = status;
     }
 
-    // Search filter
     if (search) {
       filters.$or = [
         { requesterName: { $containsi: search } },
@@ -105,13 +98,10 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       ];
     }
 
-    // Department-based filtering for non-admins
-    if (!isAdmin) {
-      const deptKey = userWithDept?.department?.key;
-      console.log(`🎫 User ${user.id} dept=${deptKey}, isLead=${isLead}, myTicketsOnly=${myTicketsOnly}`);
+    if (!isSuperAdmin) {
+      const deptKey = dept?.key;
 
       if (!deptKey) {
-        console.log(`🎫 No department for user ${user.id}`);
         ctx.body = { data: [], meta: { pagination: { total: 0, page: 1, pageSize, pageCount: 0 } } };
         return;
       }
@@ -124,10 +114,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
         }
       )) as any[];
 
-      console.log(`🎫 Found ${serviceGroups?.length || 0} service groups for dept ${deptKey}:`, serviceGroups?.map((sg: any) => ({ id: sg.id, slug: sg.slug, deptKey: sg.department?.key })));
-
       if (!serviceGroups || serviceGroups.length === 0) {
-        console.log(`🎫 No service groups found for dept ${deptKey}`);
         ctx.body = { data: [], meta: { pagination: { total: 0, page: 1, pageSize, pageCount: 0 } } };
         return;
       }
@@ -135,20 +122,16 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       const sgIds = serviceGroups.map((sg: any) => sg.id);
       filters.serviceGroup = { id: { $in: sgIds } };
 
-      // Regular staff always see only their own tickets
-      if (!isLead) {
+      if (!canManageTickets) {
         filters.assignee = { id: user.id };
       } else {
-        // Lead can filter by assignee or see own tickets
         if (myTicketsOnly) {
           filters.assignee = { id: user.id };
         } else if (assigneeId) {
           filters.assignee = { id: assigneeId };
         }
-        // If neither, lead sees all department tickets
       }
     } else {
-      // Admin can see all, optionally filter
       if (myTicketsOnly) {
         filters.assignee = { id: user.id };
       } else if (assigneeId) {
@@ -156,7 +139,6 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       }
     }
 
-    // Query tickets
     const [tickets, total] = await Promise.all([
       strapi.entityService.findMany('api::ticket.ticket', {
         filters,
@@ -195,27 +177,22 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     const userWithDept = (await strapi.entityService.findOne(
       'plugin::users-permissions.user',
       user.id,
-      { populate: ['role', 'department'] }
+      { populate: ['department'] }
     )) as any;
 
-    const roleName = (userWithDept?.role?.name || '').toLowerCase().replace(/\s+/g, '');
-    const roleType = (userWithDept?.role?.type || '').toLowerCase().replace(/\s+/g, '');
-    const adminRoles = ['admin', 'superadmin', 'super_admin', 'суперадмин'];
-    const leadRoles = ['lead', 'руководитель'];
-    const isAdmin = adminRoles.some((r) => roleName.includes(r) || roleType.includes(r));
-    const isLead = leadRoles.some((r) => roleName.includes(r) || roleType.includes(r));
+    const { isSuperAdmin } = getUserFlags(userWithDept);
+    const dept = userWithDept?.department;
+    const canManageTickets = isSuperAdmin || dept?.canManageTickets === true;
 
-    // Get custom query parameters (separate from Strapi filters)
     const myTicketsOnly = ctx.query.myTickets === 'true' || ctx.query.myTickets === true;
     const assigneeFilter = ctx.query.assigneeId as string | undefined;
     const queryFilters = ctx.query.filters as any || {};
 
-    // Clean up custom params from query to avoid Strapi validation errors
     delete ctx.query.myTickets;
     delete ctx.query.assigneeId;
 
-    if (!isAdmin) {
-      const deptKey = userWithDept?.department?.key;
+    if (!isSuperAdmin) {
+      const deptKey = dept?.key;
       if (!deptKey) {
         ctx.body = { data: [], meta: { pagination: { total: 0, page: 1, pageSize: 25, pageCount: 0 } } };
         return;
@@ -233,29 +210,23 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
 
       const sgIds = serviceGroups.map((sg: any) => sg.id);
 
-      // Base filter: service group must match department
       const filters: any = {
         ...queryFilters,
         serviceGroup: { id: { $in: sgIds } },
       };
 
-      // If not lead/admin and myTicketsOnly is true (or by default for regular staff)
-      // Regular staff see only their own tickets by default
-      if (!isLead && !isAdmin) {
+      if (!canManageTickets) {
         if (myTicketsOnly || !assigneeFilter) {
-          // Show only own tickets
           filters.assignee = { id: user.id };
         }
       }
 
-      // If assignee filter is specified (lead viewing specific employee's tickets)
-      if (assigneeFilter && (isLead || isAdmin)) {
+      if (assigneeFilter && canManageTickets) {
         filters.assignee = { id: parseInt(assigneeFilter) };
       }
 
       ctx.query.filters = filters;
     } else {
-      // Admin can see all tickets, optionally filter by assignee
       if (assigneeFilter) {
         ctx.query.filters = {
           ...queryFilters,
@@ -279,25 +250,22 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       return;
     }
 
-    const { id } = ctx.params; // documentId in Strapi v5 routes
+    const { id } = ctx.params;
 
     const userWithDept = (await strapi.entityService.findOne(
       'plugin::users-permissions.user',
       user.id,
-      { populate: ['role', 'department'] }
+      { populate: ['department'] }
     )) as any;
 
-    const roleName = (userWithDept?.role?.name || '').toLowerCase().replace(/\s+/g, '');
-    const roleType = (userWithDept?.role?.type || '').toLowerCase().replace(/\s+/g, '');
-    const adminRoles = ['admin', 'superadmin', 'super_admin', 'суперадмин'];
-    const leadRoles = ['lead', 'руководитель'];
-    const isAdmin = adminRoles.some((r) => roleName.includes(r) || roleType.includes(r));
-    const isLead = leadRoles.some((r) => roleName.includes(r) || roleType.includes(r));
+    const { isSuperAdmin } = getUserFlags(userWithDept);
+    const dept = userWithDept?.department;
+    const canManageTickets = isSuperAdmin || dept?.canManageTickets === true;
 
     const filters: any = { documentId: id };
 
-    if (!isAdmin) {
-      const deptKey = userWithDept?.department?.key;
+    if (!isSuperAdmin) {
+      const deptKey = dept?.key;
       if (!deptKey) {
         ctx.throw(404, 'Ticket not found');
         return;
@@ -316,8 +284,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
 
       filters.serviceGroup = { id: { $in: sgIds } };
 
-      // Regular staff can view only own tickets. Lead can view all in own department.
-      if (!isLead) {
+      if (!canManageTickets) {
         filters.assignee = { id: user.id };
       }
     }
@@ -469,13 +436,6 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       populate: ['assignee', 'category', 'serviceGroup'],
     })) as any;
 
-    const finalAssigneeIds = (Array.isArray(ticket?.assignee) ? ticket.assignee : ticket?.assignee ? [ticket.assignee] : [])
-      .map((item: any) => (typeof item === 'number' ? item : item?.id))
-      .filter((id: number | undefined) => Boolean(id));
-    console.log(
-      `🎫 reassign ticket=${id} (${ticketRow.id}) requested=${JSON.stringify(uniqueAssigneeIds)} final=${JSON.stringify(finalAssigneeIds)}`
-    );
-
     const normalizedTicket = await (this as any).formatTicketForClient(ticket);
     ctx.body = { data: normalizedTicket };
   },
@@ -490,21 +450,15 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     const userWithDept = (await strapi.entityService.findOne(
       'plugin::users-permissions.user',
       user.id,
-      { populate: ['role', 'department'] }
+      { populate: ['department'] }
     )) as any;
 
-    const roleName = (userWithDept?.role?.name || '').toLowerCase().replace(/\s+/g, '');
-    const roleType = (userWithDept?.role?.type || '').toLowerCase().replace(/\s+/g, '');
-    const adminRoles = ['admin', 'superadmin', 'super_admin', 'суперадмин'];
-    const isAdmin = adminRoles.some((r) => roleName.includes(r) || roleType.includes(r));
-
+    const { isSuperAdmin } = getUserFlags(userWithDept);
     const deptKey = userWithDept?.department?.key;
-    console.log(`👥 assignableUsers: user=${user.id}, isAdmin=${isAdmin}, deptKey=${deptKey}`);
 
-    // Don't filter by blocked field - it might not work correctly
     const filters: any = {};
 
-    if (!isAdmin && deptKey) {
+    if (!isSuperAdmin && deptKey) {
       filters.department = { key: deptKey };
     }
 
@@ -513,8 +467,6 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       populate: ['department'],
       sort: { firstName: 'asc', lastName: 'asc', username: 'asc' } as any,
     })) as any[];
-
-    console.log(`👥 Found ${users?.length || 0} users:`, users?.map((u: any) => ({ id: u.id, username: u.username, deptKey: u.department?.key })));
 
     const sanitized = (users || []).map((u: any) => ({
       id: u.id,

@@ -1,3 +1,15 @@
+/**
+ * Department-based permission system.
+ * Permissions are derived from user.isSuperAdmin flag and user.department flags.
+ * Old role-based system (getRoleFlags) is kept as deprecated shim for gradual migration.
+ */
+
+export const getUserFlags = (user?: { isSuperAdmin?: boolean } | null) => {
+  const isSuperAdmin = user?.isSuperAdmin === true;
+  return { isSuperAdmin };
+};
+
+// Deprecated — kept for backward compatibility during migration
 type RoleInfo = {
   name?: string | null;
   type?: string | null;
@@ -12,6 +24,7 @@ const roleHasToken = (role: RoleInfo | undefined, tokens: string[]) => {
   return tokens.some((token) => roleName.includes(token) || roleType.includes(token));
 };
 
+/** @deprecated Use getUserFlags instead */
 export const getRoleFlags = (role?: RoleInfo) => {
   const superAdminTokens = ['superadmin', 'суперадмин'];
   const adminTokens = ['admin', 'superadmin', 'суперадмин'];
