@@ -79,8 +79,13 @@ async function setupPermissions(strapi: any) {
     'api::ticket-category.ticket-category': ['find', 'findOne'],
     // News
     'api::news-post.news-post': ['find', 'findOne', 'create', 'update', 'delete'],
-    // Role config
-    'api::role-config.role-config': ['find', 'update'],
+    // Admin users (includes department CRUD)
+    'api::admin-users.admin-users': [
+      'find', 'findOne', 'create', 'update', 'delete',
+      'createKeycloakUser', 'resetPassword',
+      'getDepartments', 'createDepartment', 'updateDepartment', 'deleteDepartment',
+      'updateDepartmentPermissions',
+    ],
   };
 
   // Apply public permissions
