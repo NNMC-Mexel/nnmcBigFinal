@@ -34,8 +34,8 @@ export default {
     // Always ensure permissions are set correctly
     await setupPermissions(strapi);
 
-    // Seed role configs for permission management
-    await seedRoleConfigs(strapi);
+    // Migrate: ensure SuperAdmin users + department permissions
+    await migrateDepartmentPermissions(strapi);
   },
 };
 
@@ -153,61 +153,88 @@ async function normalizeTicketCategoryDefaultAssignees(strapi: any) {
   }
 }
 
-async function seedRoleConfigs(strapi: any) {
-  console.log('🔧 Checking role configs...');
+/**
+ * One-time migration: promote SuperAdmin-role users to isSuperAdmin=true,
+ * and seed department permission flags if all are false.
+ */
+async function migrateDepartmentPermissions(strapi: any) {
+  console.log('🔄 Checking department permissions migration...');
 
+  // 1. Find SuperAdmin role and promote its users
   const roles = await strapi.entityService.findMany('plugin::users-permissions.role');
-  const existingConfigs = await strapi.entityService.findMany('api::role-config.role-config');
-  const existingNames = new Set(existingConfigs.map((c: any) => c.roleName));
+  const superAdminRole = roles.find((r: any) => r.type === 'superadmin');
 
-  const defaults: Record<string, any> = {
-    superadmin: {
-      canViewDashboard: true, canViewBoard: true, canViewTable: true,
-      canViewHelpdesk: true, canViewKpi: true, canViewKpiTimesheet: true,
-      canDeleteProject: true, canDragProjects: true,
-      defaultModuleAccess: ['conf', 'journal'],
+  if (superAdminRole) {
+    const saUsers = await strapi.entityService.findMany('plugin::users-permissions.user', {
+      filters: { role: { id: superAdminRole.id } },
+    });
+    for (const u of saUsers) {
+      if (!u.isSuperAdmin) {
+        await strapi.entityService.update('plugin::users-permissions.user', u.id, {
+          data: { isSuperAdmin: true },
+        });
+        console.log(`  ✅ Promoted to isSuperAdmin: ${u.username || u.email}`);
+      }
+    }
+  }
+
+  // 2. Also ensure testnnmc is SuperAdmin (Keycloak-created user, may not be in SuperAdmin role)
+  const testUsers = await strapi.entityService.findMany('plugin::users-permissions.user', {
+    filters: { $or: [{ username: 'testnnmc' }, { email: 'testnnmc@nnmc.kz' }] },
+  });
+  for (const u of testUsers) {
+    if (!u.isSuperAdmin) {
+      await strapi.entityService.update('plugin::users-permissions.user', u.id, {
+        data: { isSuperAdmin: true },
+      });
+      console.log(`  ✅ Promoted testnnmc to isSuperAdmin: ${u.username || u.email}`);
+    }
+  }
+
+  // 3. Seed default permissions on departments that have all flags = false
+  const permissionFlags = [
+    'canViewNews', 'canViewDashboard', 'canViewBoard', 'canViewTable',
+    'canViewHelpdesk', 'canViewKpiIt', 'canViewKpiMedical', 'canViewKpiEngineering',
+    'canViewKpiTimesheet', 'canAccessConf', 'canAccessJournal', 'canAccessSigndoc',
+    'canManageNews', 'canDeleteProject', 'canDragProjects',
+    'canManageProjectAssignments', 'canManageTickets', 'canViewActivityLog',
+  ];
+
+  const deptDefaults: Record<string, Record<string, boolean>> = {
+    IT: {
+      canViewNews: true, canViewDashboard: true, canViewBoard: true, canViewTable: true,
+      canViewHelpdesk: true, canViewKpiIt: true, canViewKpiTimesheet: true,
+      canAccessConf: true, canAccessJournal: true, canAccessSigndoc: true,
+      canManageNews: true, canDeleteProject: true, canDragProjects: true,
+      canManageProjectAssignments: true, canManageTickets: true, canViewActivityLog: true,
     },
-    admin: {
-      canViewDashboard: true, canViewBoard: true, canViewTable: true,
-      canViewHelpdesk: true, canViewKpi: true, canViewKpiTimesheet: true,
-      canDeleteProject: true, canDragProjects: true,
-      defaultModuleAccess: ['conf', 'journal'],
+    DIGITALIZATION: {
+      canViewNews: true, canViewDashboard: true, canViewBoard: true, canViewTable: true,
+      canAccessConf: true,
     },
-    lead: {
-      canViewDashboard: true, canViewBoard: true, canViewTable: true,
-      canViewHelpdesk: true, canViewKpi: true, canViewKpiTimesheet: false,
-      canDeleteProject: true, canDragProjects: true,
-      defaultModuleAccess: [],
+    MEDICAL_EQUIPMENT: {
+      canViewNews: true, canViewHelpdesk: true, canViewKpiMedical: true,
     },
-    member: {
-      canViewDashboard: true, canViewBoard: true, canViewTable: true,
-      canViewHelpdesk: true, canViewKpi: true, canViewKpiTimesheet: false,
-      canDeleteProject: false, canDragProjects: false,
-      defaultModuleAccess: [],
-    },
-    authenticated: {
-      canViewDashboard: false, canViewBoard: false, canViewTable: false,
-      canViewHelpdesk: false, canViewKpi: false, canViewKpiTimesheet: false,
-      canDeleteProject: false, canDragProjects: false,
-      defaultModuleAccess: [],
+    ENGINEERING: {
+      canViewNews: true, canViewHelpdesk: true, canViewKpiEngineering: true,
     },
   };
 
-  for (const role of roles) {
-    if (existingNames.has(role.name)) continue;
+  const departments = await strapi.entityService.findMany('api::department.department');
+  for (const dept of departments) {
+    const allFalse = permissionFlags.every((f) => !dept[f]);
+    if (!allFalse) continue; // already configured
 
-    const roleType = (role.type || '').toLowerCase();
-    const defaultConfig = defaults[roleType] || defaults.authenticated;
+    const defaults = deptDefaults[dept.key];
+    if (!defaults) continue; // unknown department, skip
 
-    await strapi.entityService.create('api::role-config.role-config', {
-      data: {
-        roleName: role.name,
-        roleId: role.id,
-        ...defaultConfig,
-      },
+    await strapi.entityService.update('api::department.department', dept.id, {
+      data: defaults,
     });
-    console.log(`  ✅ Created role config for: ${role.name}`);
+    console.log(`  ✅ Seeded permissions for department: ${dept.name_ru} (${dept.key})`);
   }
+
+  console.log('  ✅ Department permissions migration complete');
 }
 
 async function ensurePermission(strapi: any, roleId: number, contentType: string, action: string) {
