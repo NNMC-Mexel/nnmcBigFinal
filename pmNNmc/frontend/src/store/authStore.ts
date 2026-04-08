@@ -61,7 +61,11 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const response = await authApi.register(data);
-          localStorage.setItem('jwt', response.jwt);
+          if (get().rememberMe) {
+            localStorage.setItem('jwt', response.jwt);
+          } else {
+            sessionStorage.setItem('jwt', response.jwt);
+          }
 
           const userWithDetails = await authApi.getMe();
 
@@ -132,8 +136,6 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       partialize: (state) => ({
         user: state.user,
-        token: state.token,
-        isAuthenticated: state.isAuthenticated,
         rememberMe: state.rememberMe,
       }),
     }

@@ -22,15 +22,29 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle auth errors
+// Handle auth errors — redirect to Keycloak logout on 401
 client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Clear all tokens
       localStorage.removeItem('jwt');
       sessionStorage.removeItem('jwt');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      localStorage.removeItem('auth-storage');
+      localStorage.removeItem('kpi_token');
+      localStorage.removeItem('kpi_user_cache_v1');
+      localStorage.removeItem('kpi_cache_v1');
+      localStorage.removeItem('conf_token');
+      localStorage.removeItem('journal_token');
+      localStorage.removeItem('signdoc_token');
+      localStorage.removeItem('signdoc_user');
+      // Redirect to Keycloak logout (SSO flow)
+      const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://192.168.101.25:12012';
+      const keycloakRealm = import.meta.env.VITE_KEYCLOAK_REALM || 'nnmc';
+      const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'pmnnmc-app';
+      const redirectUri = encodeURIComponent(`${window.location.origin}/logged-out`);
+      window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout?client_id=${clientId}&post_logout_redirect_uri=${redirectUri}`;
     }
     return Promise.reject(error);
   }

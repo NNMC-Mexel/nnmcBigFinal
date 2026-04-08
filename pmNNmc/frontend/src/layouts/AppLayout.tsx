@@ -48,7 +48,8 @@ export default function AppLayout() {
     } = useUserRole();
 
     const handleLogout = () => {
-        // Clear local storage directly (without triggering React re-render via logout())
+        // Clear ALL tokens and Zustand state
+        useAuthStore.getState().logout();
         localStorage.removeItem('auth-storage');
         // End Keycloak session, then redirect to /logged-out page
         const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://192.168.101.25:12012';

@@ -1,11 +1,28 @@
 import { Context } from 'koa';
+import crypto from 'crypto';
 
-// Генерация случайного пароля
+// Allowlist полей для department CRUD
+const DEPT_FIELDS = ['key', 'name_ru', 'name_kz', 'description'];
+const DEPT_PERMISSION_FLAGS = [
+  'canViewNews', 'canViewDashboard', 'canViewBoard', 'canViewTable',
+  'canViewHelpdesk', 'canViewKpiIt', 'canViewKpiMedical', 'canViewKpiEngineering',
+  'canViewKpiTimesheet', 'canAccessConf', 'canAccessJournal', 'canAccessSigndoc',
+  'canManageNews', 'canDeleteProject', 'canDragProjects',
+  'canManageProjectAssignments', 'canManageTickets', 'canViewActivityLog',
+];
+const ALLOWED_DEPT_FIELDS = [...DEPT_FIELDS, ...DEPT_PERMISSION_FLAGS];
+
+function sanitizeFields(data: Record<string, any>, allowlist: string[]): Record<string, any> {
+  return Object.fromEntries(Object.entries(data).filter(([k]) => allowlist.includes(k)));
+}
+
+// Генерация случайного пароля (криптографически безопасная)
 function generatePassword(length = 12): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+  const bytes = crypto.randomBytes(length);
   let password = '';
   for (let i = 0; i < length; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
+    password += chars.charAt(bytes[i] % chars.length);
   }
   return password;
 }
@@ -72,7 +89,8 @@ export default {
       });
 
       ctx.body = { data: safeUsers };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.status) throw error;
       console.error('Error fetching users:', error);
       ctx.throw(500, 'Error fetching users');
     }
@@ -97,7 +115,8 @@ export default {
 
       const { password, resetPasswordToken, confirmationToken, ...safeUser } = user;
       ctx.body = { data: safeUser };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.status) throw error;
       console.error('Error fetching user:', error);
       ctx.throw(500, 'Error fetching user');
     }
@@ -198,7 +217,8 @@ export default {
         data: safeUser,
         message: 'User updated successfully',
       };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.status) throw error;
       console.error('Error updating user:', error);
       ctx.throw(500, 'Error updating user');
     }
@@ -226,9 +246,10 @@ export default {
 
       ctx.body = {
         message: 'Password reset successfully',
-        newPassword: password,
+        newPassword: generateNew ? password : undefined,
       };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.status) throw error;
       console.error('Error resetting password:', error);
       ctx.throw(500, 'Error resetting password');
     }
@@ -250,7 +271,8 @@ export default {
       await strapi.entityService.delete('plugin::users-permissions.user', id);
 
       ctx.body = { message: 'User deleted successfully' };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.status) throw error;
       console.error('Error deleting user:', error);
       ctx.throw(500, 'Error deleting user');
     }
@@ -269,7 +291,8 @@ export default {
       });
 
       ctx.body = { data: departments };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.status) throw error;
       console.error('Error fetching departments:', error);
       ctx.throw(500, 'Error fetching departments');
     }
@@ -297,8 +320,9 @@ export default {
         return;
       }
 
+      const safeFlags = sanitizeFields(permissionFlags, DEPT_PERMISSION_FLAGS);
       const department = await strapi.entityService.create('api::department.department', {
-        data: { key, name_ru, name_kz, description: description || null, ...permissionFlags },
+        data: { key, name_ru, name_kz, description: description || null, ...safeFlags },
       });
 
       ctx.body = { data: department, message: 'Department created successfully' };
@@ -316,14 +340,16 @@ export default {
 
     const { id } = ctx.params;
     const body = ctx.request.body as any;
+    const sanitized = sanitizeFields(body, ALLOWED_DEPT_FIELDS);
 
     try {
       const department = await strapi.entityService.update('api::department.department', id, {
-        data: body,
+        data: sanitized,
       });
 
       ctx.body = { data: department, message: 'Department updated successfully' };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.status) throw error;
       console.error('Error updating department:', error);
       ctx.throw(500, 'Error updating department');
     }
@@ -375,14 +401,16 @@ export default {
       for (const dept of departments) {
         const { id, ...permissions } = dept;
         if (!id) continue;
+        const safePerms = sanitizeFields(permissions, DEPT_PERMISSION_FLAGS);
         const updated = await strapi.entityService.update('api::department.department', id, {
-          data: permissions,
+          data: safePerms,
         });
         results.push(updated);
       }
 
       ctx.body = { data: results, message: 'Permissions updated successfully' };
-    } catch (error) {
+    } catch (error: any) {
+      if (error.status) throw error;
       console.error('Error updating department permissions:', error);
       ctx.throw(500, 'Error updating department permissions');
     }
