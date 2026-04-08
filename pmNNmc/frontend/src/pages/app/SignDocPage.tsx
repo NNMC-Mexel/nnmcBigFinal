@@ -95,14 +95,6 @@ export default function SignDocPage() {
     }
   };
 
-  const handleSignDocLogout = () => {
-    localStorage.removeItem(SIGNDOC_TOKEN_KEY);
-    localStorage.removeItem(SIGNDOC_USER_KEY);
-    setSdUser(null);
-    setLoginForm({ login: '', password: '' });
-    setLoginError('');
-  };
-
   // Loading
   if (!authChecked) {
     return (
@@ -133,7 +125,7 @@ export default function SignDocPage() {
 
   // Authenticated — render module
   if (sdUser) {
-    return <SignDocModule user={sdUser} onSignDocLogout={handleSignDocLogout} />;
+    return <SignDocModule user={sdUser} />;
   }
 
   // Login form

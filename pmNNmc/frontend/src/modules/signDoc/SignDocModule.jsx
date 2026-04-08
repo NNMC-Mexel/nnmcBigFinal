@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate, NavLink, useLocation } from "react-router-dom";
-import { FileText, Clock, PlusCircle, LogOut } from "lucide-react";
+import { FileText, Clock, PlusCircle } from "lucide-react";
 import { ToastProvider } from "./components/Toast";
 import DocumentList from "./components/DocumentList";
 import DocumentCreate from "./components/DocumentCreate";
@@ -8,7 +8,7 @@ import DocumentView from "./components/DocumentView";
 import BatchSignPage from "./components/BatchSignPage";
 import { getActionablePendingDocuments } from "./api/signdocClient";
 
-export default function SignDocModule({ user, onSignDocLogout }) {
+export default function SignDocModule({ user }) {
     const [pendingCount, setPendingCount] = useState(0);
     const location = useLocation();
 
@@ -91,14 +91,6 @@ export default function SignDocModule({ user, onSignDocLogout }) {
                                 Создать
                             </NavLink>
 
-                            {onSignDocLogout && (
-                                <button
-                                    onClick={onSignDocLogout}
-                                    className='flex items-center gap-1 px-3 py-2 text-sm text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-2'
-                                    title='Выйти из модуля'>
-                                    <LogOut className='w-4 h-4' />
-                                </button>
-                            )}
                         </div>
                     </div>
 

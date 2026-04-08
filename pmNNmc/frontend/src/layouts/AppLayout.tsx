@@ -67,6 +67,9 @@ export default function AppLayout() {
             to: "/app/news",
             icon: Newspaper,
             label: "Новостная лента",
+            iconColor: "text-orange-500",
+            activeBg: "bg-orange-50",
+            activeText: "text-orange-700",
         },
     ];
 
@@ -76,11 +79,14 @@ export default function AppLayout() {
                   to: "/app/dashboard",
                   icon: LayoutDashboard,
                   label: t("nav.dashboard"),
+                  iconColor: "text-blue-500",
+                  activeBg: "bg-blue-50",
+                  activeText: "text-blue-700",
               }
             : null,
-        canViewBoard ? { to: "/app/board", icon: Kanban, label: t("nav.board") } : null,
-        canViewTable ? { to: "/app/table", icon: Table, label: t("nav.table") } : null,
-    ].filter(Boolean) as Array<{ to: string; icon: typeof LayoutDashboard; label: string }>;
+        canViewBoard ? { to: "/app/board", icon: Kanban, label: t("nav.board"), iconColor: "text-violet-500", activeBg: "bg-violet-50", activeText: "text-violet-700" } : null,
+        canViewTable ? { to: "/app/table", icon: Table, label: t("nav.table"), iconColor: "text-cyan-500", activeBg: "bg-cyan-50", activeText: "text-cyan-700" } : null,
+    ].filter(Boolean) as Array<{ to: string; icon: typeof LayoutDashboard; label: string; iconColor: string; activeBg: string; activeText: string }>;
 
     const helpdeskNavItems = [
         canViewHelpdesk
@@ -88,6 +94,9 @@ export default function AppLayout() {
                   to: "/app/helpdesk",
                   icon: Headphones,
                   label: t("nav.helpdesk", "Заявки"),
+                  iconColor: "text-emerald-500",
+                  activeBg: "bg-emerald-50",
+                  activeText: "text-emerald-700",
               }
             : null,
         ...(canViewKpiIt
@@ -96,6 +105,9 @@ export default function AppLayout() {
                       to: "/app/kpi-it",
                       icon: Calculator,
                       label: "KPI IT",
+                      iconColor: "text-teal-500",
+                      activeBg: "bg-teal-50",
+                      activeText: "text-teal-700",
                   },
               ]
             : []),
@@ -105,6 +117,9 @@ export default function AppLayout() {
                       to: "/app/kpi-medical",
                       icon: Calculator,
                       label: "KPI Медоборудование",
+                      iconColor: "text-rose-500",
+                      activeBg: "bg-rose-50",
+                      activeText: "text-rose-700",
                   },
               ]
             : []),
@@ -114,6 +129,9 @@ export default function AppLayout() {
                       to: "/app/kpi-engineering",
                       icon: Calculator,
                       label: "KPI Инженерная служба",
+                      iconColor: "text-amber-500",
+                      activeBg: "bg-amber-50",
+                      activeText: "text-amber-700",
                   },
               ]
             : []),
@@ -123,10 +141,13 @@ export default function AppLayout() {
                       to: "/app/kpi-timesheet",
                       icon: BarChart2,
                       label: "KPI Табель",
+                      iconColor: "text-indigo-500",
+                      activeBg: "bg-indigo-50",
+                      activeText: "text-indigo-700",
                   },
               ]
             : []),
-    ].filter(Boolean) as Array<{ to: string; icon: typeof Headphones; label: string }>;
+    ].filter(Boolean) as Array<{ to: string; icon: typeof Headphones; label: string; iconColor: string; activeBg: string; activeText: string }>;
 
     const navItems = [...projectNavItems, ...helpdeskNavItems];
 
@@ -162,7 +183,7 @@ export default function AppLayout() {
     };
 
     return (
-        <div className='min-h-screen bg-slate-50 flex'>
+        <div className='min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-teal-50/20 flex'>
             {/* Sidebar overlay for mobile */}
             {sidebarOpen && (
                 <div
@@ -180,26 +201,13 @@ export default function AppLayout() {
                     {/* Logo */}
                     <div className='p-4 border-b border-slate-100'>
                         <div className='flex items-center gap-3'>
-                            <div className='w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-medical-500 flex items-center justify-center'>
-                                <svg
-                                    className='w-6 h-6 text-white'
-                                    fill='none'
-                                    viewBox='0 0 24 24'
-                                    stroke='currentColor'>
-                                    <path
-                                        strokeLinecap='round'
-                                        strokeLinejoin='round'
-                                        strokeWidth={2}
-                                        d='M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2'
-                                    />
-                                </svg>
-                            </div>
+                            <img src="/logo.png" alt="ННМЦ" className="w-10 h-10 object-contain" />
                             <div>
                                 <h1 className='font-display font-bold text-slate-800'>
-                                    NNMC IT Board
+                                    АО "ННМЦ"
                                 </h1>
                                 <p className='text-xs text-slate-500'>
-                                    Project Management
+                                    Корпоративная система
                                 </p>
                             </div>
                         </div>
@@ -213,15 +221,19 @@ export default function AppLayout() {
                                 key={item.to}
                                 to={item.to}
                                 className={({ isActive }) =>
-                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
                                         isActive
-                                            ? "bg-primary-50 text-primary-700 font-medium"
+                                            ? `${item.activeBg} ${item.activeText} font-medium`
                                             : "text-slate-600 hover:bg-slate-50"
                                     }`
                                 }
                                 onClick={() => setSidebarOpen(false)}>
-                                <item.icon className='w-5 h-5' />
-                                {item.label}
+                                {({ isActive }) => (
+                                    <>
+                                        <item.icon className={`w-5 h-5 ${isActive ? item.activeText : item.iconColor}`} />
+                                        <span>{item.label}</span>
+                                    </>
+                                )}
                             </NavLink>
                         ))}
 
@@ -231,15 +243,19 @@ export default function AppLayout() {
                                 key={item.to}
                                 to={item.to}
                                 className={({ isActive }) =>
-                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
                                         isActive
-                                            ? "bg-primary-50 text-primary-700 font-medium"
+                                            ? `${item.activeBg} ${item.activeText} font-medium`
                                             : "text-slate-600 hover:bg-slate-50"
                                     }`
                                 }
                                 onClick={() => setSidebarOpen(false)}>
-                                <item.icon className='w-5 h-5' />
-                                {item.label}
+                                {({ isActive }) => (
+                                    <>
+                                        <item.icon className={`w-5 h-5 ${isActive ? item.activeText : item.iconColor}`} />
+                                        <span>{item.label}</span>
+                                    </>
+                                )}
                             </NavLink>
                         ))}
 
@@ -272,45 +288,57 @@ export default function AppLayout() {
                             <NavLink
                                 to="/app/rooms"
                                 className={({ isActive }) =>
-                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
                                         isActive
-                                            ? "bg-primary-50 text-primary-700 font-medium"
+                                            ? "bg-sky-50 text-sky-700 font-medium"
                                             : "text-slate-600 hover:bg-slate-50"
                                     }`
                                 }
                                 onClick={() => setSidebarOpen(false)}>
-                                <CalendarRange className='w-5 h-5' />
-                                Конференц-залы
+                                {({ isActive }) => (
+                                    <>
+                                        <CalendarRange className={`w-5 h-5 ${isActive ? "text-sky-700" : "text-sky-500"}`} />
+                                        <span>Конференц-залы</span>
+                                    </>
+                                )}
                             </NavLink>
                         )}
                         {canAccessJournal && (
                             <NavLink
                                 to="/app/journal"
                                 className={({ isActive }) =>
-                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
                                         isActive
-                                            ? "bg-primary-50 text-primary-700 font-medium"
+                                            ? "bg-purple-50 text-purple-700 font-medium"
                                             : "text-slate-600 hover:bg-slate-50"
                                     }`
                                 }
                                 onClick={() => setSidebarOpen(false)}>
-                                <BookOpen className='w-5 h-5' />
-                                Журнал приёмной
+                                {({ isActive }) => (
+                                    <>
+                                        <BookOpen className={`w-5 h-5 ${isActive ? "text-purple-700" : "text-purple-500"}`} />
+                                        <span>Журнал приёмной</span>
+                                    </>
+                                )}
                             </NavLink>
                         )}
                         {canAccessSigndoc && (
                             <NavLink
                                 to="/app/signdoc"
                                 className={({ isActive }) =>
-                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                                    `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
                                         isActive
-                                            ? "bg-primary-50 text-primary-700 font-medium"
+                                            ? "bg-fuchsia-50 text-fuchsia-700 font-medium"
                                             : "text-slate-600 hover:bg-slate-50"
                                     }`
                                 }
                                 onClick={() => setSidebarOpen(false)}>
-                                <FileSignature className='w-5 h-5' />
-                                Документооборот
+                                {({ isActive }) => (
+                                    <>
+                                        <FileSignature className={`w-5 h-5 ${isActive ? "text-fuchsia-700" : "text-fuchsia-500"}`} />
+                                        <span>Документооборот</span>
+                                    </>
+                                )}
                             </NavLink>
                         )}
 

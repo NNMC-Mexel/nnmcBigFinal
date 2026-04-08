@@ -285,13 +285,9 @@ function App() {
 
       {/* Logged out page — not protected, prevents auto-redirect to Keycloak */}
       <Route path="/logged-out" element={
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-teal-50 via-blue-50 to-emerald-50">
           <div className="text-center bg-white p-8 rounded-2xl shadow-lg">
-            <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </div>
+            <img src="/logo.png" alt="ННМЦ" className="w-16 h-16 mx-auto mb-4 object-contain" />
             <h2 className="text-xl font-semibold text-slate-800 mb-2">Вы вышли из системы</h2>
             <p className="text-slate-500 mb-6">Сессия завершена</p>
             <button
@@ -304,6 +300,7 @@ function App() {
               Войти снова
             </button>
           </div>
+          <p className="mt-6 text-sm text-slate-400">© 2026 ТОО "Biocraft Digital"</p>
         </div>
       } />
 
