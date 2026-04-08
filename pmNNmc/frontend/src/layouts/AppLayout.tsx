@@ -51,12 +51,8 @@ export default function AppLayout() {
         // Clear ALL tokens and Zustand state
         useAuthStore.getState().logout();
         localStorage.removeItem('auth-storage');
-        // End Keycloak session, then redirect to /logged-out page
-        const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://192.168.101.25:12012';
-        const keycloakRealm = import.meta.env.VITE_KEYCLOAK_REALM || 'nnmc';
-        const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'pmnnmc-app';
-        const redirectUri = encodeURIComponent(`${window.location.origin}/logged-out`);
-        window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout?client_id=${clientId}&post_logout_redirect_uri=${redirectUri}`;
+        // Redirect to /logged-out (works with or without Keycloak)
+        window.location.href = '/logged-out';
     };
 
     // No longer needed — services use department flags directly
@@ -183,7 +179,7 @@ export default function AppLayout() {
     };
 
     return (
-        <div className='min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-teal-50/20 flex'>
+        <div className='min-h-screen bg-gradient-to-br from-teal-50 via-blue-50 to-indigo-50 flex'>
             {/* Sidebar overlay for mobile */}
             {sidebarOpen && (
                 <div

@@ -3,7 +3,7 @@ import LanguageSwitcher from '../components/ui/LanguageSwitcher';
 
 export default function AuthLayout() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 via-blue-50 to-emerald-50 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-teal-100 via-blue-50 to-indigo-100 flex flex-col">
       {/* Header */}
       <header className="p-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
