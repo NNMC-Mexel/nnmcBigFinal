@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NNMC IT Board — Вход</title>
+  <title>АО "ННМЦ" — Вход в систему</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="${url.resourcesPath}/css/style.css">
@@ -13,14 +13,10 @@
 
     <header class="header">
       <div class="brand">
-        <div class="brand-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
-          </svg>
-        </div>
+        <img src="${url.resourcesPath}/img/logo.png" alt="ННМЦ" class="brand-logo" />
         <div>
-          <div class="brand-title">NNMC IT Board</div>
-          <div class="brand-sub">Project Management</div>
+          <div class="brand-title">АО "ННМЦ"</div>
+          <div class="brand-sub">Корпоративная система</div>
         </div>
       </div>
     </header>
@@ -37,7 +33,7 @@
             </svg>
           </div>
           <h2 class="card-title">Вход в систему</h2>
-          <p class="card-sub">NNMC IT Project Board</p>
+          <p class="card-sub">АО "ННМЦ" — корпоративная система</p>
         </div>
 
         <#if message?has_content>
@@ -102,7 +98,7 @@
       </div>
     </main>
 
-    <footer class="footer">© 2024 NNMC IT Department</footer>
+    <footer class="footer">© 2026 ТОО "Biocraft Digital"</footer>
   </div>
 </body>
 </html>

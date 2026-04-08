@@ -51,8 +51,12 @@ export default function AppLayout() {
         // Clear ALL tokens and Zustand state
         useAuthStore.getState().logout();
         localStorage.removeItem('auth-storage');
-        // Redirect to /logged-out (works with or without Keycloak)
-        window.location.href = '/logged-out';
+        // End Keycloak session, then redirect back to app (triggers new SSO login)
+        const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://192.168.101.25:12012';
+        const keycloakRealm = import.meta.env.VITE_KEYCLOAK_REALM || 'nnmc';
+        const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'pmnnmc-app';
+        const redirectUri = encodeURIComponent(window.location.origin);
+        window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout?client_id=${clientId}&post_logout_redirect_uri=${redirectUri}`;
     };
 
     // No longer needed — services use department flags directly
