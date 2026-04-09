@@ -479,7 +479,7 @@ export default {
         userPayload.credentials = [{
           type: 'password',
           value: password,
-          temporary: true,
+          temporary: false,
         }];
       }
 
