@@ -27,6 +27,8 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Grab id_token before clearing
+      const idToken = localStorage.getItem('kc_id_token');
       // Clear all tokens
       localStorage.removeItem('jwt');
       sessionStorage.removeItem('jwt');
@@ -39,10 +41,16 @@ client.interceptors.response.use(
       localStorage.removeItem('journal_token');
       localStorage.removeItem('signdoc_token');
       localStorage.removeItem('signdoc_user');
-      // End Keycloak session — let Keycloak show its own logout/login page
+      localStorage.removeItem('kc_id_token');
+      // End Keycloak session with id_token_hint
       const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://192.168.101.25:12012';
       const keycloakRealm = import.meta.env.VITE_KEYCLOAK_REALM || 'nnmc';
-      window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout`;
+      const redirectUri = encodeURIComponent(window.location.origin + '/logged-out');
+      if (idToken) {
+        window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout?id_token_hint=${idToken}&post_logout_redirect_uri=${redirectUri}`;
+      } else {
+        window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout`;
+      }
     }
     return Promise.reject(error);
   }

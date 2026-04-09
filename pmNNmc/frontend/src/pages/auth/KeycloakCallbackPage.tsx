@@ -52,7 +52,13 @@ export default function KeycloakCallbackPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const accessToken = params.get('access_token');
+    const idToken = params.get('id_token');
     const jwt = params.get('jwt');
+
+    // Store id_token for OIDC logout (Keycloak needs it to destroy session)
+    if (idToken) {
+      localStorage.setItem('kc_id_token', idToken);
+    }
 
     if (jwt) {
       if (accessToken) {

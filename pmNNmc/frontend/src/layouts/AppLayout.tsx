@@ -48,13 +48,21 @@ export default function AppLayout() {
     } = useUserRole();
 
     const handleLogout = () => {
+        // Grab id_token BEFORE clearing storage (needed for Keycloak session destroy)
+        const idToken = localStorage.getItem('kc_id_token');
         // Clear ALL tokens and Zustand state
         useAuthStore.getState().logout();
         localStorage.removeItem('auth-storage');
-        // End Keycloak session — let Keycloak show its own logout/login page
+        localStorage.removeItem('kc_id_token');
+        // End Keycloak session with id_token_hint (required in Keycloak 26.x)
         const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://192.168.101.25:12012';
         const keycloakRealm = import.meta.env.VITE_KEYCLOAK_REALM || 'nnmc';
-        window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout`;
+        const redirectUri = encodeURIComponent(window.location.origin + '/logged-out');
+        if (idToken) {
+            window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout?id_token_hint=${idToken}&post_logout_redirect_uri=${redirectUri}`;
+        } else {
+            window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout`;
+        }
     };
 
     // No longer needed — services use department flags directly

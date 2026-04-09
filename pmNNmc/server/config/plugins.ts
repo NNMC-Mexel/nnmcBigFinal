@@ -1,6 +1,10 @@
 export default ({ env }) => ({
   'users-permissions': {
     config: {
+      ratelimit: {
+        max: 100,
+        interval: 60 * 1000, // 100 requests per minute instead of default 10
+      },
       jwt: {
         expiresIn: '7d',
       },
