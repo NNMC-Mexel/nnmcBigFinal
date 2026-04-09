@@ -58,27 +58,6 @@ export const buildProjectsQuery = (params?: {
   return query;
 };
 
-// Strapi v5 requires manyToMany relations in { connect: [...] } format
-const formatProjectRelations = (data: any) => {
-  const formatted = { ...data };
-
-  // manyToMany: supportingSpecialists
-  if (Array.isArray(formatted.supportingSpecialists)) {
-    formatted.supportingSpecialists = {
-      set: formatted.supportingSpecialists.map((id: number) => ({ id })),
-    };
-  }
-
-  // manyToMany: responsibleUsers
-  if (Array.isArray(formatted.responsibleUsers)) {
-    formatted.responsibleUsers = {
-      set: formatted.responsibleUsers.map((id: number) => ({ id })),
-    };
-  }
-
-  return formatted;
-};
-
 export const projectsApi = {
   getAll: async (params?: {
     status?: Project['status'] | string;
@@ -114,12 +93,12 @@ export const projectsApi = {
   },
 
   create: async (data: Partial<Project>): Promise<Project> => {
-    const response = await client.post('/projects', { data: formatProjectRelations(data) });
+    const response = await client.post('/projects', { data });
     return response.data.data;
   },
 
   update: async (id: number | string, data: Partial<Project>): Promise<Project> => {
-    const response = await client.put(`/projects/${id}`, { data: formatProjectRelations(data) });
+    const response = await client.put(`/projects/${id}`, { data });
     return response.data.data;
   },
 

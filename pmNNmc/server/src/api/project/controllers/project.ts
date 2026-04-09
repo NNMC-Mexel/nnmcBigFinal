@@ -33,16 +33,63 @@ async function checkSuperAdmin(
 }
 
 export default factories.createCoreController('api::project.project', ({ strapi }) => ({
+  // Custom create — bypass REST API sanitizer that rejects relation fields
   async create(ctx) {
-    console.log('[project.create] body:', JSON.stringify(ctx.request.body));
-    try {
-      const result = await super.create(ctx);
-      console.log('[project.create] SUCCESS, id:', result?.data?.id);
-      return result;
-    } catch (err: any) {
-      console.log('[project.create] ERROR:', err.name, err.message, JSON.stringify(err.details || {}));
-      throw err;
+    const data = ctx.request.body?.data || {};
+
+    const entry = await strapi.entityService.create('api::project.project', {
+      data: {
+        title: data.title,
+        description: data.description || null,
+        startDate: data.startDate || null,
+        dueDate: data.dueDate || null,
+        priorityLight: data.priorityLight || 'GREEN',
+        status: data.status || 'ACTIVE',
+        department: data.department || null,
+        owner: data.owner || null,
+        supportingSpecialists: data.supportingSpecialists || [],
+        responsibleUsers: data.responsibleUsers || [],
+        manualStageOverride: data.manualStageOverride || null,
+      },
+      populate: ['department', 'owner', 'supportingSpecialists', 'responsibleUsers', 'tasks', 'manualStageOverride'],
+    });
+
+    ctx.body = { data: enrichProjectWithComputedFields(entry) };
+  },
+
+  // Custom update — bypass REST API sanitizer
+  async update(ctx) {
+    const paramId = ctx.params.id;
+    const data = ctx.request.body?.data || {};
+
+    // Resolve documentId → numeric id if needed
+    let numericId = Number(paramId);
+    if (isNaN(numericId)) {
+      const doc = await strapi.documents('api::project.project').findOne({
+        documentId: paramId,
+        fields: ['id'],
+      }) as any;
+      if (!doc) { ctx.throw(404, 'Project not found'); return; }
+      numericId = doc.id;
     }
+
+    // Build update payload with only the fields that were sent
+    const updateData: Record<string, any> = {};
+    const allowedScalars = ['title', 'description', 'startDate', 'dueDate', 'priorityLight', 'status'];
+    for (const field of allowedScalars) {
+      if (field in data) updateData[field] = data[field];
+    }
+    const allowedRelations = ['department', 'owner', 'supportingSpecialists', 'responsibleUsers', 'manualStageOverride'];
+    for (const field of allowedRelations) {
+      if (field in data) updateData[field] = data[field];
+    }
+
+    const entry = await strapi.entityService.update('api::project.project', numericId, {
+      data: updateData,
+      populate: ['department', 'owner', 'supportingSpecialists', 'responsibleUsers', 'tasks', 'tasks.assignee', 'manualStageOverride', 'meetings', 'meetings.author'],
+    });
+
+    ctx.body = { data: enrichProjectWithComputedFields(entry) };
   },
 
   async find(ctx) {
