@@ -7,12 +7,16 @@ export default factories.createCoreController('api::project-document.project-doc
       return ctx.unauthorized('You must be logged in');
     }
 
-    // Set uploadedBy to current user
-    if (ctx.request.body.data) {
-      ctx.request.body.data.uploadedBy = user.id;
-    }
+    const data = ctx.request.body?.data || {};
 
-    const response = await super.create(ctx);
-    return response;
+    const entry = await strapi.entityService.create('api::project-document.project-document', {
+      data: {
+        ...data,
+        uploadedBy: user.id,
+      },
+      populate: ['project', 'file', 'uploadedBy'],
+    });
+
+    ctx.body = { data: entry };
   },
 }));

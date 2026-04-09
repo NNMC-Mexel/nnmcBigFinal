@@ -32,36 +32,31 @@ export default factories.createCoreController('api::project-survey.project-surve
       return ctx.unauthorized('You must be logged in');
     }
 
-    // Generate unique public token
     const publicToken = crypto.randomBytes(16).toString('hex');
-    
     const requestData = ctx.request.body.data || {};
-    
-    // Handle project relation - convert documentId to connect format
-    let projectRelation = undefined;
-    if (requestData.project) {
-      // If it's a documentId string, use connect
-      if (typeof requestData.project === 'string') {
-        projectRelation = { connect: [requestData.project] };
-      } else {
-        projectRelation = requestData.project;
-      }
+
+    // Resolve project: documentId string → numeric id
+    let projectId = requestData.project || null;
+    if (typeof projectId === 'string') {
+      try {
+        const doc = await strapi.documents('api::project.project').findOne({
+          documentId: projectId,
+          fields: ['id'],
+        }) as any;
+        projectId = doc?.id || null;
+      } catch { projectId = null; }
     }
 
-    // createdBy is set via lifecycle hook
-    ctx.request.body.data = {
-      ...requestData,
-      project: projectRelation,
-      publicToken,
-    };
+    const entry = await strapi.entityService.create('api::project-survey.project-survey', {
+      data: {
+        ...requestData,
+        project: projectId,
+        publicToken,
+      },
+      populate: ['questions', 'project', 'createdBy'],
+    });
 
-    try {
-      const response = await super.create(ctx);
-      return response;
-    } catch (error: any) {
-      console.error('Survey create error:', error.message, error.details);
-      throw error;
-    }
+    ctx.body = { data: entry };
   },
 
   // Get survey by public token (no auth required)
