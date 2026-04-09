@@ -109,6 +109,36 @@ const SuperAdminRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Clean up all tokens when user lands on /logged-out
+const LoggedOutPage = () => {
+  useEffect(() => {
+    // Clear all stored tokens and auth state
+    useAuthStore.getState().logout();
+    localStorage.removeItem('auth-storage');
+    localStorage.removeItem('kc_id_token');
+  }, []);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-teal-50 via-blue-50 to-emerald-50">
+      <div className="text-center bg-white p-8 rounded-2xl shadow-lg">
+        <img src="/logo.png" alt="ННМЦ" className="w-16 h-16 mx-auto mb-4 object-contain" />
+        <h2 className="text-xl font-semibold text-slate-800 mb-2">Вы вышли из системы</h2>
+        <p className="text-slate-500 mb-6">Сессия завершена</p>
+        <button
+          onClick={() => {
+            const apiUrl = import.meta.env.VITE_API_URL;
+            window.location.href = `${apiUrl}/api/connect/keycloak`;
+          }}
+          className="px-6 py-2.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-medium"
+        >
+          Войти снова
+        </button>
+      </div>
+      <p className="mt-6 text-sm text-slate-400">© 2026 ТОО "Biocraft Digital"</p>
+    </div>
+  );
+};
+
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
   const {
@@ -283,26 +313,8 @@ function App() {
         <Route path="signdoc/*" element={<FeatureRoute allow={canAccessSigndoc}><SignDocPage /></FeatureRoute>} />
       </Route>
 
-      {/* Logged out page — not protected, prevents auto-redirect to Keycloak */}
-      <Route path="/logged-out" element={
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-teal-50 via-blue-50 to-emerald-50">
-          <div className="text-center bg-white p-8 rounded-2xl shadow-lg">
-            <img src="/logo.png" alt="ННМЦ" className="w-16 h-16 mx-auto mb-4 object-contain" />
-            <h2 className="text-xl font-semibold text-slate-800 mb-2">Вы вышли из системы</h2>
-            <p className="text-slate-500 mb-6">Сессия завершена</p>
-            <button
-              onClick={() => {
-                const apiUrl = import.meta.env.VITE_API_URL;
-                window.location.href = `${apiUrl}/api/connect/keycloak`;
-              }}
-              className="px-6 py-2.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-medium"
-            >
-              Войти снова
-            </button>
-          </div>
-          <p className="mt-6 text-sm text-slate-400">© 2026 ТОО "Biocraft Digital"</p>
-        </div>
-      } />
+      {/* Logged out page — not protected, cleans up tokens on mount */}
+      <Route path="/logged-out" element={<LoggedOutPage />} />
 
       {/* Public pages (no auth required) */}
       <Route path="/survey/:token" element={<PublicSurveyPage />} />
