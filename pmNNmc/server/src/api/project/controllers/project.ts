@@ -33,6 +33,18 @@ async function checkSuperAdmin(
 }
 
 export default factories.createCoreController('api::project.project', ({ strapi }) => ({
+  async create(ctx) {
+    console.log('[project.create] body:', JSON.stringify(ctx.request.body));
+    try {
+      const result = await super.create(ctx);
+      console.log('[project.create] SUCCESS, id:', result?.data?.id);
+      return result;
+    } catch (err: any) {
+      console.log('[project.create] ERROR:', err.name, err.message, JSON.stringify(err.details || {}));
+      throw err;
+    }
+  },
+
   async find(ctx) {
     const isSuperAdmin = await checkSuperAdmin(ctx, strapi, { throwOnFail: false });
     const { data, meta } = await super.find(ctx);
