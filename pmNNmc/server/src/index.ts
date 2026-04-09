@@ -79,6 +79,9 @@ async function setupPermissions(strapi: any) {
     'api::ticket-category.ticket-category': ['find', 'findOne'],
     // News
     'api::news-post.news-post': ['find', 'findOne', 'create', 'update', 'delete'],
+    // Project sub-resources
+    'api::project-document.project-document': ['find', 'findOne', 'create', 'update', 'delete'],
+    'api::project-survey.project-survey': ['find', 'findOne', 'create', 'update', 'delete', 'getResults', 'toggleStatus', 'duplicate'],
     // Admin users (includes department CRUD)
     'api::admin-users.admin-users': [
       'find', 'findOne', 'create', 'update', 'delete',
