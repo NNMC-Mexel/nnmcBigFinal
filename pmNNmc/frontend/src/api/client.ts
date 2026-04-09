@@ -39,12 +39,10 @@ client.interceptors.response.use(
       localStorage.removeItem('journal_token');
       localStorage.removeItem('signdoc_token');
       localStorage.removeItem('signdoc_user');
-      // End Keycloak session and redirect back to app
+      // End Keycloak session — let Keycloak show its own logout/login page
       const keycloakUrl = import.meta.env.VITE_KEYCLOAK_URL || 'http://192.168.101.25:12012';
       const keycloakRealm = import.meta.env.VITE_KEYCLOAK_REALM || 'nnmc';
-      const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'pmnnmc-app';
-      const redirectUri = encodeURIComponent(window.location.origin + '/logged-out');
-      window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout?client_id=${clientId}&post_logout_redirect_uri=${redirectUri}`;
+      window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout`;
     }
     return Promise.reject(error);
   }
