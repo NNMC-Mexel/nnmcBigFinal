@@ -111,7 +111,13 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
   const hasOwnerField = Object.prototype.hasOwnProperty.call(data, 'owner');
   const isCreate = ctx.request?.method === 'POST';
 
+  console.log('[project-assignees] method:', ctx.request?.method, 'userId:', currentUser.id,
+    'owner:', JSON.stringify(data.owner), 'ownerIds:', ownerIds,
+    'dept:', dept?.key, 'isSuperAdmin:', isSuperAdmin,
+    'department:', JSON.stringify(data.department));
+
   if (isCreate && ownerIds.length === 0) {
+    console.log('[project-assignees] REJECTED: owner is required but ownerIds empty. Raw data.owner:', data.owner);
     throw new ValidationError('Project owner is required');
   }
 
@@ -131,6 +137,7 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
 
   const requesterDepartmentKey = userWithDept?.department?.key ?? null;
   if (!requesterDepartmentKey) {
+    console.log('[project-assignees] REJECTED: user has no department. userId:', currentUser.id);
     throw new ForbiddenError('User department is required to assign project users');
   }
 
@@ -179,6 +186,7 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
 
   const missingIds = assigneeIds.filter((id) => !assignees.some((user: any) => user.id === id));
   if (missingIds.length > 0) {
+    console.log('[project-assignees] REJECTED: assignees not found. missingIds:', missingIds, 'requestedIds:', assigneeIds);
     throw new ValidationError('Some assignees were not found');
   }
 
@@ -186,6 +194,8 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
     (user: any) => user.department?.key !== projectDepartmentKey
   );
   if (invalidDepartment) {
+    console.log('[project-assignees] REJECTED: department mismatch. projectDeptKey:', projectDepartmentKey,
+      'assignees:', assignees.map((u: any) => ({ id: u.id, dept: u.department?.key })));
     throw new ForbiddenError('You can assign users only from the project department');
   }
 
