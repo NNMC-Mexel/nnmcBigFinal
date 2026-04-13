@@ -263,23 +263,6 @@ export default function AppLayout() {
                             </NavLink>
                         ))}
 
-                        {/* External links */}
-                        {/* <div className="pt-4 pb-2">
-              <p className="px-3 text-xs font-medium text-slate-400 uppercase">
-                Сервисы
-              </p>
-            </div>
-            <a
-              href="http://192.168.101.25:13000/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-slate-600 hover:bg-slate-50"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <Calculator className="w-5 h-5" />
-              KPI расчет
-            </a> */}
-
                         {/* Services — visible based on department flags */}
                         {(canAccessConf || canAccessJournal || canAccessSigndoc) && (
                             <div className='pt-4 pb-2'>

@@ -159,7 +159,14 @@ export default {
         return;
       }
 
-      // Use the default "Authenticated" role (id=1)
+      // Look up the "Authenticated" role dynamically
+      const roles = await strapi.entityService.findMany('plugin::users-permissions.role');
+      const authenticatedRole = roles.find((r: any) => r.type === 'authenticated');
+      if (!authenticatedRole) {
+        ctx.throw(500, 'Authenticated role not found');
+        return;
+      }
+
       const user = await strapi.entityService.create('plugin::users-permissions.user', {
         data: {
           email,
@@ -167,7 +174,7 @@ export default {
           firstName: firstName || '',
           lastName: lastName || '',
           password,
-          role: 1,
+          role: authenticatedRole.id,
           department: department || null,
           blocked: blocked || false,
           confirmed: true,
@@ -520,6 +527,14 @@ export default {
           },
         });
       } else {
+        // Look up the "Authenticated" role dynamically
+        const roles = await strapi.entityService.findMany('plugin::users-permissions.role');
+        const authenticatedRole = roles.find((r: any) => r.type === 'authenticated');
+        if (!authenticatedRole) {
+          ctx.throw(500, 'Authenticated role not found');
+          return;
+        }
+
         strapiUser = await strapi.entityService.create('plugin::users-permissions.user', {
           data: {
             email,
@@ -527,7 +542,7 @@ export default {
             firstName: firstName || '',
             lastName: lastName || '',
             password: tempPassword,
-            role: 1,
+            role: authenticatedRole.id,
             department: department || null,
             confirmed: true,
             provider: 'keycloak',

@@ -107,10 +107,12 @@ export const createSurvey = async (data: {
 
 // Get all surveys for a project
 export const getProjectSurveys = async (projectDocumentId: string): Promise<ProjectSurvey[]> => {
-  // Strapi v5: get all surveys and filter on client side, or use custom endpoint
+  // Strapi v5: get all surveys and filter on client side
   const res = await client.get('/project-surveys', {
     params: {
-      'populate': '*',
+      'populate[0]': 'questions',
+      'populate[1]': 'project',
+      'populate[2]': 'createdBy',
       'sort': 'createdAt:desc',
     },
   });
@@ -167,134 +169,15 @@ export const toggleSurveyStatus = async (
   return res.data.data;
 };
 
-// Get survey results (fetch survey with responses and calculate on frontend)
+// Get survey results using backend aggregation endpoint
 export const getSurveyResults = async (documentId: string): Promise<SurveyResults> => {
-  const res = await client.get(`/project-surveys/${documentId}`, {
-    params: {
-      'populate': '*',
-    },
-  });
-  
-  const survey = res.data.data;
-  const questions = survey.questions || [];
-  const responses = survey.responses || [];
-  
-  // Calculate statistics on frontend
-  const statistics: SurveyStatistics[] = questions.map((question: any) => {
-    const questionAnswers = responses
-      .map((r: any) => r.answers?.[question.id])
-      .filter((a: any) => a !== undefined && a !== null);
-
-    let stats: SurveyStatistics = {
-      questionId: question.id,
-      questionText: question.text,
-      questionType: question.type,
-      totalAnswers: questionAnswers.length,
-    };
-
-    switch (question.type) {
-      case 'single_choice':
-      case 'multiple_choice':
-        const optionCounts: Record<string, number> = {};
-        questionAnswers.forEach((answer: any) => {
-          if (Array.isArray(answer)) {
-            answer.forEach((a: string) => {
-              optionCounts[a] = (optionCounts[a] || 0) + 1;
-            });
-          } else {
-            optionCounts[answer] = (optionCounts[answer] || 0) + 1;
-          }
-        });
-        stats.optionCounts = optionCounts;
-        stats.options = question.options;
-        break;
-
-      case 'rating':
-        const ratings = questionAnswers.map((a: any) => Number(a)).filter((n: number) => !isNaN(n));
-        stats.average = ratings.length > 0 
-          ? Number((ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(2))
-          : 0;
-        stats.distribution = {};
-        ratings.forEach((r: number) => {
-          stats.distribution![r] = (stats.distribution![r] || 0) + 1;
-        });
-        break;
-
-      case 'yes_no':
-        const yesCount = questionAnswers.filter((a: any) => a === 'yes' || a === true).length;
-        const noCount = questionAnswers.filter((a: any) => a === 'no' || a === false).length;
-        stats.yesCount = yesCount;
-        stats.noCount = noCount;
-        stats.yesPercent = questionAnswers.length > 0 
-          ? Number(((yesCount / questionAnswers.length) * 100).toFixed(1))
-          : 0;
-        break;
-
-      case 'text':
-        stats.textAnswers = questionAnswers;
-        break;
-    }
-
-    return stats;
-  });
-
-  return {
-    survey: {
-      id: survey.id,
-      documentId: survey.documentId,
-      title: survey.title,
-      description: survey.description,
-      status: survey.status,
-      isAnonymous: survey.isAnonymous,
-      publicToken: survey.publicToken,
-      expiresAt: survey.expiresAt,
-      createdAt: survey.createdAt,
-      projectTitle: survey.project?.title,
-    },
-    totalResponses: responses.length,
-    statistics,
-    individualResponses: responses.map((r: any) => ({
-      id: r.id,
-      documentId: r.documentId,
-      respondentName: r.respondentName,
-      respondentPosition: r.respondentPosition,
-      respondentDepartment: r.respondentDepartment,
-      respondentEmail: r.respondentEmail,
-      isAnonymous: r.isAnonymous,
-      answers: r.answers,
-      completionTime: r.completionTime,
-      createdAt: r.createdAt,
-    })),
-  };
+  const res = await client.get(`/project-surveys/${documentId}/results`);
+  return res.data.data;
 };
 
-// Duplicate survey (fetch original and create copy)
+// Duplicate survey using backend endpoint
 export const duplicateSurvey = async (documentId: string): Promise<ProjectSurvey> => {
-  // Fetch original survey
-  const originalRes = await client.get(`/project-surveys/${documentId}`, {
-    params: { 'populate': '*' },
-  });
-  const original = originalRes.data.data;
-  
-  // Create a copy
-  const copyData = {
-    title: `${original.title} (копия)`,
-    description: original.description,
-    project: original.project?.documentId,
-    isAnonymous: original.isAnonymous,
-    questions: (original.questions || []).map((q: any) => ({
-      text: q.text,
-      type: q.type,
-      options: q.options,
-      isRequired: q.isRequired,
-      order: q.order,
-    })),
-    thankYouMessage: original.thankYouMessage,
-    allowMultipleResponses: original.allowMultipleResponses,
-    showProgressBar: original.showProgressBar,
-  };
-  
-  const res = await client.post('/project-surveys', { data: copyData });
+  const res = await client.post(`/project-surveys/${documentId}/duplicate`);
   return res.data.data;
 };
 

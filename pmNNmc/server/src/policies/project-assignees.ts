@@ -85,9 +85,27 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
   const ctx = policyContext;
   const data = ctx.request?.body?.data || {};
 
-  // Skip assignment validation for status-only updates (soft delete, archive, restore)
+  // Status-only updates: skip assignment validation but still verify auth + permissions
   const dataKeys = Object.keys(data);
   if (dataKeys.length === 1 && dataKeys[0] === 'status') {
+    const currentUser = ctx.state.user;
+    if (!currentUser) {
+      throw new UnauthorizedError('Not authenticated');
+    }
+
+    // For DELETED status, require canDeleteProject or isSuperAdmin
+    if (data.status === 'DELETED') {
+      const userWithDept = (await strapi.entityService.findOne(
+        'plugin::users-permissions.user',
+        currentUser.id,
+        { populate: ['department'] }
+      )) as any;
+      const { isSuperAdmin } = getUserFlags(userWithDept);
+      if (!isSuperAdmin && !userWithDept?.department?.canDeleteProject) {
+        throw new ForbiddenError('You do not have permission to delete projects');
+      }
+    }
+
     return true;
   }
 

@@ -1,3 +1,3 @@
-import { factories } from '@strapi/strapi';
-
-export default factories.createCoreRouter('api::survey-response.survey-response');
+// Disable direct CRUD — responses are created via project-survey.submitResponse
+// and read via project-survey.getResults
+export default { routes: [] };

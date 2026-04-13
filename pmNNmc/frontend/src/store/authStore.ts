@@ -95,6 +95,7 @@ export const useAuthStore = create<AuthState>()(
         localStorage.removeItem('journal_token');
         localStorage.removeItem('signdoc_token');
         localStorage.removeItem('signdoc_user');
+        localStorage.removeItem('auth-storage');
         set({
           user: null,
           token: null,

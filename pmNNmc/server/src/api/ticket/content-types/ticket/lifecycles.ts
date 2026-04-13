@@ -2,9 +2,16 @@ export default {
   async beforeCreate(event: any) {
     const strapi = (global as any).strapi;
 
-    // Generate ticket number
-    const count = await strapi.db.query('api::ticket.ticket').count({});
-    event.params.data.ticketNumber = `HD-${String(count + 1).padStart(4, '0')}`;
+    // Generate ticket number based on last ticket ID (monotonically increasing)
+    const lastTickets = await strapi.db.query('api::ticket.ticket').findMany({
+      orderBy: { id: 'desc' },
+      limit: 1,
+      select: ['ticketNumber'],
+    });
+    const lastNum = lastTickets[0]?.ticketNumber
+      ? parseInt(lastTickets[0].ticketNumber.replace('HD-', ''), 10) || 0
+      : 0;
+    event.params.data.ticketNumber = `HD-${String(lastNum + 1).padStart(4, '0')}`;
 
     // Helper to extract one ID from various Strapi relation formats
     const extractRelationId = (relation: any): number | null => {

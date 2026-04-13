@@ -25,6 +25,20 @@ interface SurveyData {
   createdAt?: string;
 }
 
+// Resolve :id param — may be numeric ID or documentId
+async function resolveSurveyId(paramId: string | number, strapi: any): Promise<number | null> {
+  const numericId = Number(paramId);
+  if (!isNaN(numericId)) return numericId;
+  // Treat as documentId
+  try {
+    const doc = await strapi.documents('api::project-survey.project-survey').findOne({
+      documentId: String(paramId),
+      fields: ['id'],
+    }) as any;
+    return doc?.id ?? null;
+  } catch { return null; }
+}
+
 export default factories.createCoreController('api::project-survey.project-survey', ({ strapi }) => ({
   async create(ctx) {
     const user = ctx.state.user;
@@ -49,7 +63,14 @@ export default factories.createCoreController('api::project-survey.project-surve
 
     const entry = await strapi.entityService.create('api::project-survey.project-survey', {
       data: {
-        ...requestData,
+        title: requestData.title,
+        description: requestData.description || null,
+        isAnonymous: requestData.isAnonymous ?? false,
+        questions: requestData.questions || [],
+        thankYouMessage: requestData.thankYouMessage || null,
+        allowMultipleResponses: requestData.allowMultipleResponses ?? false,
+        showProgressBar: requestData.showProgressBar ?? true,
+        expiresAt: requestData.expiresAt || null,
         project: projectId,
         publicToken,
       },
@@ -182,14 +203,17 @@ export default factories.createCoreController('api::project-survey.project-surve
 
   // Get survey results with aggregated statistics
   async getResults(ctx) {
-    const { id } = ctx.params;
+    const { id: paramId } = ctx.params;
     const user = ctx.state.user;
 
     if (!user) {
       return ctx.unauthorized('You must be logged in');
     }
 
-    const survey = await strapi.entityService.findOne('api::project-survey.project-survey', id, {
+    const numericId = await resolveSurveyId(paramId, strapi);
+    if (!numericId) return ctx.notFound('Survey not found');
+
+    const survey = await strapi.entityService.findOne('api::project-survey.project-survey', numericId, {
       populate: ['questions', 'responses', 'project', 'createdBy'],
     }) as unknown as SurveyData | null;
 
@@ -290,7 +314,7 @@ export default factories.createCoreController('api::project-survey.project-surve
 
   // Toggle survey status
   async toggleStatus(ctx) {
-    const { id } = ctx.params;
+    const { id: paramId } = ctx.params;
     const { status } = ctx.request.body;
     const user = ctx.state.user;
 
@@ -298,13 +322,21 @@ export default factories.createCoreController('api::project-survey.project-surve
       return ctx.unauthorized('You must be logged in');
     }
 
-    const survey = await strapi.entityService.findOne('api::project-survey.project-survey', id);
+    const validStatuses = ['draft', 'active', 'closed'];
+    if (!status || !validStatuses.includes(status)) {
+      return ctx.badRequest(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    }
+
+    const numericId = await resolveSurveyId(paramId, strapi);
+    if (!numericId) return ctx.notFound('Survey not found');
+
+    const survey = await strapi.entityService.findOne('api::project-survey.project-survey', numericId);
 
     if (!survey) {
       return ctx.notFound('Survey not found');
     }
 
-    const updated = await strapi.entityService.update('api::project-survey.project-survey', id, {
+    const updated = await strapi.entityService.update('api::project-survey.project-survey', numericId, {
       data: { status },
     });
 
@@ -313,14 +345,17 @@ export default factories.createCoreController('api::project-survey.project-surve
 
   // Duplicate survey
   async duplicate(ctx) {
-    const { id } = ctx.params;
+    const { id: paramId } = ctx.params;
     const user = ctx.state.user;
 
     if (!user) {
       return ctx.unauthorized('You must be logged in');
     }
 
-    const survey = await strapi.entityService.findOne('api::project-survey.project-survey', id, {
+    const numericId = await resolveSurveyId(paramId, strapi);
+    if (!numericId) return ctx.notFound('Survey not found');
+
+    const survey = await strapi.entityService.findOne('api::project-survey.project-survey', numericId, {
       populate: ['questions', 'project'],
     }) as unknown as SurveyData | null;
 

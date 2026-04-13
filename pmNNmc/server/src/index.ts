@@ -69,8 +69,7 @@ async function setupPermissions(strapi: any) {
     'api::meeting.meeting': ['find', 'findOne', 'create', 'update', 'delete'],
     'api::activity-log.activity-log': ['find', 'findOne'],
     'api::document.document': ['find', 'findOne', 'create', 'update', 'delete'],
-    'api::survey.survey': ['find', 'findOne', 'create', 'update', 'delete'],
-    'api::survey-response.survey-response': ['find', 'findOne', 'create'],
+    'api::survey-response.survey-response': ['create'],
     // Analytics
     'api::analytics.analytics': ['summary'],
     // Helpdesk content types

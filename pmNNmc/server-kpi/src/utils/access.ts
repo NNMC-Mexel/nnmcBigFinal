@@ -29,7 +29,8 @@ function isAdminLogin(user: any): boolean {
   const email = String(user?.email || '').toLowerCase();
   return (
     username === 'admin-nnmc' ||
-    username.startsWith('admin') ||
+    username === 'admin' ||
+    email === 'admin@nnmc.kz' ||
     email.startsWith('admin@') ||
     email.includes('.admin@')
   );

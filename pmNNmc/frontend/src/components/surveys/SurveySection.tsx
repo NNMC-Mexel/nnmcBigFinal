@@ -38,7 +38,7 @@ interface Props {
 const DEFAULT_FRONTEND_URL =
   typeof window !== 'undefined'
     ? window.location.origin
-    : 'http://127.0.0.1:13005';
+    : 'http://127.0.0.1:13010';
 const FRONTEND_URL = import.meta.env.VITE_FRONTEND_URL || DEFAULT_FRONTEND_URL;
 
 export default function SurveySection({
