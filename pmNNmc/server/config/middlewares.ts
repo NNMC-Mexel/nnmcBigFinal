@@ -4,7 +4,6 @@ export default ({ env }) => {
   const devOrigins = devPorts.flatMap((port) => [
     `http://localhost:${port}`,
     `http://127.0.0.1:${port}`,
-    `http://192.168.46.222:${port}`,
     `http://192.168.101.25:${port}`,
   ]);
 

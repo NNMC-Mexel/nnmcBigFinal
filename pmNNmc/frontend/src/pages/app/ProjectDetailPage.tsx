@@ -774,10 +774,6 @@ export default function ProjectDetailPage() {
                 <p className="text-slate-400 text-center py-4">{t('meeting.noNotes')}</p>
               ) : (
                 project.meetings.map((meeting) => {
-                  // Debug: log meeting data to see what we're getting
-                  console.log('Meeting data:', meeting);
-                  console.log('Meeting author:', meeting.author);
-                  
                   return (
                   <div key={meeting.id} className="p-3 rounded-lg bg-slate-50 border border-slate-100">
                     <div className="flex items-start justify-between gap-2 mb-2">

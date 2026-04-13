@@ -98,12 +98,7 @@ interface Employee {
     for (const emp of prevParsed) addToMap(emp);
     for (const emp of currParsed) addToMap(emp);
 
-    const result = Array.from(map.values());
-    console.log(`📊 MERGE: prev=${prevParsed.length}, curr=${currParsed.length}, merged=${result.length}`);
-    result.slice(0, 3).forEach(e => {
-      console.log(`  👤 ${e.fio}: letters(wd=${e.letters_weekday},sat=${e.letters_sat},sun=${e.letters_sun},hol=${e.letters_holiday}) numbers(wd=${e.numbers_weekday},sat=${e.numbers_sat},sun=${e.numbers_sun},hol=${e.numbers_holiday})`);
-    });
-    return result;
+    return Array.from(map.values());
   }
 
   export function calculateKPI(
@@ -188,8 +183,6 @@ interface Employee {
         if (workPercent < 0) workPercent = 0;
 
         const kpiFinal = (workPercent / 100) * kpiSum;
-
-        console.log(`  📊 DAY ${fio}: assigned=${daysAssigned}, notWorked=${notWorked}, worked=${daysWorked}, %=${Math.round(workPercent*100)/100}`);
 
         results.push({
           fio,

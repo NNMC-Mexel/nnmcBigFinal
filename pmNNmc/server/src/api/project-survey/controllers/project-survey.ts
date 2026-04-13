@@ -102,9 +102,6 @@ export default factories.createCoreController('api::project-survey.project-surve
 
   // Submit response to survey (no auth required)
   async submitResponse(ctx) {
-    console.log('submitResponse called with token:', ctx.params.token);
-    console.log('Request body:', JSON.stringify(ctx.request.body));
-    
     const { token } = ctx.params;
     const { answers, respondentName, respondentPosition, respondentDepartment, respondentEmail, completionTime } = ctx.request.body;
 
@@ -118,11 +115,9 @@ export default factories.createCoreController('api::project-survey.project-surve
     }
 
     const surveyData = surveys[0] as unknown as SurveyData;
-    console.log('Survey found:', surveyData.title, 'Status:', surveyData.status);
 
     // Validations
     if (surveyData.status !== 'active') {
-      console.log('Survey not active, status is:', surveyData.status);
       return ctx.badRequest('This survey is not currently active');
     }
 
@@ -152,8 +147,6 @@ export default factories.createCoreController('api::project-survey.project-surve
 
     // Create response using entityService - use numeric ID for relations
     try {
-      console.log('Creating survey response with survey id:', surveyData.id);
-      
       // Build response data, only include email if it's a valid non-empty string
       const responseData: any = {
         survey: surveyData.id,
@@ -175,10 +168,8 @@ export default factories.createCoreController('api::project-survey.project-surve
       await strapi.entityService.create('api::survey-response.survey-response', {
         data: responseData,
       });
-      console.log('Survey response created successfully');
     } catch (error: any) {
-      console.error('Error creating survey response:', error.message, error.details);
-      return ctx.badRequest('Failed to save response: ' + error.message);
+      return ctx.badRequest('Failed to save response');
     }
 
     return {

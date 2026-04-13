@@ -37,28 +37,19 @@ function normalizeHolidays(
   month: number
 ): Set<number> {
   const out = new Set<number>();
-  if (!holidays) {
-    console.log(`📅 Нет праздников для ${year}-${month}`);
-    return out;
-  }
-
-  console.log(`📅 Обработка праздников для ${year}-${month}:`, holidays);
+  if (!holidays) return out;
 
   for (const h of holidays) {
     if (h === null || h === undefined) continue;
-    
+
     if (typeof h === 'number') {
-      if (h >= 1 && h <= 31) {
-        out.add(h);
-        console.log(`  ✓ Добавлен праздник: день ${h}`);
-      }
+      if (h >= 1 && h <= 31) out.add(h);
       continue;
     }
 
     const s = String(h).trim();
     if (!s) continue;
 
-    // ISO date format: "2025-12-16" or "2025-12-16T00:00:00.000Z"
     if (s.includes('-')) {
       const parts = s.split('T')[0].split('-');
       if (parts.length === 3) {
@@ -67,25 +58,17 @@ function normalizeHolidays(
         const d = parseInt(parts[2]);
         if (y === year && m === month && d >= 1 && d <= 31) {
           out.add(d);
-          console.log(`  ✓ Добавлен праздник: ${s} -> день ${d}`);
-        } else {
-          console.log(`  ✗ Пропущен праздник ${s} (не соответствует ${year}-${month})`);
         }
       }
       continue;
     }
 
-    // Day number: "16" or 16
     if (/^\d+$/.test(s)) {
       const d = parseInt(s);
-      if (d >= 1 && d <= 31) {
-        out.add(d);
-        console.log(`  ✓ Добавлен праздник: день ${d}`);
-      }
+      if (d >= 1 && d <= 31) out.add(d);
     }
   }
 
-  console.log(`📅 Итоговый набор праздничных дней:`, Array.from(out).sort((a, b) => a - b));
   return out;
 }
 
@@ -318,8 +301,6 @@ function parseKazakhTemplate(
     }
   }
 
-  console.log(`📊 KAZ TEMPLATE: диапазон дней [${dayFrom}..${dayTo}], найдено колонок: ${dayCols.length}, дни: [${dayCols.map(d => d.day).join(', ')}]`);
-
   const employees: ParsedEmployee[] = [];
 
   // Process employee rows
@@ -429,8 +410,6 @@ function parseSimpleTemplate(
   if (!employeeCol) {
     throw new Error('Не найдена колонка "Сотрудник"');
   }
-
-  console.log(`📊 SIMPLE TEMPLATE: диапазон дней [${dayFrom}..${dayTo}], найдено колонок: ${dayCols.length}, дни: [${dayCols.map(d => d.day).join(', ')}]`);
 
   const employees: ParsedEmployee[] = [];
 

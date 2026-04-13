@@ -45,8 +45,6 @@ export default {
   // GET /api/kpi-list
   async list(ctx: Context) {
     const access = await getUserAccess(ctx);
-    const reqUser = (ctx.state as any)?.user || {};
-    console.log('[KPI_LIST] request by', { id: reqUser.id, username: reqUser.username, email: reqUser.email, role: access.roleName, isAdmin: access.isAdmin, allowedDepartments: access.allowedDepartments });
     const filters: any = {};
 
     if (!access.isAdmin) {
@@ -61,8 +59,6 @@ export default {
       pagination: { pageSize: 10000 },
       filters,
     });
-
-    console.log('[KPI_LIST] employees fetched', { count: (employees || []).length, sample: (employees || []).slice(0, 5).map((e: any) => ({ id: e.id, fio: e.fio, department: e.department })) });
 
     const items = (employees || []).map((e: any) => ({
       id: e.id,
@@ -80,8 +76,7 @@ export default {
   async add(ctx: Context) {
     try {
       const body: any = ctx.request.body || {};
-      console.log('📥 Получен запрос на добавление сотрудника:', JSON.stringify(body, null, 2));
-      
+
       const fio = String(body.fio || '').trim();
       if (!fio) {
         ctx.throw(400, 'Укажите ФИО как в удостоверении личности или в 1С');
@@ -115,8 +110,6 @@ export default {
         }
       }
 
-      console.log('✅ Валидация пройдена. Данные:', { fio, kpiSum, scheduleType, department, categoryCode });
-
       const existing = await strapi.entityService.findMany('api::employee.employee', {
         filters: {
           fio: {
@@ -129,7 +122,6 @@ export default {
         ctx.throw(400, 'Сотрудник с таким ФИО уже существует.');
       }
 
-      console.log('📝 Создаю сотрудника...');
       const employeeData: any = {
         fio,
         kpiSum: Number(kpiSum), // Явно преобразуем в число
@@ -142,12 +134,9 @@ export default {
         employeeData.categoryCode = categoryCode;
       }
       
-      console.log('📦 Данные для создания:', JSON.stringify(employeeData, null, 2));
-      
       const created = await strapi.entityService.create('api::employee.employee', {
         data: employeeData,
       });
-      console.log('✅ Сотрудник создан:', created.id);
 
       // Создаём запись в логе (если не получится - не критично)
       try {
@@ -169,13 +158,11 @@ export default {
         });
       } catch (logErr: any) {
         // Логируем ошибку, но не прерываем создание сотрудника
-        console.error('Ошибка создания записи в логе:', logErr);
+        // Log entry creation failed — non-critical
       }
 
       ctx.body = { item: created, message: 'Сотрудник успешно добавлен' };
     } catch (err: any) {
-      console.error('❌ Ошибка при добавлении сотрудника:', err);
-      console.error('Stack:', err?.stack);
       ctx.status = err.status || 500;
       const errorMessage = err?.message || err?.error?.message || String(err) || 'Ошибка сохранения сотрудника';
       ctx.body = { error: errorMessage };
@@ -277,7 +264,7 @@ export default {
           },
         });
       } catch (logErr: any) {
-        console.error('Ошибка создания записи в логе:', logErr);
+        // Log entry creation failed — non-critical
       }
 
       ctx.body = { item: updated, message: 'Данные сотрудника успешно обновлены' };
@@ -334,7 +321,7 @@ export default {
           },
         });
       } catch (logErr: any) {
-        console.error('Ошибка создания записи в логе:', logErr);
+        // Log entry creation failed — non-critical
       }
 
       ctx.body = {
@@ -402,7 +389,6 @@ export default {
 
       ctx.body = { items };
     } catch (err: any) {
-      console.error('❌ Ошибка при получении лога удалённых:', err);
       ctx.status = err.status || 500;
       ctx.body = { error: err?.message || 'Ошибка получения лога удалённых' };
     }
@@ -450,7 +436,6 @@ export default {
 
       ctx.body = { items };
     } catch (err: any) {
-      console.error('❌ Ошибка при получении лога изменённых:', err);
       ctx.status = err.status || 500;
       ctx.body = { error: err?.message || 'Ошибка получения лога изменённых' };
     }
@@ -496,7 +481,6 @@ export default {
 
       ctx.body = { items };
     } catch (err: any) {
-      console.error('❌ Ошибка при получении лога восстановленных:', err);
       ctx.status = err.status || 500;
       ctx.body = { error: err?.message || 'Ошибка получения лога восстановленных' };
     }
@@ -570,7 +554,7 @@ export default {
           },
         });
       } catch (logErr: any) {
-        console.error('Ошибка создания записи в логе:', logErr);
+        // Log entry creation failed — non-critical
       }
 
       ctx.body = { item: created, message: 'Сотрудник успешно восстановлен' };

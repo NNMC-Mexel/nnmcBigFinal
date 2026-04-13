@@ -353,14 +353,6 @@ async function calcCore(ctx: Context) {
       }
     : null;
   const withDebug = (payload: any) => (debug ? { ...payload, debug } : payload);
-  console.log('KPI_CALC_DEBUG rawBodyKeys:', Object.keys(body || {}));
-  if (body && typeof body === 'object') {
-    console.log('KPI_CALC_DEBUG body.department:', body.department);
-    console.log('KPI_CALC_DEBUG body.data:', body.data);
-    console.log('KPI_CALC_DEBUG body.fields:', body.fields);
-  }
-  console.log('KPI_CALC_DEBUG requestedDepartment:', requestedDepartment);
-  console.log('KPI_CALC_DEBUG allowedDepartments:', allowedDepartments);
 
   if (!access.isAdmin) {
     if (normalizedAllowed.length === 0) {
@@ -401,8 +393,6 @@ async function calcCore(ctx: Context) {
     pagination: { pageSize: 1000 },
   });
 
-  console.log(`📅 Сырые данные праздников из Strapi:`, JSON.stringify(strapiHolidays, null, 2));
-
   // Преобразуем в массив дат (entityService возвращает объекты напрямую)
   const strapiHolidayDates: string[] = [];
   (strapiHolidays || []).forEach((h: any) => {
@@ -413,13 +403,9 @@ async function calcCore(ctx: Context) {
     }
   });
 
-  console.log(`📅 Загружено праздников из Strapi для ${year}-${month}:`, strapiHolidayDates);
-
   // Объединяем с праздниками из формы (если есть)
   const formHolidays = parseHolidays(getRequestField(ctx, 'holidays'));
   const allHolidays = [...new Set([...strapiHolidayDates, ...formHolidays])];
-  
-  console.log(`📅 Всего праздников для расчёта:`, allHolidays);
 
   // --- Two-file parsing: prev month (25-end) + current month (1-25) ---
   const fileBuffer = await getFileBufferFromCtx(ctx);
@@ -451,8 +437,6 @@ async function calcCore(ctx: Context) {
     });
     const allPrevHolidays = [...new Set(prevHolidayDates)];
 
-    console.log(`📅 Парсинг двух табелей: ${prevYear}-${prevMonth} (25-конец) + ${year}-${month} (1-25)`);
-
     // Parse prev month: days 25 to end
     const prevParsed = await parseTimesheet(prevFileBuffer, prevYear, prevMonth, allPrevHolidays, { dayFrom: 25, dayTo: 31 });
     // Parse current month: days 1 to 25
@@ -460,7 +444,6 @@ async function calcCore(ctx: Context) {
 
     // Merge by FIO
     parsedEmployees = kpiCalculator.mergeEmployees(prevParsed, currParsed);
-    console.log(`📊 Объединено сотрудников: ${parsedEmployees.length} (prev: ${prevParsed.length}, curr: ${currParsed.length})`);
   } else {
     // Fallback: single file mode (backwards compatibility)
     parsedEmployees = await parseTimesheet(fileBuffer, year, month, allHolidays);
@@ -468,7 +451,6 @@ async function calcCore(ctx: Context) {
   const parsedDeptSamples = parsedEmployees
     .map((e: any) => String(e?.department || '').trim())
     .filter(Boolean);
-  console.log('KPI_CALC_DEBUG timesheetDeptSample:', Array.from(new Set(parsedDeptSamples)).slice(0, 12));
   if (debug) {
     debug.timesheetDeptSample = Array.from(new Set(parsedDeptSamples)).slice(0, 12);
   }
@@ -494,7 +476,6 @@ async function calcCore(ctx: Context) {
   const kpiDeptSamples = (kpiTable || [])
     .map((e: any) => String(e?.department || '').trim())
     .filter(Boolean);
-  console.log('KPI_CALC_DEBUG kpiDeptSample:', Array.from(new Set(kpiDeptSamples)).slice(0, 12));
   if (debug) {
     debug.kpiDeptSample = Array.from(new Set(kpiDeptSamples)).slice(0, 12);
   }

@@ -35,12 +35,7 @@ export default async (policyContext: any, config: { feature?: FeatureKey } = {})
   }
 
   if (feature === 'projects') {
-    const allowed = dept?.canViewBoard === true || dept?.canViewTable === true;
-    if (!allowed) {
-      console.log('[feature-access] DENIED projects for user', user.id, 'dept:', dept?.key,
-        'canViewBoard:', dept?.canViewBoard, 'canViewTable:', dept?.canViewTable);
-    }
-    return allowed;
+    return dept?.canViewBoard === true || dept?.canViewTable === true;
   }
 
   if (feature === 'helpdesk') {

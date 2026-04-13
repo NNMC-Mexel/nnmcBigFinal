@@ -59,11 +59,6 @@ export default {
     // Auto-assign all default category executors to ticket
     const categoryId = extractRelationId(event.params.data.category);
 
-    console.log(
-      `🎫 beforeCreate: categoryId=${categoryId}, existingAssigneeIds=${JSON.stringify(existingAssigneeIds)}, raw category=`,
-      event.params.data.category
-    );
-
     if (categoryId && existingAssigneeIds.length === 0) {
       try {
         const category = await strapi.entityService.findOne(
@@ -74,22 +69,13 @@ export default {
 
         const assigneeIds = extractRelationIds(category?.defaultAssignee);
 
-        console.log(
-          `🎫 Category found: ${category?.name_ru}; assigneeIds=${JSON.stringify(assigneeIds)}`
-        );
-
         if (assigneeIds.length > 0) {
           event.params.data.assignee = {
             set: assigneeIds.map((id) => ({ id })),
           };
-          console.log(
-            `🎫 Auto-assigned ticket to users ${JSON.stringify(assigneeIds)} based on category ${categoryId}`
-          );
-        } else {
-          console.log(`🎫 No defaultAssignee found for category ${categoryId}`);
         }
-      } catch (err) {
-        console.error('Failed to auto-assign ticket:', err);
+      } catch {
+        // Auto-assign failed silently — ticket will be created without assignee
       }
     }
   },

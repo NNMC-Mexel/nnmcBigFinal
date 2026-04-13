@@ -17,7 +17,7 @@ export default ({ env }) => ({
           icon: 'key',
           key: env('KEYCLOAK_CLIENT_ID', ''),
           secret: env('KEYCLOAK_CLIENT_SECRET', ''),
-          callback: `${env('SERVER_URL', 'http://192.168.46.222:12005')}/api/auth/keycloak/callback`,
+          callback: `${env('SERVER_URL', 'http://localhost:12010')}/api/auth/keycloak/callback`,
           scope: ['openid', 'profile', 'email'],
           authorize_url: `${env('KEYCLOAK_URL', '')}/realms/${env('KEYCLOAK_REALM', 'nnmc')}/protocol/openid-connect/auth`,
           access_url: `${env('KEYCLOAK_URL', '')}/realms/${env('KEYCLOAK_REALM', 'nnmc')}/protocol/openid-connect/token`,

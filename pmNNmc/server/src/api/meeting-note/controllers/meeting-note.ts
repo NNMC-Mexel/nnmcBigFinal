@@ -22,9 +22,7 @@ export default factories.createCoreController('api::meeting-note.meeting-note', 
         } else {
           throw new Error('Project not found');
         }
-      } catch (error) {
-        console.error('Error finding project by documentId:', error);
-        // If lookup fails, return error
+      } catch {
         return ctx.badRequest('Project not found');
       }
     }
@@ -45,7 +43,7 @@ export default factories.createCoreController('api::meeting-note.meeting-note', 
 
       return { data: meetingNote };
     } catch (error: any) {
-      console.error('Meeting note create error:', error.message, error.details);
+      if (error.status) throw error;
       throw error;
     }
   },

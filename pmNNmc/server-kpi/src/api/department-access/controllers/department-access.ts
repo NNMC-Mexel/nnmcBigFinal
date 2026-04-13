@@ -25,15 +25,6 @@ export default {
       ctx.throw(403, 'Нет доступа');
     }
 
-    const reqUser = (ctx.state as any)?.user || {};
-    console.log('[DEPT_ACCESS] listUsers by', {
-      id: reqUser.id,
-      username: reqUser.username,
-      email: reqUser.email,
-      role: access.roleName,
-      isAdmin: access.isAdmin,
-    });
-
     const users = await strapi.entityService.findMany('plugin::users-permissions.user', {
       populate: ['role'],
       fields: ['id', 'username', 'email', 'allowedDepartments'],
@@ -47,11 +38,6 @@ export default {
       role: u.role?.name || u.role?.type || '',
       allowedDepartments: Array.isArray(u.allowedDepartments) ? u.allowedDepartments : [],
     }));
-
-    console.log('[DEPT_ACCESS] users fetched', {
-      count: items.length,
-      sample: items.slice(0, 5),
-    });
 
     ctx.body = { items };
   },
