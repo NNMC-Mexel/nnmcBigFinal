@@ -128,7 +128,7 @@ export default {
         });
       }
 
-      const assignmentFields = ['owner', 'supportingSpecialists', 'responsibleUsers'];
+      const assignmentFields = ['owner', 'managers', 'supportingSpecialists', 'responsibleUsers'];
       const hasAssignmentChange = assignmentFields.some((field) =>
         Object.prototype.hasOwnProperty.call(data, field)
       );
