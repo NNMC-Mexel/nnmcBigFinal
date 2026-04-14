@@ -32,6 +32,9 @@ import {
   apiHolidays,
   apiAccessUsers,
   apiUpdateUserAccess,
+  apiArchiveList,
+  apiArchiveGet,
+  apiArchiveDelete,
 } from "./kpiApi";
 import "./kpi.css";
 
@@ -361,6 +364,11 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   const [edsResult, setEdsResult] = useState(null);
   const { user: pmUser } = useAuthStore();
 
+  // Archive
+  const [archiveItems, setArchiveItems] = useState([]);
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [restoredFromArchive, setRestoredFromArchive] = useState(null);
+
   const isAdmin =
     String(user?.role || "").toLowerCase().includes("admin") ||
     String(user?.login || "").toLowerCase().startsWith("admin");
@@ -458,6 +466,49 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       showToast(msg || "Ошибка загрузки доступов", "error");
     } finally {
       setAccessLoading(false);
+    }
+  };
+
+  const loadArchive = async () => {
+    setArchiveLoading(true);
+    try {
+      const items = await apiArchiveList();
+      setArchiveItems(items);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (isUnauthorizedError(msg)) { handleLogout(); showToast("Сессия истекла. Войдите заново.", "error"); return; }
+    } finally {
+      setArchiveLoading(false);
+    }
+  };
+
+  const restoreFromArchive = async (item) => {
+    try {
+      const docId = item.documentId || item.id;
+      const full = await apiArchiveGet(docId);
+      if (!full) { showToast("Не удалось загрузить расчёт", "error"); return; }
+      setCalcResults(full.results || []);
+      setParsedDetails(full.parsedDetails || []);
+      setCalcErrors(full.errors || []);
+      setCalcDepartment(full.department || "");
+      setYear(String(full.year || year));
+      setMonth(String(full.month || month));
+      setRestoredFromArchive(full);
+      setActiveTab("results");
+      showToast("Расчёт восстановлен из архива");
+    } catch (err) {
+      showToast("Ошибка загрузки расчёта", "error");
+    }
+  };
+
+  const deleteArchiveItem = async (item) => {
+    try {
+      const docId = item.documentId || item.id;
+      await apiArchiveDelete(docId);
+      setArchiveItems((prev) => prev.filter((a) => (a.documentId || a.id) !== docId));
+      showToast("Расчёт удалён из архива");
+    } catch (err) {
+      showToast("Ошибка удаления", "error");
     }
   };
 
@@ -770,6 +821,9 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         <button className={`kpi-module-nav-tab${activeTab === "results" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => setActiveTab("results")}>
           Результаты
         </button>
+        <button className={`kpi-module-nav-tab${activeTab === "archive" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => { setActiveTab("archive"); loadArchive(); }}>
+          Архив расчётов
+        </button>
         <button className={`kpi-module-nav-tab${activeTab === "kpi" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => setActiveTab("kpi")}>
           Справочник сотрудников
         </button>
@@ -1008,6 +1062,12 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
           return (
           <section className="card">
             <h2>Результаты расчёта</h2>
+            {restoredFromArchive && (
+              <div style={{ background: "#eff6ff", border: "1px solid #93c5fd", borderRadius: 6, padding: "8px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                <span>Восстановлено из архива: <b>{restoredFromArchive.department}</b>, {restoredFromArchive.month}/{restoredFromArchive.year}, рассчитал {restoredFromArchive.calculatedBy} ({new Date(restoredFromArchive.createdAt).toLocaleString("ru")})</span>
+                <button onClick={() => setRestoredFromArchive(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#3b82f6", fontWeight: 600 }}>✕</button>
+              </div>
+            )}
             <p className="card-subtitle">
               Период: 25 {prevMonthInfo.name} — 25 {currMonthName} {year}.
               <span style={{ marginLeft: "8px", fontSize: "11px" }}>
@@ -1320,6 +1380,65 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                         <td><button className="btn btn-small" onClick={() => openAccessModal(u)}>Настроить</button></td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* =================== Архив расчётов =================== */}
+        {activeTab === "archive" && (
+          <section className="card">
+            <h2>Архив расчётов</h2>
+            <p className="card-subtitle">Все выполненные расчёты KPI. Нажмите на расчёт чтобы загрузить результаты.</p>
+            {archiveLoading ? (
+              <div style={{ padding: "32px", textAlign: "center", color: "#64748b" }}>Загрузка...</div>
+            ) : archiveItems.length === 0 ? (
+              <div style={{ padding: "32px", textAlign: "center", color: "#94a3b8" }}>Нет сохранённых расчётов</div>
+            ) : (
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Дата и время</th>
+                      <th>Кто выполнил</th>
+                      <th>Период</th>
+                      <th>Отдел</th>
+                      <th>Сотрудников</th>
+                      <th>Н.ч / Н.д</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {archiveItems.map((item) => {
+                      const dt = item.createdAt ? new Date(item.createdAt) : null;
+                      const dateStr = dt ? dt.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+                      const timeStr = dt ? dt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : "";
+                      const monthName = MONTH_NAMES_RU[item.month] || item.month;
+                      return (
+                        <tr key={item.documentId || item.id} style={{ cursor: "pointer" }} onClick={() => restoreFromArchive(item)}>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{dateStr}</div>
+                            <div style={{ fontSize: "12px", color: "#64748b" }}>{timeStr}</div>
+                          </td>
+                          <td>{item.calculatedBy || "—"}</td>
+                          <td>{monthName} {item.year}</td>
+                          <td>{item.department || "—"}</td>
+                          <td style={{ textAlign: "center" }}>{item.employeeCount || "—"}</td>
+                          <td style={{ textAlign: "center" }}>{item.nchDay || 0} / {item.ndShift || 0}</td>
+                          <td>
+                            <button
+                              className="btn btn-danger btn-sm"
+                              style={{ fontSize: "12px", padding: "4px 8px" }}
+                              onClick={(e) => { e.stopPropagation(); if (window.confirm("Удалить этот расчёт из архива?")) deleteArchiveItem(item); }}
+                            >
+                              Удалить
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -243,6 +243,36 @@ export async function apiRestoreEmployee(payload) {
   return handleResponse(res);
 }
 
+// --- Calculation Archive ---
+
+export async function apiArchiveList(params = {}) {
+  const query = new URLSearchParams();
+  query.set("sort", "createdAt:desc");
+  query.set("pagination[pageSize]", "50");
+  if (params.department) query.set("filters[department][$eq]", params.department);
+  const res = await fetch(`${STRAPI_BASE}/calculation-archives?${query.toString()}`, {
+    headers: { ...getAuthHeader() },
+  });
+  const data = await handleResponse(res);
+  return data?.data || [];
+}
+
+export async function apiArchiveGet(documentId) {
+  const res = await fetch(`${STRAPI_BASE}/calculation-archives/${documentId}`, {
+    headers: { ...getAuthHeader() },
+  });
+  const data = await handleResponse(res);
+  return data?.data || null;
+}
+
+export async function apiArchiveDelete(documentId) {
+  const res = await fetch(`${STRAPI_BASE}/calculation-archives/${documentId}`, {
+    method: "DELETE",
+    headers: { ...getAuthHeader() },
+  });
+  return handleResponse(res);
+}
+
 export async function apiAccessUsers() {
   const res = await fetch(`${API_BASE}/department-access/users`, {
     headers: { ...getAuthHeader() },

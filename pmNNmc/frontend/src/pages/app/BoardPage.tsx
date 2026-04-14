@@ -333,6 +333,7 @@ export default function BoardPage() {
       updateProjectLocally(projectDocumentId, {
         status: 'ARCHIVED',
       });
+      await fetchProjects(getFilters());
     } catch (error) {
       console.error('Failed to archive project:', error);
     }
@@ -352,6 +353,7 @@ export default function BoardPage() {
         status: 'ACTIVE',
         manualStageOverride: targetStage,
       });
+      await fetchProjects(getFilters());
     } catch (error) {
       console.error('Failed to update stage:', error);
     }

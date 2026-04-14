@@ -560,6 +560,38 @@ export default {
   async calculate(ctx: Context) {
     try {
       const payload = await calcCore(ctx);
+
+      // Save to archive
+      try {
+        const year = parseInt(getRequestField(ctx, 'year') || '0', 10);
+        const month = parseInt(getRequestField(ctx, 'month') || '0', 10);
+        const department = String(getRequestField(ctx, 'department') || '').trim();
+        const nchDay = parseInt(getRequestField(ctx, 'nchDay') || '0', 10) || 0;
+        const ndShift = parseInt(getRequestField(ctx, 'ndShift') || '0', 10) || 0;
+        const currentUser = (ctx.state as any)?.user;
+        const calculatedBy = currentUser?.username || currentUser?.email || 'unknown';
+
+        if (payload.results && payload.results.length > 0) {
+          await strapi.entityService.create('api::calculation-archive.calculation-archive', {
+            data: {
+              year,
+              month,
+              department,
+              nchDay,
+              ndShift,
+              calculatedBy,
+              results: payload.results,
+              parsedDetails: payload.parsedDetails || [],
+              errors: payload.errors || [],
+              employeeCount: payload.results.length,
+            },
+          });
+        }
+      } catch (archiveErr: any) {
+        // Don't fail the calculation if archive save fails
+        console.error('Failed to save calculation archive:', archiveErr?.message);
+      }
+
       ctx.body = payload;
     } catch (error: any) {
       ctx.status = error?.status || 400;

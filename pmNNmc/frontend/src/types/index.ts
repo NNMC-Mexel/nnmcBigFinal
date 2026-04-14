@@ -80,8 +80,6 @@ export interface BoardStage {
   documentId: string;
   name_ru: string;
   name_kz: string;
-  minPercent: number;
-  maxPercent: number;
   order: number;
   color: string;
 }
@@ -123,6 +121,7 @@ export interface Project {
   status: 'ACTIVE' | 'ARCHIVED' | 'DELETED';
   priorityLight: 'GREEN' | 'YELLOW' | 'RED';
   owner?: User;
+  managers?: User[];
   supportingSpecialists?: User[];
   responsibleUsers?: User[];
   manualStageOverride?: BoardStage;

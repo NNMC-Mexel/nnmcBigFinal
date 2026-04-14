@@ -118,12 +118,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 }));
 
-// Helper to get stage for a project based on progress
-export const getProjectStage = (project: Project, stages: BoardStage[]): BoardStage | undefined => {
-  if (project.manualStageOverride) {
-    return project.manualStageOverride;
-  }
-
-  const orderedStages = [...stages].sort((a, b) => (a.order || 0) - (b.order || 0));
-  return orderedStages[0];
+// Stage is determined only by manual override (drag-drop on the board)
+export const getProjectStage = (project: Project, _stages: BoardStage[]): BoardStage | undefined => {
+  return project.manualStageOverride ?? undefined;
 };

@@ -183,16 +183,31 @@ export const useUserRole = () => {
   const canViewKpi = canViewKpiIt || canViewKpiMedical || canViewKpiEngineering;
   const canViewProjects = canViewDashboard || canViewBoard || canViewTable;
 
-  // Project capabilities — everyone with access can do these
+  // Project capabilities
+  // canEditProject is now a global "can access project features" flag;
+  // actual per-project edit permission is checked by canManageProject() below
   const canEditProject = canViewProjects;
   const canAssignResponsible = canViewProjects;
   const canManageTasks = canViewProjects;
   const canDeleteTasks = canViewProjects;
-  const canChangeTaskStatus = true;
+  const canChangeTaskStatus = canViewProjects;
   const canAddMeetingNotes = true;
   const canManageMeetingNotes = canViewProjects;
   const canManageDocuments = canViewProjects;
   const canManageSurveys = canViewProjects;
+
+  /**
+   * Check if the current user can manage a specific project.
+   * Returns true if user is SuperAdmin, project owner, or in the project's managers list.
+   */
+  const canManageProject = (project: { owner?: { id: number }; managers?: { id: number }[] } | null | undefined): boolean => {
+    if (!project) return false;
+    if (isSuperAdmin) return true;
+    if (!user) return false;
+    if (project.owner?.id === user.id) return true;
+    if (Array.isArray(project.managers) && project.managers.some((m) => m.id === user.id)) return true;
+    return false;
+  };
 
   // Backward compat
   const isLead = false; // No more lead role
@@ -239,6 +254,7 @@ export const useUserRole = () => {
     canManageMeetingNotes,
     canManageDocuments,
     canManageSurveys,
+    canManageProject,
     // Backward compat
     canEdit,
   };

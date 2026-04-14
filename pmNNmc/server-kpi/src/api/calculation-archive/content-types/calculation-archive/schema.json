@@ -1,0 +1,54 @@
+{
+  "kind": "collectionType",
+  "collectionName": "calculation_archives",
+  "info": {
+    "singularName": "calculation-archive",
+    "pluralName": "calculation-archives",
+    "displayName": "CalculationArchive",
+    "description": "Архив расчётов KPI по табелю"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "year": {
+      "type": "integer",
+      "required": true
+    },
+    "month": {
+      "type": "integer",
+      "required": true,
+      "min": 1,
+      "max": 12
+    },
+    "department": {
+      "type": "string",
+      "required": true
+    },
+    "nchDay": {
+      "type": "decimal"
+    },
+    "ndShift": {
+      "type": "decimal"
+    },
+    "calculatedBy": {
+      "type": "string",
+      "required": true
+    },
+    "results": {
+      "type": "json",
+      "required": true
+    },
+    "parsedDetails": {
+      "type": "json"
+    },
+    "errors": {
+      "type": "json"
+    },
+    "employeeCount": {
+      "type": "integer",
+      "default": 0
+    }
+  }
+}

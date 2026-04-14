@@ -107,21 +107,16 @@ export const createSurvey = async (data: {
 
 // Get all surveys for a project
 export const getProjectSurveys = async (projectDocumentId: string): Promise<ProjectSurvey[]> => {
-  // Strapi v5: get all surveys and filter on client side
   const res = await client.get('/project-surveys', {
     params: {
       'populate[0]': 'questions',
       'populate[1]': 'project',
       'populate[2]': 'createdBy',
+      'filters[project][documentId][$eq]': projectDocumentId,
       'sort': 'createdAt:desc',
     },
   });
-  
-  // Filter by project documentId on client side
-  const allSurveys = res.data.data || [];
-  return allSurveys.filter((survey: any) => 
-    survey.project?.documentId === projectDocumentId
-  );
+  return res.data.data || [];
 };
 
 // Get single survey

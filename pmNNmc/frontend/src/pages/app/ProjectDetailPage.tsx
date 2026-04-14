@@ -60,10 +60,12 @@ export default function ProjectDetailPage() {
     canManageMeetingNotes,
     canManageDocuments,
     canManageSurveys,
+    canManageProject,
   } = useUserRole();
   const canManageOwner = isAdmin || isLead;
-  
+
   const { selectedProject: project, stages, fetchProject, fetchStages } = useProjectStore();
+  const canEditThisProject = canManageProject(project);
 
   const [descriptionOpen, setDescriptionOpen] = useState(true);
   const [tasksOpen, setTasksOpen] = useState(true);
@@ -218,7 +220,7 @@ export default function ProjectDetailPage() {
 
   // === DESCRIPTION HANDLERS ===
   const handleSaveDescription = async () => {
-    if (!project || !canEditProject) return;
+    if (!project || !canEditThisProject) return;
     setIsSavingDescription(true);
     try {
       await projectsApi.update(project.documentId, { description: descriptionText });
@@ -425,7 +427,7 @@ export default function ProjectDetailPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {canEditProject && project.status !== 'DELETED' && (
+            {canEditThisProject && project.status !== 'DELETED' && (
               <Button
                 variant="secondary"
                 onClick={() => setShowEditModal(true)}
@@ -535,7 +537,7 @@ export default function ProjectDetailPage() {
               <ChevronDown className="w-5 h-5 text-slate-400" />
             )}
           </button>
-          {canEditProject && descriptionOpen && !isEditingDescription && (
+          {canEditThisProject && descriptionOpen && !isEditingDescription && (
             <button
               onClick={() => setIsEditingDescription(true)}
               className="p-1 text-slate-400 hover:text-primary-600 transition-colors"

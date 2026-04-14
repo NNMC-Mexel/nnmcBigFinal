@@ -102,12 +102,6 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
     return true;
   }
 
-  const requesterDepartmentKey = userWithDept?.department?.key ?? null;
-  if (!requesterDepartmentKey) {
-    ctx.throw(403, 'User department is required');
-    return false;
-  }
-
   const isCreate = ctx.request?.method === 'POST';
   const existingTask =
     !isCreate && ctx.params?.id ? await resolveTaskWithProject(ctx.params.id, strapi) : null;
@@ -120,9 +114,24 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
   }
 
   const project = (await strapi.entityService.findOne('api::project.project', projectId, {
-    populate: ['department'],
-    fields: ['id'],
+    populate: ['department', 'owner', 'managers'],
   })) as any;
+
+  // Allow if user is the project owner or a manager
+  const isOwner = project?.owner?.id === currentUser.id;
+  const isManager = Array.isArray(project?.managers) &&
+    project.managers.some((m: any) => m.id === currentUser.id);
+
+  if (isOwner || isManager) {
+    return true;
+  }
+
+  // Otherwise, fall back to department-based check
+  const requesterDepartmentKey = userWithDept?.department?.key ?? null;
+  if (!requesterDepartmentKey) {
+    ctx.throw(403, 'User department is required');
+    return false;
+  }
 
   const projectDepartmentKey = project?.department?.key ?? null;
   if (!projectDepartmentKey) {
@@ -131,30 +140,9 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
   }
 
   if (projectDepartmentKey !== requesterDepartmentKey) {
-    ctx.throw(403, 'You can manage tasks only in your department projects');
-    return false;
-  }
-
-  const assigneeIdsFromData = extractIdsFromValue(data.assignee);
-  const assigneeId = assigneeIdsFromData[0] ?? existingTask?.assignee?.id ?? null;
-  if (!assigneeId) {
-    return true;
-  }
-
-  const assignee = (await strapi.entityService.findOne('plugin::users-permissions.user', assigneeId, {
-    populate: ['department'],
-    fields: ['id'],
-  })) as any;
-  if (!assignee) {
-    ctx.throw(400, 'Assignee not found');
-    return false;
-  }
-
-  if (assignee?.department?.key !== projectDepartmentKey) {
-    ctx.throw(403, 'Assignee must be from the project department');
+    ctx.throw(403, 'You can manage tasks only in your department projects or projects where you are a manager');
     return false;
   }
 
   return true;
 };
-

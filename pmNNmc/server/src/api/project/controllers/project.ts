@@ -47,11 +47,12 @@ export default factories.createCoreController('api::project.project', ({ strapi 
         status: data.status || 'ACTIVE',
         department: data.department || null,
         owner: data.owner || null,
+        managers: data.managers || [],
         supportingSpecialists: data.supportingSpecialists || [],
         responsibleUsers: data.responsibleUsers || [],
         manualStageOverride: data.manualStageOverride || null,
       },
-      populate: ['department', 'owner', 'supportingSpecialists', 'responsibleUsers', 'tasks', 'manualStageOverride'],
+      populate: ['department', 'owner', 'managers', 'supportingSpecialists', 'responsibleUsers', 'tasks', 'manualStageOverride'],
     });
 
     ctx.body = { data: enrichProjectWithComputedFields(entry) };
@@ -79,14 +80,14 @@ export default factories.createCoreController('api::project.project', ({ strapi 
     for (const field of allowedScalars) {
       if (field in data) updateData[field] = data[field];
     }
-    const allowedRelations = ['department', 'owner', 'supportingSpecialists', 'responsibleUsers', 'manualStageOverride'];
+    const allowedRelations = ['department', 'owner', 'managers', 'supportingSpecialists', 'responsibleUsers', 'manualStageOverride'];
     for (const field of allowedRelations) {
       if (field in data) updateData[field] = data[field];
     }
 
     const entry = await strapi.entityService.update('api::project.project', numericId, {
       data: updateData,
-      populate: ['department', 'owner', 'supportingSpecialists', 'responsibleUsers', 'tasks', 'tasks.assignee', 'manualStageOverride', 'meetings', 'meetings.author'],
+      populate: ['department', 'owner', 'managers', 'supportingSpecialists', 'responsibleUsers', 'tasks', 'tasks.assignee', 'manualStageOverride', 'meetings', 'meetings.author'],
     });
 
     ctx.body = { data: enrichProjectWithComputedFields(entry) };
@@ -158,7 +159,12 @@ export default factories.createCoreController('api::project.project', ({ strapi 
     const { isSuperAdmin } = getUserFlags(userWithDept);
     const requesterDepartmentKey = userWithDept?.department?.key ?? null;
     const requestedDepartmentKey = typeof ctx.query?.department === 'string' ? ctx.query.department : undefined;
+
+    // When "all" is requested, return all users (for cross-department manager selection)
+    const fetchAll = ctx.query?.all === 'true' || ctx.query?.all === '1';
+
     if (
+      !fetchAll &&
       !isSuperAdmin &&
       requestedDepartmentKey &&
       requesterDepartmentKey &&
@@ -167,11 +173,18 @@ export default factories.createCoreController('api::project.project', ({ strapi 
       ctx.throw(403, 'You can request users only from your department');
       return;
     }
-    const filters = getAssignableUserFilters({
-      isSuperAdmin,
-      requesterDepartmentKey,
-      requestedDepartmentKey,
-    });
+
+    let filters: Record<string, any> | null;
+    if (fetchAll) {
+      // Return all non-blocked users for manager selection
+      filters = {};
+    } else {
+      filters = getAssignableUserFilters({
+        isSuperAdmin,
+        requesterDepartmentKey,
+        requestedDepartmentKey,
+      });
+    }
 
     if (filters === null) {
       ctx.throw(403, 'User department is required');

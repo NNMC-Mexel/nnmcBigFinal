@@ -1,6 +1,6 @@
 import { useState, FormEvent, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Shield, AlertTriangle, Info } from 'lucide-react';
+import { Shield, AlertTriangle, Info, Users } from 'lucide-react';
 import type { Project, Department, AssignableUser } from '../../types';
 import { projectsApi } from '../../api/projects';
 import { useProjectStore } from '../../store/projectStore';
@@ -28,6 +28,7 @@ export default function ProjectFormModal({
   const { user } = useAuthStore();
   const { isAdmin, isLead, isSuperAdmin } = useUserRole();
   const canManageOwner = isAdmin || isLead;
+  const isProjectOwner = !project || project?.owner?.id === user?.id || isSuperAdmin;
 
   useEffect(() => {
     if (departments.length === 0) {
@@ -50,9 +51,13 @@ export default function ProjectFormModal({
   const [ownerId, setOwnerId] = useState(
     project?.owner?.id?.toString() || user?.id?.toString() || ''
   );
+  const [managerIds, setManagerIds] = useState<string[]>(
+    project?.managers?.map((m) => m.id.toString()) || []
+  );
   const [supportingIds, setSupportingIds] = useState<string[]>(
     project?.supportingSpecialists?.map((assignee) => assignee.id.toString()) || []
   );
+  const [allUsers, setAllUsers] = useState<AssignableUser[]>([]);
   const [assigneeDepartment, setAssigneeDepartment] = useState(
     isSuperAdmin ? initialDepartmentKey : userDepartmentKey || initialDepartmentKey
   );
@@ -146,6 +151,18 @@ export default function ProjectFormModal({
       isMounted = false;
     };
   }, [departmentMismatchWithUser, effectiveAssigneeDepartment, t]);
+
+  // Load all users for managers dropdown (cross-department)
+  useEffect(() => {
+    let isMounted = true;
+    if (isProjectOwner) {
+      projectsApi.getAllUsers().then((users) => {
+        if (isMounted) setAllUsers(users);
+      }).catch(() => {});
+    }
+    return () => { isMounted = false; };
+  }, [isProjectOwner]);
+
   const handleChange = (field: string) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
@@ -218,6 +235,10 @@ export default function ProjectFormModal({
         status: formData.status as 'ACTIVE' | 'ARCHIVED',
         supportingSpecialists: supportingIds.map((id) => parseInt(id)),
       };
+
+      if (isProjectOwner) {
+        data.managers = managerIds.map((id) => parseInt(id));
+      }
 
       if (canManageOwner) {
         data.owner = ownerId ? parseInt(ownerId) : undefined;
@@ -437,6 +458,56 @@ export default function ProjectFormModal({
             </div>
           )}
         </section>
+
+        {/* Managers section — only visible to project owner */}
+        {isProjectOwner && (
+          <section className="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-lg border border-indigo-200 bg-white p-2 text-indigo-600">
+                <Users className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-slate-800">
+                  {i18n.language === 'kz' ? 'Жоба менеджерлері' : 'Менеджеры проекта'}
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  {i18n.language === 'kz'
+                    ? 'Менеджерлер жобаны редакциялай, тапсырмаларды басқара алады. Кез-келген бөлімнен таңдауға болады.'
+                    : 'Менеджеры могут редактировать проект и управлять задачами. Можно выбрать из любого отдела.'}
+                </p>
+              </div>
+            </div>
+            <div className="border border-indigo-100 bg-white rounded-lg max-h-40 overflow-y-auto p-2 space-y-1">
+              {allUsers.filter((u) => u.id.toString() !== ownerId).length === 0 ? (
+                <div className="text-sm text-slate-500">{t('common.loading')}</div>
+              ) : (
+                allUsers
+                  .filter((u) => u.id.toString() !== ownerId)
+                  .map((u) => (
+                    <label key={u.id} className="flex items-center gap-2 text-sm text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={managerIds.includes(u.id.toString())}
+                        onChange={(e) => {
+                          const value = u.id.toString();
+                          setManagerIds((prev) =>
+                            e.target.checked ? [...prev, value] : prev.filter((id) => id !== value)
+                          );
+                        }}
+                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span>{getUserLabel(u)}</span>
+                      {u.department && (
+                        <span className="text-xs text-slate-400">
+                          ({i18n.language === 'kz' ? u.department.name_kz : u.department.name_ru})
+                        </span>
+                      )}
+                    </label>
+                  ))
+              )}
+            </div>
+          </section>
+        )}
 
         <div className="space-y-2">
           <label className="block text-sm font-medium text-slate-700">

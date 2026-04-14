@@ -58,6 +58,11 @@
       "relation": "manyToMany",
       "target": "plugin::users-permissions.user"
     },
+    "managers": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user"
+    },
     "manualStageOverride": {
       "type": "relation",
       "relation": "manyToOne",

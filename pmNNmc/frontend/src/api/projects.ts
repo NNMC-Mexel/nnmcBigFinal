@@ -1,18 +1,10 @@
 import client from './client';
 import type { Project, AssignableUser, Task } from '../types';
 
-const normalizeTask = (task: any): Task => {
-  const completed =
-    typeof task?.completed === 'boolean'
-      ? task.completed
-      : typeof task?.progress === 'number'
-        ? task.progress >= 100
-        : task?.status === 'PRODUCTION' || task?.status === 'ARCHIVED';
-  return {
-    ...task,
-    completed,
-  } as Task;
-};
+const normalizeTask = (task: any): Task => ({
+  ...task,
+  completed: !!task?.completed,
+}) as Task;
 
 const normalizeProject = (item: any): Project => {
   const tasks = Array.isArray(item?.tasks) ? item.tasks.map(normalizeTask) : item?.tasks;
@@ -36,9 +28,10 @@ export const buildProjectsQuery = (params?: {
     'populate[3]': 'responsibleUsers',
     'populate[4]': 'owner',
     'populate[5]': 'supportingSpecialists',
-    'populate[6]': 'manualStageOverride',
-    'populate[7]': 'meetings',
-    'populate[8]': 'meetings.author',
+    'populate[6]': 'managers',
+    'populate[7]': 'manualStageOverride',
+    'populate[8]': 'meetings',
+    'populate[9]': 'meetings.author',
     'sort[0]': 'createdAt:desc',
     'pagination[pageSize]': 100,
   };
@@ -84,9 +77,10 @@ export const projectsApi = {
         'populate[3]': 'responsibleUsers',
         'populate[4]': 'owner',
         'populate[5]': 'supportingSpecialists',
-        'populate[6]': 'manualStageOverride',
-        'populate[7]': 'meetings',
-        'populate[8]': 'meetings.author',
+        'populate[6]': 'managers',
+        'populate[7]': 'manualStageOverride',
+        'populate[8]': 'meetings',
+        'populate[9]': 'meetings.author',
       },
     });
     return normalizeProject(response.data.data);
@@ -137,6 +131,13 @@ export const projectsApi = {
   getAssignableUsers: async (departmentKey?: string): Promise<AssignableUser[]> => {
     const response = await client.get('/projects/assignable-users', {
       params: departmentKey ? { department: departmentKey } : undefined,
+    });
+    return response.data.data || [];
+  },
+
+  getAllUsers: async (): Promise<AssignableUser[]> => {
+    const response = await client.get('/projects/assignable-users', {
+      params: { all: 'true' },
     });
     return response.data.data || [];
   },

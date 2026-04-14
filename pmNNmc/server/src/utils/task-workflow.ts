@@ -19,13 +19,7 @@ export const computeProjectProgressFromTasks = (tasks: unknown[]): {
   let doneTasks = 0;
 
   tasks.forEach((task: any) => {
-    const completed =
-      typeof task?.completed === 'boolean'
-        ? task.completed
-        : typeof task?.progress === 'number'
-          ? task.progress >= 100
-          : task?.status === 'PRODUCTION' || task?.status === 'ARCHIVED';
-    if (completed) {
+    if (task?.completed) {
       doneTasks += 1;
     }
   });

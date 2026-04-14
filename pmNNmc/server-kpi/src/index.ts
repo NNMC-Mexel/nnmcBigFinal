@@ -14,6 +14,9 @@ async function ensureAuthenticatedPermissions(strapi: any) {
     'api::kpi-calculator.kpi-calculator.downloadBuh',
     'api::kpi-calculator.kpi-calculator.downloadBuhPdf',
     'api::kpi-calculator.kpi-calculator.downloadReport',
+    'api::calculation-archive.calculation-archive.find',
+    'api::calculation-archive.calculation-archive.findOne',
+    'api::calculation-archive.calculation-archive.delete',
   ];
 
   for (const action of actions) {
