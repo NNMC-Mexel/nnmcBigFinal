@@ -76,10 +76,15 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
     return true;
   }
 
-  const isCreate = ctx.request?.method === 'POST';
+  const method = ctx.request?.method;
+
+  // --- READ (GET) --- allow all authenticated users
+  if (method === 'GET') {
+    return true;
+  }
 
   // --- CREATE ---
-  if (isCreate) {
+  if (method === 'POST') {
     const ownerIds = getOwnerIds(data);
     if (ownerIds.length === 0) {
       throw new ValidationError('Project owner is required');
