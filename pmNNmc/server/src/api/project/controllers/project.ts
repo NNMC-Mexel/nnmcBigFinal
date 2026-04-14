@@ -37,7 +37,7 @@ export default factories.createCoreController('api::project.project', ({ strapi 
   async create(ctx) {
     const data = ctx.request.body?.data || {};
 
-    const entry = await strapi.entityService.create('api::project.project', {
+    const entry = await (strapi.entityService as any).create('api::project.project', {
       data: {
         title: data.title,
         description: data.description || null,
@@ -85,7 +85,7 @@ export default factories.createCoreController('api::project.project', ({ strapi 
       if (field in data) updateData[field] = data[field];
     }
 
-    const entry = await strapi.entityService.update('api::project.project', numericId, {
+    const entry = await (strapi.entityService as any).update('api::project.project', numericId, {
       data: updateData,
       populate: ['department', 'owner', 'managers', 'supportingSpecialists', 'responsibleUsers', 'tasks', 'tasks.assignee', 'manualStageOverride', 'meetings', 'meetings.author'],
     });

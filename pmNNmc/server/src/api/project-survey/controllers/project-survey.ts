@@ -61,7 +61,7 @@ export default factories.createCoreController('api::project-survey.project-surve
       } catch { projectId = null; }
     }
 
-    const entry = await strapi.entityService.create('api::project-survey.project-survey', {
+    const entry = await (strapi.entityService as any).create('api::project-survey.project-survey', {
       data: {
         title: requestData.title,
         description: requestData.description || null,
