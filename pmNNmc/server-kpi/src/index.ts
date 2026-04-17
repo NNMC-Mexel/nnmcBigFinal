@@ -17,6 +17,11 @@ async function ensureAuthenticatedPermissions(strapi: any) {
     'api::calculation-archive.calculation-archive.find',
     'api::calculation-archive.calculation-archive.findOne',
     'api::calculation-archive.calculation-archive.delete',
+    'api::department-template.department-template.find',
+    'api::department-template.department-template.findOne',
+    'api::department-template.department-template.create',
+    'api::department-template.department-template.update',
+    'api::department-template.department-template.delete',
   ];
 
   for (const action of actions) {

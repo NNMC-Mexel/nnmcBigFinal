@@ -35,6 +35,11 @@ import {
   apiArchiveList,
   apiArchiveGet,
   apiArchiveDelete,
+  apiTemplateList,
+  apiTemplateCreate,
+  apiTemplateUpdate,
+  apiTemplateDelete,
+  apiPmDepartments,
 } from "./kpiApi";
 import "./kpi.css";
 
@@ -369,6 +374,15 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   const [archiveLoading, setArchiveLoading] = useState(false);
   const [restoredFromArchive, setRestoredFromArchive] = useState(null);
 
+  // Department templates
+  const [templates, setTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null); // null = list, object = editing
+  const [templateForm, setTemplateForm] = useState({});
+
+  // Departments from server-pm
+  const [pmDepartments, setPmDepartments] = useState([]);
+
   const isAdmin =
     String(user?.role || "").toLowerCase().includes("admin") ||
     String(user?.login || "").toLowerCase().startsWith("admin");
@@ -512,6 +526,99 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     }
   };
 
+  // --- Department Templates ---
+  const loadTemplates = async () => {
+    setTemplatesLoading(true);
+    try {
+      const items = await apiTemplateList();
+      setTemplates(items);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (isUnauthorizedError(msg)) { handleLogout(); return; }
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
+
+  const startEditTemplate = (tpl) => {
+    setEditingTemplate(tpl || {});
+    setTemplateForm({
+      departmentKey: tpl?.departmentKey || "",
+      departmentName: tpl?.departmentName || "",
+      protocolNumber: tpl?.protocolNumber || "",
+      meetingTitle: tpl?.meetingTitle || "",
+      place: tpl?.place || "",
+      agendaText: tpl?.agendaText || "",
+      footerText: tpl?.footerText || "",
+      secretaryName: tpl?.secretaryName || "",
+      coordinatorRole: tpl?.coordinatorRole || "",
+      commissionMembers: (tpl?.commissionMembers || []).map((m) => ({ role: m.role || "", name: m.name || "", order: m.order ?? 0 })),
+    });
+  };
+
+  const saveTemplate = async () => {
+    try {
+      const data = {
+        ...templateForm,
+        commissionMembers: templateForm.commissionMembers?.filter((m) => m.role || m.name),
+      };
+      const docId = editingTemplate?.documentId || editingTemplate?.id;
+      if (docId) {
+        await apiTemplateUpdate(docId, data);
+        showToast("Шаблон обновлён");
+      } else {
+        await apiTemplateCreate(data);
+        showToast("Шаблон создан");
+      }
+      setEditingTemplate(null);
+      loadTemplates();
+    } catch (err) {
+      showToast("Ошибка сохранения шаблона", "error");
+    }
+  };
+
+  const deleteTemplate = async (tpl) => {
+    if (!window.confirm(`Удалить шаблон "${tpl.departmentName}"?`)) return;
+    try {
+      const docId = tpl.documentId || tpl.id;
+      await apiTemplateDelete(docId);
+      setTemplates((prev) => prev.filter((t) => (t.documentId || t.id) !== docId));
+      showToast("Шаблон удалён");
+    } catch {
+      showToast("Ошибка удаления", "error");
+    }
+  };
+
+  const addCommissionMember = () => {
+    setTemplateForm((prev) => ({
+      ...prev,
+      commissionMembers: [...(prev.commissionMembers || []), { role: "", name: "", order: (prev.commissionMembers?.length || 0) + 1 }],
+    }));
+  };
+
+  const removeCommissionMember = (idx) => {
+    setTemplateForm((prev) => ({
+      ...prev,
+      commissionMembers: prev.commissionMembers.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const updateCommissionMember = (idx, field, value) => {
+    setTemplateForm((prev) => ({
+      ...prev,
+      commissionMembers: prev.commissionMembers.map((m, i) => i === idx ? { ...m, [field]: value } : m),
+    }));
+  };
+
+  // Load PM departments on mount
+  useEffect(() => {
+    apiPmDepartments().then((depts) => {
+      if (Array.isArray(depts) && depts.length > 0) {
+        setPmDepartments(depts);
+      }
+    });
+  }, []);
+
   useEffect(() => { if (user) reloadKpiAll(); }, [user]);
   useEffect(() => { if (user && isAdmin) loadAccessUsers(); }, [user, isAdmin]);
 
@@ -536,10 +643,12 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       return String(a.fio || "").toLowerCase().localeCompare(String(b.fio || "").toLowerCase(), "ru");
     });
 
-  const allDepartments = useMemo(
-    () => Array.from(new Set(kpiItems.map((x) => x.department || "").filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b), "ru")),
-    [kpiItems]
-  );
+  const allDepartments = useMemo(() => {
+    // Merge departments from KPI employees and from server-pm
+    const kpiDepts = kpiItems.map((x) => x.department || "").filter(Boolean);
+    const pmDepts = pmDepartments.map((d) => d.name_ru || d.key || "").filter(Boolean);
+    return Array.from(new Set([...kpiDepts, ...pmDepts])).sort((a, b) => String(a).localeCompare(String(b), "ru"));
+  }, [kpiItems, pmDepartments]);
 
   useEffect(() => {
     if (!user || !allDepartments || allDepartments.length === 0) { setCalcDepartment(""); return; }
@@ -830,6 +939,11 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         {isAdmin && (
           <button className={`kpi-module-nav-tab${activeTab === "access" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => setActiveTab("access")}>
             Доступы к отделам
+          </button>
+        )}
+        {isAdmin && (
+          <button className={`kpi-module-nav-tab${activeTab === "templates" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => { setActiveTab("templates"); loadTemplates(); }}>
+            Шаблоны
           </button>
         )}
         {isAdmin && (
@@ -1218,6 +1332,17 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                 )}
               </>
             )}
+
+            {/* Кнопки подписи и скачивания (доступны и при восстановлении из архива) */}
+            {calcResults.length > 0 && (
+              <div className="btn-row" style={{ marginTop: 16 }}>
+                <button className="btn btn-outline" onClick={() => handleDownload("excel")}>Скачать общий Excel</button>
+                <button className="btn btn-outline" onClick={() => handleDownload("buh")}>Скачать для бухгалтерии</button>
+                <button className="btn btn-outline" onClick={() => handleDownload("pdf")}>Скачать PDF</button>
+                <button className="btn btn-outline" onClick={handleSendToSignDoc}>Отправить на подпись</button>
+                <button className="btn btn-outline" onClick={handleSignEds}>Подписать ЭЦП</button>
+              </div>
+            )}
           </section>
           );
         })()}
@@ -1339,6 +1464,137 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                   </div>
                 </div>
               </div>
+            )}
+          </section>
+        )}
+
+        {/* =================== Шаблоны протоколов =================== */}
+        {activeTab === "templates" && isAdmin && (
+          <section className="card">
+            {editingTemplate === null ? (
+              <>
+                <div className="card-header-row">
+                  <div>
+                    <h2>Шаблоны протоколов по отделам</h2>
+                    <p className="card-subtitle">Каждый отдел может иметь свой шаблон протокола с индивидуальными членами комиссии.</p>
+                  </div>
+                  <button className="btn btn-primary" onClick={() => startEditTemplate(null)}>+ Создать шаблон</button>
+                </div>
+                {templatesLoading ? (
+                  <div className="empty-state">Загрузка...</div>
+                ) : templates.length === 0 ? (
+                  <div className="empty-state">Шаблонов нет. Создайте первый шаблон для отдела.</div>
+                ) : (
+                  <div className="table-wrapper">
+                    <table>
+                      <thead>
+                        <tr><th>Отдел (ключ)</th><th>Название отдела</th><th>Члены комиссии</th><th>Секретарь</th><th>Действия</th></tr>
+                      </thead>
+                      <tbody>
+                        {templates.map((tpl) => (
+                          <tr key={tpl.documentId || tpl.id}>
+                            <td><code>{tpl.departmentKey}</code></td>
+                            <td>{tpl.departmentName}</td>
+                            <td>{(tpl.commissionMembers || []).length} чел.</td>
+                            <td>{tpl.secretaryName || "—"}</td>
+                            <td>
+                              <button className="btn btn-small" onClick={() => startEditTemplate(tpl)}>Редактировать</button>
+                              <button className="btn btn-small btn-danger" style={{ marginLeft: 4 }} onClick={() => deleteTemplate(tpl)}>Удалить</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="card-header-row">
+                  <h2>{editingTemplate?.documentId || editingTemplate?.id ? "Редактирование шаблона" : "Новый шаблон"}</h2>
+                  <button className="btn btn-secondary" onClick={() => setEditingTemplate(null)}>Назад к списку</button>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label className="field-label">Ключ отдела (как в справочнике KPI)</label>
+                    <select
+                      value={templateForm.departmentKey}
+                      onChange={(e) => {
+                        const key = e.target.value;
+                        const dept = pmDepartments.find((d) => (d.key || d.name_ru) === key);
+                        setTemplateForm((prev) => ({
+                          ...prev,
+                          departmentKey: key,
+                          departmentName: dept?.name_ru || prev.departmentName || key,
+                        }));
+                      }}
+                      style={{ width: "100%", padding: "6px 8px" }}
+                    >
+                      <option value="">— Выберите отдел —</option>
+                      {allDepartments.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="field-label">Название отдела (для протокола)</label>
+                    <input type="text" value={templateForm.departmentName || ""} onChange={(e) => setTemplateForm((prev) => ({ ...prev, departmentName: e.target.value }))} style={{ width: "100%", padding: "6px 8px" }} />
+                  </div>
+                  <div>
+                    <label className="field-label">Номер протокола</label>
+                    <input type="text" value={templateForm.protocolNumber || ""} onChange={(e) => setTemplateForm((prev) => ({ ...prev, protocolNumber: e.target.value }))} style={{ width: "100%", padding: "6px 8px" }} />
+                  </div>
+                  <div>
+                    <label className="field-label">Заголовок заседания</label>
+                    <input type="text" value={templateForm.meetingTitle || ""} onChange={(e) => setTemplateForm((prev) => ({ ...prev, meetingTitle: e.target.value }))} style={{ width: "100%", padding: "6px 8px" }} />
+                  </div>
+                  <div>
+                    <label className="field-label">Место проведения</label>
+                    <input type="text" value={templateForm.place || ""} onChange={(e) => setTemplateForm((prev) => ({ ...prev, place: e.target.value }))} style={{ width: "100%", padding: "6px 8px" }} />
+                  </div>
+                  <div>
+                    <label className="field-label">Роль координатора</label>
+                    <input type="text" value={templateForm.coordinatorRole || ""} onChange={(e) => setTemplateForm((prev) => ({ ...prev, coordinatorRole: e.target.value }))} style={{ width: "100%", padding: "6px 8px" }} />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label className="field-label">Повестка дня (шаблон: {"{{month}}, {{year}}, {{department}}"})</label>
+                  <textarea rows={3} value={templateForm.agendaText || ""} onChange={(e) => setTemplateForm((prev) => ({ ...prev, agendaText: e.target.value }))} style={{ width: "100%", padding: "6px 8px" }} />
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label className="field-label">Текст в конце протокола</label>
+                  <textarea rows={2} value={templateForm.footerText || ""} onChange={(e) => setTemplateForm((prev) => ({ ...prev, footerText: e.target.value }))} style={{ width: "100%", padding: "6px 8px" }} />
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label className="field-label">Секретарь комиссии</label>
+                  <input type="text" value={templateForm.secretaryName || ""} onChange={(e) => setTemplateForm((prev) => ({ ...prev, secretaryName: e.target.value }))} style={{ width: "100%", padding: "6px 8px", maxWidth: 400 }} />
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <label className="field-label" style={{ margin: 0 }}>Члены комиссии</label>
+                    <button className="btn btn-small btn-primary" onClick={addCommissionMember}>+ Добавить</button>
+                  </div>
+                  {(templateForm.commissionMembers || []).map((member, idx) => (
+                    <div key={idx} style={{ display: "flex", gap: 8, marginBottom: 6, alignItems: "center" }}>
+                      <input type="text" placeholder="Должность / Роль" value={member.role} onChange={(e) => updateCommissionMember(idx, "role", e.target.value)} style={{ flex: 1, padding: "4px 8px" }} />
+                      <input type="text" placeholder="ФИО" value={member.name} onChange={(e) => updateCommissionMember(idx, "name", e.target.value)} style={{ flex: 1, padding: "4px 8px" }} />
+                      <input type="number" placeholder="#" value={member.order} onChange={(e) => updateCommissionMember(idx, "order", parseInt(e.target.value) || 0)} style={{ width: 50, padding: "4px 8px" }} />
+                      <button className="btn btn-small btn-danger" onClick={() => removeCommissionMember(idx)} title="Удалить">x</button>
+                    </div>
+                  ))}
+                  {(!templateForm.commissionMembers || templateForm.commissionMembers.length === 0) && (
+                    <div className="muted">Членов комиссии нет. Нажмите «+ Добавить».</div>
+                  )}
+                </div>
+
+                <div className="btn-row">
+                  <button className="btn btn-primary" onClick={saveTemplate}>Сохранить шаблон</button>
+                  <button className="btn btn-secondary" onClick={() => setEditingTemplate(null)}>Отмена</button>
+                </div>
+              </>
             )}
           </section>
         )}

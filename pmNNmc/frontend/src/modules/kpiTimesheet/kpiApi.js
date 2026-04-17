@@ -273,6 +273,66 @@ export async function apiArchiveDelete(documentId) {
   return handleResponse(res);
 }
 
+// --- Department Templates ---
+
+export async function apiTemplateList() {
+  const res = await fetch(`${STRAPI_BASE}/department-templates?populate=commissionMembers&populate=meetingDateOverrides&sort=departmentName:asc`, {
+    headers: { ...getAuthHeader() },
+  });
+  const data = await handleResponse(res);
+  return data?.data || [];
+}
+
+export async function apiTemplateGet(documentId) {
+  const res = await fetch(`${STRAPI_BASE}/department-templates/${documentId}?populate=commissionMembers&populate=meetingDateOverrides`, {
+    headers: { ...getAuthHeader() },
+  });
+  const data = await handleResponse(res);
+  return data?.data || null;
+}
+
+export async function apiTemplateCreate(templateData) {
+  const res = await fetch(`${STRAPI_BASE}/department-templates`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    body: JSON.stringify({ data: templateData }),
+  });
+  return handleResponse(res);
+}
+
+export async function apiTemplateUpdate(documentId, templateData) {
+  const res = await fetch(`${STRAPI_BASE}/department-templates/${documentId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    body: JSON.stringify({ data: templateData }),
+  });
+  return handleResponse(res);
+}
+
+export async function apiTemplateDelete(documentId) {
+  const res = await fetch(`${STRAPI_BASE}/department-templates/${documentId}`, {
+    method: "DELETE",
+    headers: { ...getAuthHeader() },
+  });
+  return handleResponse(res);
+}
+
+// --- Departments from server-pm ---
+
+const PM_API_BASE = `${window.location.protocol}//${window.location.hostname}:12010/api`;
+
+export async function apiPmDepartments() {
+  try {
+    const res = await fetch(`${PM_API_BASE}/departments?fields[0]=key&fields[1]=name_ru&fields[2]=name_kz&sort=name_ru:asc&pagination[pageSize]=100`, {
+      headers: { ...getAuthHeader() },
+    });
+    const data = await handleResponse(res);
+    return data?.data || [];
+  } catch {
+    return [];
+  }
+}
+
 export async function apiAccessUsers() {
   const res = await fetch(`${API_BASE}/department-access/users`, {
     headers: { ...getAuthHeader() },

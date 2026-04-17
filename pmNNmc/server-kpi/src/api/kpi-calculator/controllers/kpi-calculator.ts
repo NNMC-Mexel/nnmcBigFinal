@@ -178,6 +178,44 @@ async function loadReportSettings(): Promise<ReportSettings | null> {
   }
 }
 
+/**
+ * Load per-department template. Falls back to global report-setting if not found.
+ */
+async function loadDepartmentTemplate(department: string): Promise<ReportSettings | null> {
+  if (!department) return null;
+  try {
+    const results: any = await (strapi.entityService as any).findMany(
+      'api::department-template.department-template',
+      {
+        filters: { departmentKey: department },
+        populate: {
+          commissionMembers: true,
+          meetingDateOverrides: true,
+        },
+        limit: 1,
+      }
+    );
+    const entity = Array.isArray(results) ? results[0] : results;
+    if (!entity) return null;
+    const data = entity?.attributes ? { ...entity.attributes } : { ...entity };
+    return data as ReportSettings;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Load settings with priority: department-template > global report-setting > defaults
+ */
+async function loadSettingsForDepartment(department: string): Promise<ReportSettings> {
+  const deptTemplate = await loadDepartmentTemplate(department);
+  if (deptTemplate) {
+    return applyReportDefaults(deptTemplate);
+  }
+  const globalSettings = await loadReportSettings();
+  return applyReportDefaults(globalSettings);
+}
+
 const DEFAULT_REPORT_SETTINGS: ReportSettings = {
   protocolNumber: '1',
   meetingTitle: 'Заседания комиссии по оплате и мотивации труда персонала',
@@ -185,19 +223,18 @@ const DEFAULT_REPORT_SETTINGS: ReportSettings = {
   place: 'г.Астана, пр.Абылай – хана 42',
   agendaText:
     'Рассмотрение итогов работы за {{month}} месяц {{year}} года. Оценка достижения ключевых показателей работы эффективности выполнения внутренних стандартов, санитарно-эпидемиологического режима и трудовой дисциплины, степень достижения КПР каждым сотрудником {{department}}.\n' +
-    'Результаты фактического исполнения целевых показателей КПР за {{month}} месяц {{year}} года в соответствии с утверждённым Положением об оплате труда. Младший медицинский персонал {{department}}.',
+    'Результаты фактического исполнения целевых показателей КПР за {{month}} месяц {{year}} года в соответствии с утверждённым Положением об оплате труда.',
   footerText:
     'Передать отделу бухгалтерии результаты рассмотрения стимулирующих и мотивирующих компонентов для своевременного начисления.',
   commissionMembers: [
     { role: 'Председатель', name: 'Нурсейтова Т.Б.' },
-    { role: 'Координатор ОЦМК', name: 'Кикимбаева Г.Т.' },
     { role: 'Руководитель по сестринскому делу', name: 'Мусабаева А.М' },
     { role: 'Руководитель отдела управления', name: 'Кенжебаева Ш.Т' },
     { role: 'Главный экономист', name: 'Мендыбаева Э.М' },
     { role: 'Главный бухгалтер', name: 'Тасеменова Д.К' },
   ],
-  secretaryName: 'Актанова К.Е',
-  coordinatorRole: 'Координатор ОЦМК',
+  secretaryName: '',
+  coordinatorRole: '',
 };
 
 function applyReportDefaults(settings?: ReportSettings | null): ReportSettings {
@@ -707,7 +744,7 @@ export default {
 
       const requestedDepartment = String(getRequestField(ctx, 'department') || '').trim();
       const holidays = await loadHolidayDates(ctx, year, month);
-      const settings = applyReportDefaults(await loadReportSettings());
+      const settings = await loadSettingsForDepartment(requestedDepartment);
       const overrideDate = resolveMeetingDateOverride(settings, year, month);
       const meetingDate = overrideDate || getLastWorkingDate(year, month, holidays);
 
@@ -977,7 +1014,7 @@ export default {
 
       const requestedDepartment = String(getRequestField(ctx, 'department') || '').trim();
       const holidays = await loadHolidayDates(ctx, year, month);
-      const settings = applyReportDefaults(await loadReportSettings());
+      const settings = await loadSettingsForDepartment(requestedDepartment);
       const overrideDate = resolveMeetingDateOverride(settings, year, month);
       const meetingDate = overrideDate || getLastWorkingDate(year, month, holidays);
 
@@ -1015,7 +1052,7 @@ export default {
 
       const requestedDepartment = String(getRequestField(ctx, 'department') || '').trim();
       const holidays = await loadHolidayDates(ctx, year, month);
-      const settings = (await loadReportSettings()) || {};
+      const settings = await loadSettingsForDepartment(requestedDepartment);
       const overrideDate = resolveMeetingDateOverride(settings, year, month);
       const meetingDate = overrideDate || getLastWorkingDate(year, month, holidays);
 
