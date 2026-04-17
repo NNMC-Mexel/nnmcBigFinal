@@ -21,6 +21,7 @@ import {
   apiCalcKpiJson,
   apiCalcKpiExcel,
   apiCalcKpiBuhPdf,
+  apiGeneratePdfFromResults,
   apiKpiList,
   apiDeletedLog,
   apiEditedLog,
@@ -765,12 +766,10 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     }
   };
 
-  const handleSendToSignDoc = async () => {
-    if (!timesheetFile) { showToast("Выберите файл табеля текущего месяца", "error"); return; }
-    if (!timesheetFilePrev) { showToast("Выберите файл табеля прошлого месяца", "error"); return; }
-    if (!calcDepartment) { showToast("Выберите отдел для расчёта", "error"); return; }
-    try {
-      showToast("Формирование PDF для подписания…");
+  const buildSignablePdfBlob = async () => {
+    if (!calcDepartment) throw new Error("Выберите отдел для расчёта");
+    const hasFiles = timesheetFile && timesheetFilePrev;
+    if (hasFiles) {
       const fd = new FormData();
       fd.append("timesheet", timesheetFile);
       fd.append("timesheetPrev", timesheetFilePrev);
@@ -780,7 +779,30 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       fd.append("month", month);
       if (calcDepartment) fd.append("department", calcDepartment);
       fd.append("holidays", JSON.stringify(holidays.map((h) => h.date || h).filter(Boolean)));
-      const blob = await apiCalcKpiBuhPdf(fd, { department: calcDepartment || "", debug: true });
+      return apiCalcKpiBuhPdf(fd, { department: calcDepartment || "", debug: true });
+    }
+    if (calcResults.length === 0) {
+      throw new Error("Нет данных для подписания. Выполните расчёт или восстановите из архива.");
+    }
+    return apiGeneratePdfFromResults({
+      results: calcResults,
+      year: parseInt(year, 10),
+      month: parseInt(month, 10),
+      department: calcDepartment,
+      nchDay: nchDay || "0",
+      ndShift: ndShift || "0",
+    });
+  };
+
+  const handleSendToSignDoc = async () => {
+    if (!calcDepartment) { showToast("Выберите отдел для расчёта", "error"); return; }
+    if (!timesheetFile && calcResults.length === 0) {
+      showToast("Выберите файлы табеля или восстановите расчёт из архива", "error");
+      return;
+    }
+    try {
+      showToast("Формирование PDF для подписания…");
+      const blob = await buildSignablePdfBlob();
       const monthName = MONTH_NAMES_RU[parseInt(month, 10)] || month;
       const fileName = `KPI_Протокол_${calcDepartment}_${monthName}_${year}.pdf`;
       const title = `KPI Протокол ${calcDepartment} ${monthName} ${year}`;
@@ -793,21 +815,14 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
 
   // ---- EDS signing handlers ----
   const handleSignEds = async () => {
-    if (!timesheetFile) { showToast("Выберите файл табеля текущего месяца", "error"); return; }
-    if (!timesheetFilePrev) { showToast("Выберите файл табеля прошлого месяца", "error"); return; }
     if (!calcDepartment) { showToast("Выберите отдел для расчёта", "error"); return; }
+    if (!timesheetFile && calcResults.length === 0) {
+      showToast("Выберите файлы табеля или восстановите расчёт из архива", "error");
+      return;
+    }
     try {
       showToast("Формирование PDF для подписания…");
-      const fd = new FormData();
-      fd.append("timesheet", timesheetFile);
-      fd.append("timesheetPrev", timesheetFilePrev);
-      fd.append("nchDay", nchDay || "0");
-      fd.append("ndShift", ndShift || "0");
-      fd.append("year", year);
-      fd.append("month", month);
-      if (calcDepartment) fd.append("department", calcDepartment);
-      fd.append("holidays", JSON.stringify(holidays.map((h) => h.date || h).filter(Boolean)));
-      const blob = await apiCalcKpiBuhPdf(fd, { department: calcDepartment || "", debug: true });
+      const blob = await buildSignablePdfBlob();
       const monthName = MONTH_NAMES_RU[parseInt(month, 10)] || month;
       const fileName = `KPI_Протокол_${calcDepartment}_${monthName}_${year}.pdf`;
       const title = `KPI Протокол ${calcDepartment} ${monthName} ${year}`;

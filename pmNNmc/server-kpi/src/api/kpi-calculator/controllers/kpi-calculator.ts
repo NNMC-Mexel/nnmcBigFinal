@@ -1076,5 +1076,51 @@ export default {
       ctx.body = { error: error.message || 'Ошибка формирования отчёта' };
     }
   },
+
+  /**
+   * Generate PDF from pre-calculated results (e.g. restored from archive).
+   * Accepts JSON body with { results, year, month, department, nchDay, ndShift }.
+   * No timesheet files needed.
+   */
+  async generatePdfFromResults(ctx: Context) {
+    try {
+      const body = ctx.request.body as any;
+      const results = body?.results || [];
+      const year = parseInt(body?.year || '0', 10);
+      const month = parseInt(body?.month || '0', 10);
+      const department = String(body?.department || '').trim();
+
+      if (!year || !month || month < 1 || month > 12) {
+        throw new Error('Некорректные значения года или месяца');
+      }
+      if (!results || results.length === 0) {
+        throw new Error('Нет результатов для генерации PDF');
+      }
+
+      const holidays = await loadHolidayDates(ctx, year, month);
+      const settings = await loadSettingsForDepartment(department);
+      const overrideDate = resolveMeetingDateOverride(settings, year, month);
+      const meetingDate = overrideDate || getLastWorkingDate(year, month, holidays);
+
+      const buffer = await buildBuhPdf({
+        results,
+        year,
+        month,
+        department,
+        meetingDate,
+        settings,
+      });
+
+      ctx.set('Content-Type', 'application/pdf');
+      ctx.set(
+        'Content-Disposition',
+        `attachment; filename="KPI_Protocol_${department}_${year}-${String(month).padStart(2, '0')}.pdf"`
+      );
+      ctx.body = buffer;
+    } catch (error: any) {
+      ctx.status = error?.status || 400;
+      ctx.body = { error: error.message || 'Ошибка формирования PDF' };
+    }
+  },
 };
 

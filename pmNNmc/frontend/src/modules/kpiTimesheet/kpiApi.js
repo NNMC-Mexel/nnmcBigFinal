@@ -187,6 +187,19 @@ export async function apiCalcKpiBuhPdf(formData, opts = {}) {
   return res.blob();
 }
 
+export async function apiGeneratePdfFromResults(payload) {
+  const res = await fetch(`${STRAPI_BASE}/kpi-calculator/generate-pdf-from-results`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  return res.blob();
+}
+
 export async function apiKpiList() {
   const res = await fetch(`${API_BASE}/kpi-list`, { headers: { ...getAuthHeader() } });
   return handleResponse(res);

@@ -48,6 +48,14 @@
         auth: { scope: [] },
       },
     },
+    {
+      method: 'POST',
+      path: '/kpi-calculator/generate-pdf-from-results',
+      handler: 'kpi-calculator.generatePdfFromResults',
+      config: {
+        auth: { scope: [] },
+      },
+    },
   ],
 };
 
