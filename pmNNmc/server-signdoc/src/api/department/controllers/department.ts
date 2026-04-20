@@ -8,7 +8,7 @@ async function syncFromPm(strapi: any) {
   if (!pmUrl) return;
   try {
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 2000);
+    const t = setTimeout(() => ctrl.abort(), 5000);
     const res = await fetch(
       `${pmUrl}/api/departments?pagination[pageSize]=500&fields[0]=name_ru`,
       { signal: ctrl.signal }
