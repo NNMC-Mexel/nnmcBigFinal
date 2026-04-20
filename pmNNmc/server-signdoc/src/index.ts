@@ -22,7 +22,7 @@ async function seedDocumentTypes(strapi: any) {
 }
 
 async function syncDepartmentsFromPm(strapi: any) {
-  const pmUrl = process.env.SERVER_PM_URL || 'http://localhost:12010';
+  const pmUrl = process.env.SERVER_PM_URL || 'http://192.168.101.25:12010';
   try {
     const res = await fetch(
       `${pmUrl}/api/departments?pagination[pageSize]=500&fields[0]=name_ru&fields[1]=name_kz&fields[2]=key`
