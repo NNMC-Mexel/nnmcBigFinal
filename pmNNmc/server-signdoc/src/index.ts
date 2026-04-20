@@ -21,6 +21,88 @@ async function seedDocumentTypes(strapi: any) {
   }
 }
 
+async function syncUsersFromPm(strapi: any) {
+  const pmUrl = process.env.SERVER_PM_URL;
+  if (!pmUrl) return;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 15000);
+    const res = await fetch(
+      `${pmUrl}/api/users?populate=department&pagination[pageSize]=500`,
+      { signal: ctrl.signal }
+    ).finally(() => clearTimeout(t));
+    if (!res.ok) {
+      console.warn(`⚠️ sync users: HTTP ${res.status} from ${pmUrl}`);
+      return;
+    }
+    const items: any[] = (await res.json()) as any[];
+    if (!Array.isArray(items) || items.length === 0) {
+      console.warn('⚠️ sync users: empty list from server-pm');
+      return;
+    }
+
+    const authRole = await strapi.db
+      .query('plugin::users-permissions.role')
+      .findOne({ where: { type: 'authenticated' } });
+    if (!authRole) {
+      console.warn('⚠️ sync users: no authenticated role found');
+      return;
+    }
+
+    let created = 0;
+    let updated = 0;
+    for (const pmUser of items) {
+      const email = String(pmUser?.email || '').toLowerCase().trim();
+      if (!email) continue;
+      const username = String(pmUser?.username || email).trim();
+      const fullName = String(pmUser?.fullName || '').trim();
+      const deptName = String(pmUser?.department?.name_ru || '').trim();
+
+      let departmentId: number | null = null;
+      if (deptName) {
+        const dept = await strapi.db
+          .query('api::department.department')
+          .findOne({ where: { name: deptName } });
+        departmentId = dept?.id || null;
+      }
+
+      const existing = await strapi.db
+        .query('plugin::users-permissions.user')
+        .findOne({ where: { email } });
+
+      if (!existing) {
+        await (strapi.entityService as any).create('plugin::users-permissions.user', {
+          data: {
+            username,
+            email,
+            fullName,
+            department: departmentId,
+            provider: 'local',
+            password: `kc-${Math.random().toString(36).slice(2)}-${Date.now()}`,
+            confirmed: true,
+            blocked: false,
+            role: authRole.id,
+          },
+        });
+        created += 1;
+      } else {
+        const patch: Record<string, any> = {};
+        if (fullName && fullName !== existing.fullName) patch.fullName = fullName;
+        if (departmentId && existing.department !== departmentId) patch.department = departmentId;
+        if (Object.keys(patch).length > 0) {
+          await strapi.entityService.update('plugin::users-permissions.user', existing.id, {
+            data: patch,
+          });
+          updated += 1;
+        }
+      }
+    }
+    console.log(`👥 Users synced from server-pm: +${created} created, ${updated} updated`);
+  } catch (err) {
+    console.warn('⚠️ Failed to sync users from server-pm:', err);
+  }
+}
+
 async function syncDepartmentsFromPm(strapi: any) {
   const pmUrl = process.env.SERVER_PM_URL;
   if (!pmUrl) {
@@ -89,5 +171,6 @@ export default {
   async bootstrap({ strapi }: { strapi: any }) {
     await seedDocumentTypes(strapi);
     await syncDepartmentsFromPm(strapi);
+    await syncUsersFromPm(strapi);
   },
 };

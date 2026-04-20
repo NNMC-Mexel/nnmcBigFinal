@@ -58,6 +58,7 @@ async function setupPermissions(strapi: any) {
   const publicPermissions: Record<string, string[]> = {
     'api::ticket.ticket': ['publicSubmit', 'publicCategories'],
     'api::department.department': ['find', 'findOne'],
+    'plugin::users-permissions.user': ['find', 'findOne'],
   };
 
   // Full permissions for all content types
