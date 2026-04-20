@@ -28,9 +28,12 @@ async function syncDepartmentsFromPm(strapi: any) {
     return;
   }
   try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 3000);
     const res = await fetch(
-      `${pmUrl}/api/departments?pagination[pageSize]=500&fields[0]=name_ru&fields[1]=name_kz&fields[2]=key`
-    );
+      `${pmUrl}/api/departments?pagination[pageSize]=500&fields[0]=name_ru&fields[1]=name_kz&fields[2]=key`,
+      { signal: ctrl.signal }
+    ).finally(() => clearTimeout(t));
     if (!res.ok) {
       console.warn(`⚠️ sync departments: HTTP ${res.status} from ${pmUrl}`);
       return;

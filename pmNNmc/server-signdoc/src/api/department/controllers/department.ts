@@ -7,9 +7,12 @@ async function syncFromPm(strapi: any) {
   const pmUrl = process.env.SERVER_PM_URL;
   if (!pmUrl) return;
   try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2000);
     const res = await fetch(
-      `${pmUrl}/api/departments?pagination[pageSize]=500&fields[0]=name_ru`
-    );
+      `${pmUrl}/api/departments?pagination[pageSize]=500&fields[0]=name_ru`,
+      { signal: ctrl.signal }
+    ).finally(() => clearTimeout(t));
     if (!res.ok) return;
     const json: any = await res.json();
     const items: any[] = Array.isArray(json?.data) ? json.data : [];
