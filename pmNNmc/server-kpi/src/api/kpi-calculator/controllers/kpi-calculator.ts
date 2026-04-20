@@ -1111,10 +1111,15 @@ export default {
         settings,
       });
 
+      const asciiDept = department.replace(/[^\x20-\x7E]/g, '_');
+      const asciiName = `KPI_Protocol_${asciiDept}_${year}-${String(month).padStart(2, '0')}.pdf`;
+      const utf8Name = encodeURIComponent(
+        `KPI_Protocol_${department}_${year}-${String(month).padStart(2, '0')}.pdf`
+      );
       ctx.set('Content-Type', 'application/pdf');
       ctx.set(
         'Content-Disposition',
-        `attachment; filename="KPI_Protocol_${department}_${year}-${String(month).padStart(2, '0')}.pdf"`
+        `attachment; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`
       );
       ctx.body = buffer;
     } catch (error: any) {
