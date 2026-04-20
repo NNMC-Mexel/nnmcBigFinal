@@ -4,7 +4,8 @@ let lastSyncAt = 0;
 const SYNC_TTL_MS = 30_000;
 
 async function syncFromPm(strapi: any) {
-  const pmUrl = process.env.SERVER_PM_URL || "http://192.168.101.25:12010";
+  const pmUrl = process.env.SERVER_PM_URL;
+  if (!pmUrl) return;
   try {
     const res = await fetch(
       `${pmUrl}/api/departments?pagination[pageSize]=500&fields[0]=name_ru`
