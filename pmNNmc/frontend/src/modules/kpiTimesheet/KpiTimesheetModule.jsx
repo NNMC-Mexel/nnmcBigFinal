@@ -650,13 +650,14 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     const pmDepts = pmDepartments.map((d) => d.name_ru || d.key || "").filter(Boolean);
     const merged = Array.from(new Set([...kpiDepts, ...pmDepts]));
 
-    // Access control: SuperAdmin or kpiAllDepartments → full list.
-    // Otherwise filter by user's kpiVisibleDepartments (by name_ru).
-    const isSuper = user?.isSuperAdmin === true;
-    const allAllowed = user?.kpiAllDepartments === true;
-    if (!isSuper && !allAllowed) {
-      const allowedNames = Array.isArray(user?.kpiVisibleDepartments)
-        ? user.kpiVisibleDepartments.map((d) => d?.name_ru || d?.name || "").filter(Boolean)
+    // Access control: pmUser is the server-pm user with isSuperAdmin + KPI access fields.
+    // If pmUser not loaded yet → show merged (don't block UI). SuperAdmin or kpiAllDepartments → full.
+    // Otherwise filter by pmUser.kpiVisibleDepartments (match by name_ru).
+    const isSuper = pmUser?.isSuperAdmin === true;
+    const allAllowed = pmUser?.kpiAllDepartments === true;
+    if (pmUser && !isSuper && !allAllowed) {
+      const allowedNames = Array.isArray(pmUser?.kpiVisibleDepartments)
+        ? pmUser.kpiVisibleDepartments.map((d) => d?.name_ru || d?.name || "").filter(Boolean)
         : [];
       const allowedSet = new Set(allowedNames);
       return merged
@@ -664,7 +665,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         .sort((a, b) => String(a).localeCompare(String(b), "ru"));
     }
     return merged.sort((a, b) => String(a).localeCompare(String(b), "ru"));
-  }, [kpiItems, pmDepartments, user]);
+  }, [kpiItems, pmDepartments, pmUser]);
 
   useEffect(() => {
     if (!user || !allDepartments || allDepartments.length === 0) { setCalcDepartment(""); return; }
