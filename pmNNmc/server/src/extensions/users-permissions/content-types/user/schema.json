@@ -116,6 +116,15 @@
     "isSuperAdmin": {
       "type": "boolean",
       "default": false
+    },
+    "kpiAllDepartments": {
+      "type": "boolean",
+      "default": false
+    },
+    "kpiVisibleDepartments": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::department.department"
     }
   }
 }

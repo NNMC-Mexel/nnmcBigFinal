@@ -648,8 +648,23 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     // Merge departments from KPI employees and from server-pm
     const kpiDepts = kpiItems.map((x) => x.department || "").filter(Boolean);
     const pmDepts = pmDepartments.map((d) => d.name_ru || d.key || "").filter(Boolean);
-    return Array.from(new Set([...kpiDepts, ...pmDepts])).sort((a, b) => String(a).localeCompare(String(b), "ru"));
-  }, [kpiItems, pmDepartments]);
+    const merged = Array.from(new Set([...kpiDepts, ...pmDepts]));
+
+    // Access control: SuperAdmin or kpiAllDepartments → full list.
+    // Otherwise filter by user's kpiVisibleDepartments (by name_ru).
+    const isSuper = user?.isSuperAdmin === true;
+    const allAllowed = user?.kpiAllDepartments === true;
+    if (!isSuper && !allAllowed) {
+      const allowedNames = Array.isArray(user?.kpiVisibleDepartments)
+        ? user.kpiVisibleDepartments.map((d) => d?.name_ru || d?.name || "").filter(Boolean)
+        : [];
+      const allowedSet = new Set(allowedNames);
+      return merged
+        .filter((name) => allowedSet.has(name))
+        .sort((a, b) => String(a).localeCompare(String(b), "ru"));
+    }
+    return merged.sort((a, b) => String(a).localeCompare(String(b), "ru"));
+  }, [kpiItems, pmDepartments, user]);
 
   useEffect(() => {
     if (!user || !allDepartments || allDepartments.length === 0) { setCalcDepartment(""); return; }

@@ -103,6 +103,8 @@ export default function AdminPanelPage() {
     generatePasswordAuto: true,
     createInKeycloak: true,
     isSuperAdmin: false,
+    kpiAllDepartments: false,
+    kpiVisibleDepartments: [] as number[],
   });
 
   // Department form
@@ -179,6 +181,7 @@ export default function AdminPanelPage() {
     setUserForm({
       email: '', username: '', firstName: '', lastName: '', password: '',
       department: null, blocked: false, generatePasswordAuto: true, createInKeycloak: true, isSuperAdmin: false,
+      kpiAllDepartments: false, kpiVisibleDepartments: [],
     });
   };
 
@@ -232,6 +235,8 @@ export default function AdminPanelPage() {
         department: userForm.department,
         blocked: userForm.blocked,
         isSuperAdmin: userForm.isSuperAdmin,
+        kpiAllDepartments: userForm.kpiAllDepartments,
+        kpiVisibleDepartments: userForm.kpiVisibleDepartments,
       });
       setShowEditUserModal(false);
       setSelectedUser(null);
@@ -291,6 +296,10 @@ export default function AdminPanelPage() {
       generatePasswordAuto: true,
       createInKeycloak: true,
       isSuperAdmin: user.isSuperAdmin === true,
+      kpiAllDepartments: (user as any).kpiAllDepartments === true,
+      kpiVisibleDepartments: Array.isArray((user as any).kpiVisibleDepartments)
+        ? ((user as any).kpiVisibleDepartments as Array<{ id: number }>).map((d) => d.id)
+        : [],
     });
     setShowEditUserModal(true);
   };
@@ -850,6 +859,42 @@ export default function AdminPanelPage() {
             <input type="checkbox" checked={userForm.blocked} onChange={(e) => setUserForm({ ...userForm, blocked: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500" />
             <span className="text-sm text-slate-700">Заблокировать аккаунт</span>
           </label>
+
+          <div className="border-t border-slate-200 pt-4">
+            <div className="text-sm font-semibold text-slate-700 mb-2">Доступ к отделам KPI</div>
+            <label className="flex items-center gap-2 cursor-pointer mb-2">
+              <input
+                type="checkbox"
+                checked={userForm.kpiAllDepartments}
+                onChange={(e) => setUserForm({ ...userForm, kpiAllDepartments: e.target.checked })}
+                className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm text-slate-700">Все отделы</span>
+            </label>
+            {!userForm.kpiAllDepartments && (
+              <div className="max-h-48 overflow-y-auto border border-slate-200 rounded p-2 space-y-1">
+                {departments.map((d) => {
+                  const checked = userForm.kpiVisibleDepartments.includes(d.id);
+                  return (
+                    <label key={d.id} className="flex items-center gap-2 cursor-pointer text-sm">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          const next = e.target.checked
+                            ? [...userForm.kpiVisibleDepartments, d.id]
+                            : userForm.kpiVisibleDepartments.filter((x) => x !== d.id);
+                          setUserForm({ ...userForm, kpiVisibleDepartments: next });
+                        }}
+                        className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <span>{d.name_ru}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="secondary" onClick={() => { setShowEditUserModal(false); setSelectedUser(null); }}>Отмена</Button>
