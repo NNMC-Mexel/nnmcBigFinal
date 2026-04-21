@@ -657,7 +657,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     const allAllowed = pmUser?.kpiAllDepartments === true;
     if (pmUser && !isSuper && !allAllowed) {
       const allowedNames = Array.isArray(pmUser?.kpiVisibleDepartments)
-        ? pmUser.kpiVisibleDepartments.map((d) => d?.name_ru || d?.name || "").filter(Boolean)
+        ? pmUser.kpiVisibleDepartments.map((d) => (typeof d === "string" ? d : d?.name_ru || d?.name || "")).filter(Boolean)
         : [];
       const allowedSet = new Set(allowedNames);
       return merged

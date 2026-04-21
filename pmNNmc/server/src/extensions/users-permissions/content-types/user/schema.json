@@ -122,9 +122,8 @@
       "default": false
     },
     "kpiVisibleDepartments": {
-      "type": "relation",
-      "relation": "manyToMany",
-      "target": "api::department.department"
+      "type": "json",
+      "default": []
     }
   }
 }

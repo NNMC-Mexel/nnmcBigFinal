@@ -104,7 +104,7 @@ export default function AdminPanelPage() {
     createInKeycloak: true,
     isSuperAdmin: false,
     kpiAllDepartments: false,
-    kpiVisibleDepartments: [] as number[],
+    kpiVisibleDepartments: [] as string[],
   });
 
   // Department form
@@ -115,11 +115,34 @@ export default function AdminPanelPage() {
     description: '',
   });
 
+  // KPI departments (from server-kpi — different set than pm departments)
+  const [kpiDepartments, setKpiDepartments] = useState<string[]>([]);
+
   useEffect(() => {
     loadDepartments();
     loadUsers();
     loadDeletedProjects();
+    loadKpiDepartments();
   }, []);
+
+  const loadKpiDepartments = async () => {
+    try {
+      const base = `${window.location.protocol}//${window.location.hostname}:12011/api`;
+      const token = localStorage.getItem('jwt');
+      const res = await fetch(`${base}/kpi-list`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      const items: any[] = Array.isArray(json?.items) ? json.items : Array.isArray(json) ? json : [];
+      const names = Array.from(
+        new Set(items.map((x) => String(x?.department || '').trim()).filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b, 'ru'));
+      setKpiDepartments(names);
+    } catch {
+      /* ignore */
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => loadUsers(), 300);
@@ -298,7 +321,7 @@ export default function AdminPanelPage() {
       isSuperAdmin: user.isSuperAdmin === true,
       kpiAllDepartments: (user as any).kpiAllDepartments === true,
       kpiVisibleDepartments: Array.isArray((user as any).kpiVisibleDepartments)
-        ? ((user as any).kpiVisibleDepartments as Array<{ id: number }>).map((d) => d.id)
+        ? ((user as any).kpiVisibleDepartments as any[]).map((d) => (typeof d === 'string' ? d : d?.name_ru || '')).filter(Boolean)
         : [],
     });
     setShowEditUserModal(true);
@@ -873,22 +896,25 @@ export default function AdminPanelPage() {
             </label>
             {!userForm.kpiAllDepartments && (
               <div className="max-h-48 overflow-y-auto border border-slate-200 rounded p-2 space-y-1">
-                {departments.map((d) => {
-                  const checked = userForm.kpiVisibleDepartments.includes(d.id);
+                {kpiDepartments.length === 0 && (
+                  <div className="text-xs text-slate-400 p-2">Список KPI отделов пуст</div>
+                )}
+                {kpiDepartments.map((name) => {
+                  const checked = userForm.kpiVisibleDepartments.includes(name);
                   return (
-                    <label key={d.id} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <label key={name} className="flex items-center gap-2 cursor-pointer text-sm">
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={(e) => {
                           const next = e.target.checked
-                            ? [...userForm.kpiVisibleDepartments, d.id]
-                            : userForm.kpiVisibleDepartments.filter((x) => x !== d.id);
+                            ? [...userForm.kpiVisibleDepartments, name]
+                            : userForm.kpiVisibleDepartments.filter((x) => x !== name);
                           setUserForm({ ...userForm, kpiVisibleDepartments: next });
                         }}
                         className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                       />
-                      <span>{d.name_ru}</span>
+                      <span>{name}</span>
                     </label>
                   );
                 })}

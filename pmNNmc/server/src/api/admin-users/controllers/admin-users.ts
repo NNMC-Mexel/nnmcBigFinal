@@ -79,7 +79,7 @@ export default {
 
       const users = await strapi.entityService.findMany('plugin::users-permissions.user', {
         filters,
-        populate: ['department', 'kpiVisibleDepartments'],
+        populate: ['department'],
         sort: { createdAt: 'desc' },
       });
 
@@ -105,7 +105,7 @@ export default {
 
     try {
       const user = await strapi.entityService.findOne('plugin::users-permissions.user', id, {
-        populate: ['department', 'kpiVisibleDepartments'],
+        populate: ['department'],
       });
 
       if (!user) {
@@ -218,13 +218,13 @@ export default {
       if (kpiAllDepartments !== undefined) updateData.kpiAllDepartments = !!kpiAllDepartments;
       if (kpiVisibleDepartments !== undefined) {
         updateData.kpiVisibleDepartments = Array.isArray(kpiVisibleDepartments)
-          ? kpiVisibleDepartments.map((d: any) => (typeof d === 'number' ? d : d?.id)).filter(Boolean)
+          ? kpiVisibleDepartments.map((s: any) => String(s || '').trim()).filter(Boolean)
           : [];
       }
 
       const user = await strapi.entityService.update('plugin::users-permissions.user', id, {
         data: updateData,
-        populate: ['department', 'kpiVisibleDepartments'],
+        populate: ['department'],
       });
 
       const { password, resetPasswordToken, confirmationToken, ...safeUser } = user;

@@ -20,7 +20,7 @@ export interface AdminUser {
   };
   isSuperAdmin?: boolean;
   kpiAllDepartments?: boolean;
-  kpiVisibleDepartments?: Array<{ id: number; name_ru?: string }>;
+  kpiVisibleDepartments?: string[];
 }
 
 export const adminUsersApi = {
@@ -62,7 +62,7 @@ export const adminUsersApi = {
     blocked?: boolean;
     isSuperAdmin?: boolean;
     kpiAllDepartments?: boolean;
-    kpiVisibleDepartments?: number[];
+    kpiVisibleDepartments?: string[];
   }): Promise<AdminUser> => {
     const response = await client.put(`/admin-users/${id}`, data);
     return response.data.data;
