@@ -116,14 +116,6 @@
     "isSuperAdmin": {
       "type": "boolean",
       "default": false
-    },
-    "kpiAllDepartments": {
-      "type": "boolean",
-      "default": false
-    },
-    "kpiVisibleDepartments": {
-      "type": "json",
-      "default": []
     }
   }
 }

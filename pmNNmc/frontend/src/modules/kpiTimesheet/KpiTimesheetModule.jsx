@@ -645,27 +645,23 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     });
 
   const allDepartments = useMemo(() => {
-    // Merge departments from KPI employees and from server-pm
     const kpiDepts = kpiItems.map((x) => x.department || "").filter(Boolean);
     const pmDepts = pmDepartments.map((d) => d.name_ru || d.key || "").filter(Boolean);
     const merged = Array.from(new Set([...kpiDepts, ...pmDepts]));
 
-    // Access control: pmUser is the server-pm user with isSuperAdmin + KPI access fields.
-    // If pmUser not loaded yet → show merged (don't block UI). SuperAdmin or kpiAllDepartments → full.
-    // Otherwise filter by pmUser.kpiVisibleDepartments (match by name_ru).
-    const isSuper = pmUser?.isSuperAdmin === true;
-    const allAllowed = pmUser?.kpiAllDepartments === true;
-    if (pmUser && !isSuper && !allAllowed) {
-      const allowedNames = Array.isArray(pmUser?.kpiVisibleDepartments)
-        ? pmUser.kpiVisibleDepartments.map((d) => (typeof d === "string" ? d : d?.name_ru || d?.name || "")).filter(Boolean)
-        : [];
-      const allowedSet = new Set(allowedNames);
+    // Access control: user (KPI user) comes with role + allowedDepartments from server-kpi.
+    // Admin role OR empty allowedDepartments → full access. Otherwise restrict.
+    const roleLower = String(user?.role || "").toLowerCase();
+    const isAdmin = roleLower.includes("admin") || pmUser?.isSuperAdmin === true;
+    const allowed = Array.isArray(user?.allowedDepartments) ? user.allowedDepartments : [];
+    if (!isAdmin && allowed.length > 0) {
+      const allowedSet = new Set(allowed.map((x) => String(x || "").trim()).filter(Boolean));
       return merged
         .filter((name) => allowedSet.has(name))
         .sort((a, b) => String(a).localeCompare(String(b), "ru"));
     }
     return merged.sort((a, b) => String(a).localeCompare(String(b), "ru"));
-  }, [kpiItems, pmDepartments, pmUser]);
+  }, [kpiItems, pmDepartments, user, pmUser]);
 
   useEffect(() => {
     if (!user || !allDepartments || allDepartments.length === 0) { setCalcDepartment(""); return; }

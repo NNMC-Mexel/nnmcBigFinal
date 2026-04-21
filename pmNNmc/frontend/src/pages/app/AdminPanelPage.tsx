@@ -104,8 +104,12 @@ export default function AdminPanelPage() {
     createInKeycloak: true,
     isSuperAdmin: false,
     kpiAllDepartments: false,
-    kpiVisibleDepartments: [] as string[],
+    kpiAllowedDepartments: [] as string[],
   });
+
+  // KPI access state for the user being edited
+  const [kpiAccessUserId, setKpiAccessUserId] = useState<number | null>(null);
+  const [kpiAccessLoading, setKpiAccessLoading] = useState(false);
 
   // Department form
   const [deptForm, setDeptForm] = useState({
@@ -128,19 +132,28 @@ export default function AdminPanelPage() {
   const loadKpiDepartments = async () => {
     try {
       const base = `${window.location.protocol}//${window.location.hostname}:12011/api`;
-      const token = localStorage.getItem('jwt');
+      const token = localStorage.getItem('kpi_token');
       const res = await fetch(`${base}/kpi-list`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) return;
-      const json = await res.json();
-      const items: any[] = Array.isArray(json?.items) ? json.items : Array.isArray(json) ? json : [];
+      if (!res.ok) {
+        console.warn('loadKpiDepartments: HTTP', res.status);
+        return;
+      }
+      const json: any = await res.json();
+      const items: any[] = Array.isArray(json)
+        ? json
+        : Array.isArray(json?.items)
+        ? json.items
+        : Array.isArray(json?.data)
+        ? json.data
+        : [];
       const names = Array.from(
-        new Set(items.map((x) => String(x?.department || '').trim()).filter(Boolean))
+        new Set(items.map((x: any) => String(x?.department || '').trim()).filter(Boolean))
       ).sort((a, b) => a.localeCompare(b, 'ru'));
       setKpiDepartments(names);
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.warn('loadKpiDepartments failed:', err);
     }
   };
 
@@ -204,8 +217,9 @@ export default function AdminPanelPage() {
     setUserForm({
       email: '', username: '', firstName: '', lastName: '', password: '',
       department: null, blocked: false, generatePasswordAuto: true, createInKeycloak: true, isSuperAdmin: false,
-      kpiAllDepartments: false, kpiVisibleDepartments: [],
+      kpiAllDepartments: false, kpiAllowedDepartments: [],
     });
+    setKpiAccessUserId(null);
   };
 
   const handleCreateUser = async () => {
@@ -258,9 +272,29 @@ export default function AdminPanelPage() {
         department: userForm.department,
         blocked: userForm.blocked,
         isSuperAdmin: userForm.isSuperAdmin,
-        kpiAllDepartments: userForm.kpiAllDepartments,
-        kpiVisibleDepartments: userForm.kpiVisibleDepartments,
       });
+
+      // Save KPI access via server-kpi department-access endpoint
+      if (kpiAccessUserId != null) {
+        const base = `${window.location.protocol}//${window.location.hostname}:12011/api`;
+        const token = localStorage.getItem('kpi_token');
+        // If "all departments" checked — send empty array (KPI treats admin-level / empty as unrestricted;
+        // but for non-admin user empty means none. We send all known KPI dept names when "all" is on.)
+        const departments = userForm.kpiAllDepartments ? kpiDepartments : userForm.kpiAllowedDepartments;
+        try {
+          await fetch(`${base}/department-access/update`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ userId: kpiAccessUserId, departments }),
+          });
+        } catch (err) {
+          console.warn('KPI access update failed:', err);
+        }
+      }
+
       setShowEditUserModal(false);
       setSelectedUser(null);
       resetUserForm();
@@ -306,7 +340,7 @@ export default function AdminPanelPage() {
     }
   };
 
-  const openEditUserModal = (user: AdminUser) => {
+  const openEditUserModal = async (user: AdminUser) => {
     setSelectedUser(user);
     setUserForm({
       email: user.email,
@@ -319,12 +353,45 @@ export default function AdminPanelPage() {
       generatePasswordAuto: true,
       createInKeycloak: true,
       isSuperAdmin: user.isSuperAdmin === true,
-      kpiAllDepartments: (user as any).kpiAllDepartments === true,
-      kpiVisibleDepartments: Array.isArray((user as any).kpiVisibleDepartments)
-        ? ((user as any).kpiVisibleDepartments as any[]).map((d) => (typeof d === 'string' ? d : d?.name_ru || '')).filter(Boolean)
-        : [],
+      kpiAllDepartments: false,
+      kpiAllowedDepartments: [],
     });
+    setKpiAccessUserId(null);
     setShowEditUserModal(true);
+
+    // Fetch KPI access for this user (match by email)
+    setKpiAccessLoading(true);
+    try {
+      const base = `${window.location.protocol}//${window.location.hostname}:12011/api`;
+      const token = localStorage.getItem('kpi_token');
+      const res = await fetch(`${base}/department-access/users`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const json: any = await res.json();
+        const items: any[] = Array.isArray(json?.items) ? json.items : [];
+        const match = items.find(
+          (u) =>
+            String(u.email || '').toLowerCase() === String(user.email || '').toLowerCase() ||
+            String(u.username || '').toLowerCase() === String(user.username || '').toLowerCase()
+        );
+        if (match) {
+          const allowed: string[] = Array.isArray(match.allowedDepartments) ? match.allowedDepartments : [];
+          setKpiAccessUserId(match.id);
+          // "all departments" = list covers all known KPI depts
+          const allOn = kpiDepartments.length > 0 && kpiDepartments.every((d) => allowed.includes(d));
+          setUserForm((prev) => ({
+            ...prev,
+            kpiAllDepartments: allOn,
+            kpiAllowedDepartments: allOn ? [] : allowed,
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('loadKpiAccess failed:', err);
+    } finally {
+      setKpiAccessLoading(false);
+    }
   };
 
   // ─── Department CRUD ────────────────────────────────────
@@ -885,9 +952,18 @@ export default function AdminPanelPage() {
 
           <div className="border-t border-slate-200 pt-4">
             <div className="text-sm font-semibold text-slate-700 mb-2">Доступ к отделам KPI</div>
+            {kpiAccessLoading && (
+              <div className="text-xs text-slate-400 mb-2">Загрузка…</div>
+            )}
+            {!kpiAccessLoading && kpiAccessUserId == null && (
+              <div className="text-xs text-amber-600 mb-2">
+                Пользователь не найден в server-kpi (проверьте синхронизацию или email).
+              </div>
+            )}
             <label className="flex items-center gap-2 cursor-pointer mb-2">
               <input
                 type="checkbox"
+                disabled={kpiAccessUserId == null}
                 checked={userForm.kpiAllDepartments}
                 onChange={(e) => setUserForm({ ...userForm, kpiAllDepartments: e.target.checked })}
                 className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
@@ -900,17 +976,18 @@ export default function AdminPanelPage() {
                   <div className="text-xs text-slate-400 p-2">Список KPI отделов пуст</div>
                 )}
                 {kpiDepartments.map((name) => {
-                  const checked = userForm.kpiVisibleDepartments.includes(name);
+                  const checked = userForm.kpiAllowedDepartments.includes(name);
                   return (
                     <label key={name} className="flex items-center gap-2 cursor-pointer text-sm">
                       <input
                         type="checkbox"
+                        disabled={kpiAccessUserId == null}
                         checked={checked}
                         onChange={(e) => {
                           const next = e.target.checked
-                            ? [...userForm.kpiVisibleDepartments, name]
-                            : userForm.kpiVisibleDepartments.filter((x) => x !== name);
-                          setUserForm({ ...userForm, kpiVisibleDepartments: next });
+                            ? [...userForm.kpiAllowedDepartments, name]
+                            : userForm.kpiAllowedDepartments.filter((x) => x !== name);
+                          setUserForm({ ...userForm, kpiAllowedDepartments: next });
                         }}
                         className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                       />

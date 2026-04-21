@@ -204,7 +204,6 @@ export default {
     const { id } = ctx.params;
     const {
       firstName, lastName, department, blocked, isSuperAdmin,
-      kpiAllDepartments, kpiVisibleDepartments,
     } = ctx.request.body as any;
 
     try {
@@ -215,12 +214,6 @@ export default {
       if (department !== undefined) updateData.department = department;
       if (blocked !== undefined) updateData.blocked = blocked;
       if (isSuperAdmin !== undefined) updateData.isSuperAdmin = isSuperAdmin;
-      if (kpiAllDepartments !== undefined) updateData.kpiAllDepartments = !!kpiAllDepartments;
-      if (kpiVisibleDepartments !== undefined) {
-        updateData.kpiVisibleDepartments = Array.isArray(kpiVisibleDepartments)
-          ? kpiVisibleDepartments.map((s: any) => String(s || '').trim()).filter(Boolean)
-          : [];
-      }
 
       const user = await strapi.entityService.update('plugin::users-permissions.user', id, {
         data: updateData,
