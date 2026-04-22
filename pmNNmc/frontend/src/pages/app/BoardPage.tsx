@@ -45,16 +45,11 @@ export default function BoardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const paramsKey = searchParams.toString();
   const isSyncingFromUrl = useRef(false);
-  const { departmentKey, userDepartment, isAdmin, canDragProjects, canEditProject, canDeleteProject } = useUserRole();
+  const { departmentKey, userDepartment, isAdmin, canViewBoard, canEditProject, canDeleteProject } = useUserRole();
   const { user } = useAuthStore();
   const canDragThisProject = (project: Project | null | undefined): boolean => {
     if (!project) return false;
-    if (canDragProjects) return true;
-    if (!user) return false;
-    if ((project as any).owner?.id === user.id) return true;
-    const managers = (project as any).managers;
-    if (Array.isArray(managers) && managers.some((m: any) => m?.id === user.id)) return true;
-    return false;
+    return Boolean(user) && canViewBoard;
   };
   const {
     projects,
