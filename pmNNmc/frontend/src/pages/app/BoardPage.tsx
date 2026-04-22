@@ -26,7 +26,7 @@ import {
   Archive,
 } from 'lucide-react';
 import { useProjectStore, getProjectStage } from '../../store/projectStore';
-import { useUserRole } from '../../store/authStore';
+import { useUserRole, useAuthStore } from '../../store/authStore';
 import { projectsApi } from '../../api/projects';
 import type { Project, BoardStage } from '../../types';
 import Card from '../../components/ui/Card';
@@ -46,6 +46,16 @@ export default function BoardPage() {
   const paramsKey = searchParams.toString();
   const isSyncingFromUrl = useRef(false);
   const { departmentKey, userDepartment, isAdmin, canDragProjects, canEditProject, canDeleteProject } = useUserRole();
+  const { user } = useAuthStore();
+  const canDragThisProject = (project: Project | null | undefined): boolean => {
+    if (!project) return false;
+    if (canDragProjects) return true;
+    if (!user) return false;
+    if ((project as any).owner?.id === user.id) return true;
+    const managers = (project as any).managers;
+    if (Array.isArray(managers) && managers.some((m: any) => m?.id === user.id)) return true;
+    return false;
+  };
   const {
     projects,
     stages,
@@ -299,7 +309,6 @@ export default function BoardPage() {
     const { active, over } = event;
     setActiveProject(null);
 
-    if (!canDragProjects) return;
     if (!over) return;
 
     const projectDocumentId = active.id as string;
@@ -307,6 +316,7 @@ export default function BoardPage() {
 
     const project = filteredProjects.find((p) => p.documentId === projectDocumentId);
     if (!project) return;
+    if (!canDragThisProject(project)) return;
 
     if (targetColumnKey === 'ARCHIVE') {
       if (project.status === 'ARCHIVED') return;
@@ -509,7 +519,7 @@ export default function BoardPage() {
                 iconBgClassName={column.iconBgClassName}
                 projects={getProjectsForColumn(column.key)}
                 onProjectClick={(documentId) => navigate(`/app/projects/${documentId}`)}
-                canDrag={canDragProjects}
+                canDragProject={canDragThisProject}
                 canDeleteProject={canDeleteProject}
                 onDeleteProject={handleDeleteProject}
                 onShowDescription={column.isArchive ? undefined : setDescriptionKey}

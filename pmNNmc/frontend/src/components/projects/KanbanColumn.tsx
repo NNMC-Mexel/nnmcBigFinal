@@ -14,7 +14,7 @@ interface KanbanColumnProps {
   iconBgClassName?: string;
   projects: Project[];
   onProjectClick: (documentId: string) => void;
-  canDrag: boolean;
+  canDragProject: (project: Project) => boolean;
   canDeleteProject?: boolean;
   onDeleteProject?: (project: Project) => void;
   onShowDescription?: (columnKey: string) => void;
@@ -30,7 +30,7 @@ export default function KanbanColumn({
   iconBgClassName,
   projects,
   onProjectClick,
-  canDrag,
+  canDragProject,
   canDeleteProject,
   onDeleteProject,
   onShowDescription,
@@ -76,7 +76,7 @@ export default function KanbanColumn({
               key={project.id}
               project={project}
               onProjectClick={onProjectClick}
-              canDrag={canDrag}
+              canDrag={canDragProject(project)}
               canDeleteProject={canDeleteProject}
               onDeleteProject={onDeleteProject}
             />
