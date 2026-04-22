@@ -56,6 +56,14 @@
         auth: { scope: [] },
       },
     },
+    {
+      method: 'POST',
+      path: '/kpi-calculator/recalculate',
+      handler: 'kpi-calculator.recalculate',
+      config: {
+        auth: { scope: [] },
+      },
+    },
   ],
 };
 

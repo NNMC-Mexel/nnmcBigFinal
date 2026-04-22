@@ -370,6 +370,48 @@ function normalizeDepartment(value: any): string {
     .replace(/[\s\-–—_]+/g, '');
 }
 
+function isNumericValue(value: any): boolean {
+  if (value === null || value === undefined) return false;
+  const s = String(value).trim().replace(',', '.');
+  if (!s) return false;
+  const num = parseFloat(s);
+  return !isNaN(num);
+}
+
+function aggregateDayValues(dayValues: any[]): {
+  letters_weekday: number;
+  letters_sat: number;
+  letters_sun: number;
+  letters_holiday: number;
+  numbers_weekday: number;
+  numbers_sat: number;
+  numbers_sun: number;
+  numbers_holiday: number;
+} {
+  const out = {
+    letters_weekday: 0,
+    letters_sat: 0,
+    letters_sun: 0,
+    letters_holiday: 0,
+    numbers_weekday: 0,
+    numbers_sat: 0,
+    numbers_sun: 0,
+    numbers_holiday: 0,
+  };
+  for (const dv of dayValues || []) {
+    const raw = dv?.value;
+    if (raw === null || raw === undefined || String(raw).trim() === '') continue;
+    const isNum = isNumericValue(raw);
+    const dayType = String(dv?.dayType || 'weekday');
+    const bucket = isNum ? 'numbers' : 'letters';
+    const key = `${bucket}_${dayType}` as keyof typeof out;
+    if (key in out) {
+      out[key] = (out[key] as number) + 1;
+    }
+  }
+  return out;
+}
+
 async function calcCore(ctx: Context) {
   const body: any = (ctx.request as any).body || {};
   const access = await getUserAccess(ctx);
@@ -1074,6 +1116,103 @@ export default {
     } catch (error: any) {
       ctx.status = error?.status || 400;
       ctx.body = { error: error.message || 'Ошибка формирования отчёта' };
+    }
+  },
+
+  /**
+   * Recalculate KPI from edited parsedDetails (no Excel file).
+   * Body: { parsedDetails, year, month, department, nchDay, ndShift }
+   * Re-aggregates letters_x / numbers_x from dayValues, then runs calculateKPI.
+   */
+  async recalculate(ctx: Context) {
+    try {
+      const body: any = (ctx.request as any).body || {};
+      const parsedDetails: any[] = Array.isArray(body?.parsedDetails) ? body.parsedDetails : [];
+      const year = parseInt(String(body?.year || '0'), 10);
+      const month = parseInt(String(body?.month || '0'), 10);
+      const department = String(body?.department || '').trim();
+      const nchDay = parseInt(String(body?.nchDay || '0'), 10) || 0;
+      const ndShift = parseInt(String(body?.ndShift || '0'), 10) || 0;
+
+      if (!year || !month || month < 1 || month > 12) {
+        throw new Error('Некорректные значения года или месяца');
+      }
+      if (nchDay <= 0 && ndShift <= 0) {
+        throw new Error('Нужно указать Н.ч для дневных и/или Н.д для суточных');
+      }
+      if (parsedDetails.length === 0) {
+        throw new Error('Нет данных для пересчёта');
+      }
+
+      const access = await getUserAccess(ctx);
+      const allowedDepartments = access.allowedDepartments || [];
+      const normalizedAllowed = allowedDepartments.map(normalizeDepartment).filter(Boolean);
+      if (!access.isAdmin) {
+        if (normalizedAllowed.length === 0) ctx.throw(403, 'Нет доступных отделов');
+        if (!department) ctx.throw(400, 'Отдел для расчёта не указан');
+        const requestedNorm = normalizeDepartment(department);
+        if (!normalizedAllowed.includes(requestedNorm)) {
+          ctx.throw(403, 'Нет доступа к указанному отделу');
+        }
+      }
+
+      const employees = parsedDetails.map((p: any) => {
+        const agg = aggregateDayValues(p?.dayValues || []);
+        return {
+          fio: String(p?.fio || '').trim(),
+          department: p?.department || '',
+          ...agg,
+          dayValues: p?.dayValues || [],
+        };
+      });
+
+      const kpiFilters: any = {};
+      if (!access.isAdmin && allowedDepartments.length > 0) {
+        kpiFilters.department = { $in: allowedDepartments };
+      }
+      const kpiQuery: any = {
+        fields: ['id', 'fio', 'kpiSum', 'scheduleType', 'department', 'categoryCode'],
+        publicationState: 'live',
+        pagination: { pageSize: 10000 },
+      };
+      if (Object.keys(kpiFilters).length > 0) {
+        kpiQuery.filters = kpiFilters;
+      }
+      const kpiTable = await strapi.entityService.findMany('api::employee.employee', kpiQuery);
+
+      let finalKpi = kpiTable;
+      if (department) {
+        const target = normalizeDepartment(department);
+        finalKpi = (kpiTable || []).filter(
+          (item: any) => normalizeDepartment(item?.department) === target
+        );
+      }
+
+      const { results, errors } = kpiCalculator.calculateKPI(
+        employees as any,
+        finalKpi as any,
+        nchDay,
+        ndShift
+      );
+
+      const refreshedDetails = employees.map((e: any) => ({
+        fio: e.fio,
+        department: e.department,
+        letters_weekday: e.letters_weekday,
+        letters_sat: e.letters_sat,
+        letters_sun: e.letters_sun,
+        letters_holiday: e.letters_holiday,
+        numbers_weekday: e.numbers_weekday,
+        numbers_sat: e.numbers_sat,
+        numbers_sun: e.numbers_sun,
+        numbers_holiday: e.numbers_holiday,
+        dayValues: e.dayValues,
+      }));
+
+      ctx.body = { results, errors, parsedDetails: refreshedDetails };
+    } catch (error: any) {
+      ctx.status = error?.status || 400;
+      ctx.body = { error: error.message || 'Ошибка пересчёта KPI' };
     }
   },
 

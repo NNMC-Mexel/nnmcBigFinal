@@ -187,6 +187,15 @@ export async function apiCalcKpiBuhPdf(formData, opts = {}) {
   return res.blob();
 }
 
+export async function apiRecalculate(payload) {
+  const res = await fetch(`${STRAPI_BASE}/kpi-calculator/recalculate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}
+
 export async function apiGeneratePdfFromResults(payload) {
   const res = await fetch(`${STRAPI_BASE}/kpi-calculator/generate-pdf-from-results`, {
     method: "POST",
@@ -276,6 +285,15 @@ export async function apiArchiveGet(documentId) {
   });
   const data = await handleResponse(res);
   return data?.data || null;
+}
+
+export async function apiArchiveCreate(payload) {
+  const res = await fetch(`${STRAPI_BASE}/calculation-archives`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    body: JSON.stringify({ data: payload }),
+  });
+  return handleResponse(res);
 }
 
 export async function apiArchiveDelete(documentId) {

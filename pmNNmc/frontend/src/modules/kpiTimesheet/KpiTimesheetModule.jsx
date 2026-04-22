@@ -13,7 +13,7 @@
  *   onKpiLogout — callback to clear kpi_token and return to login form
  */
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import EdsSignature from "../signDoc/components/EdsSignature";
@@ -35,7 +35,9 @@ import {
   apiUpdateUserAccess,
   apiArchiveList,
   apiArchiveGet,
+  apiArchiveCreate,
   apiArchiveDelete,
+  apiRecalculate,
   apiTemplateList,
   apiTemplateCreate,
   apiTemplateUpdate,
@@ -384,6 +386,15 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   // Departments from server-pm
   const [pmDepartments, setPmDepartments] = useState([]);
 
+  // Edit mode for Результаты tab
+  const [editMode, setEditMode] = useState(false);
+  const [hasEdits, setHasEdits] = useState(false);
+  const [recalcLoading, setRecalcLoading] = useState(false);
+  const recalcTimerRef = useRef(null);
+
+  // Pre-sign confirmation modal
+  const [signPreview, setSignPreview] = useState(null); // null or { action: 'signdoc'|'eds' }
+
   const isAdmin =
     String(user?.role || "").toLowerCase().includes("admin") ||
     String(user?.login || "").toLowerCase().startsWith("admin");
@@ -509,6 +520,8 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       setYear(String(full.year || year));
       setMonth(String(full.month || month));
       setRestoredFromArchive(full);
+      setHasEdits(Boolean(full.edited));
+      setEditMode(false);
       setActiveTab("results");
       showToast("Расчёт восстановлен из архива");
     } catch (err) {
@@ -737,6 +750,8 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       setCalcResults(filteredResults);
       setCalcErrors(data.errors || []);
       setParsedDetails(data.parsedDetails || []);
+      setHasEdits(false);
+      setEditMode(false);
       const deptError = (data.errors || []).find((e) => e && (e.type === "NO_EMPLOYEES" || e.type === "NO_DEPARTMENT_COLUMN"));
       if (deptError) showToast(deptError.details || "Нет сотрудников в выбранном отделе", "error");
       else if (calcDepartment && filteredResults.length === 0) showToast(`Нету никого в отделе ${calcDepartment}`, "error");
@@ -806,18 +821,91 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     });
   };
 
-  const handleSendToSignDoc = async () => {
-    if (!calcDepartment) { showToast("Выберите отдел для расчёта", "error"); return; }
-    if (!timesheetFile && calcResults.length === 0) {
-      showToast("Выберите файлы табеля или восстановите расчёт из архива", "error");
-      return;
+  // ---- Edit mode for Результаты ----
+  const triggerLiveRecalc = (nextParsedDetails) => {
+    if (recalcTimerRef.current) clearTimeout(recalcTimerRef.current);
+    recalcTimerRef.current = setTimeout(async () => {
+      try {
+        setRecalcLoading(true);
+        const res = await apiRecalculate({
+          parsedDetails: nextParsedDetails,
+          year: parseInt(year, 10),
+          month: parseInt(month, 10),
+          department: calcDepartment,
+          nchDay: parseInt(nchDay, 10) || 0,
+          ndShift: parseInt(ndShift, 10) || 0,
+        });
+        if (Array.isArray(res?.results)) setCalcResults(res.results);
+        if (Array.isArray(res?.errors)) setCalcErrors(res.errors);
+        if (Array.isArray(res?.parsedDetails)) setParsedDetails(res.parsedDetails);
+      } catch (err) {
+        showToast(err?.message || "Ошибка пересчёта", "error");
+      } finally {
+        setRecalcLoading(false);
+      }
+    }, 500);
+  };
+
+  const handleCellChange = (empIdx, dayKey, newValue) => {
+    setParsedDetails((prev) => {
+      const next = prev.map((p, i) => {
+        if (i !== empIdx) return p;
+        const dayValues = (p.dayValues || []).map((dv) => {
+          const key = `${dv.year}-${dv.month}-${dv.day}`;
+          if (key !== dayKey) return dv;
+          const trimmed = String(newValue || "").trim();
+          const num = trimmed ? parseFloat(trimmed.replace(",", ".")) : NaN;
+          return { ...dv, value: trimmed, isNumber: !isNaN(num) };
+        });
+        return { ...p, dayValues };
+      });
+      triggerLiveRecalc(next);
+      return next;
+    });
+    setHasEdits(true);
+  };
+
+  const handleToggleEditMode = () => {
+    setEditMode((v) => !v);
+  };
+
+  const handleSaveEdited = async () => {
+    try {
+      const currentUser = user?.login || user?.email || "unknown";
+      await apiArchiveCreate({
+        year: parseInt(year, 10),
+        month: parseInt(month, 10),
+        department: calcDepartment,
+        nchDay: parseInt(nchDay, 10) || 0,
+        ndShift: parseInt(ndShift, 10) || 0,
+        calculatedBy: currentUser,
+        results: calcResults,
+        parsedDetails,
+        errors: calcErrors,
+        employeeCount: calcResults.length,
+        edited: true,
+      });
+      showToast("Изменённый расчёт сохранён в архив");
+      setEditMode(false);
+    } catch (err) {
+      showToast(err?.message || "Ошибка сохранения", "error");
     }
+  };
+
+  const buildFileNames = () => {
+    const monthName = MONTH_NAMES_RU[parseInt(month, 10)] || month;
+    const suffix = hasEdits ? "_edited" : "";
+    return {
+      fileName: `KPI_Протокол_${calcDepartment}_${monthName}_${year}${suffix}.pdf`,
+      title: `KPI Протокол ${calcDepartment} ${monthName} ${year}${hasEdits ? " (edited)" : ""}`,
+    };
+  };
+
+  const doSendToSignDoc = async () => {
     try {
       showToast("Формирование PDF для подписания…");
       const blob = await buildSignablePdfBlob();
-      const monthName = MONTH_NAMES_RU[parseInt(month, 10)] || month;
-      const fileName = `KPI_Протокол_${calcDepartment}_${monthName}_${year}.pdf`;
-      const title = `KPI Протокол ${calcDepartment} ${monthName} ${year}`;
+      const { fileName, title } = buildFileNames();
       const file = new File([blob], fileName, { type: "application/pdf" });
       navigate("/app/signdoc/documents/new", { state: { pendingFile: file, pendingTitle: title } });
     } catch (err) {
@@ -825,19 +913,11 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     }
   };
 
-  // ---- EDS signing handlers ----
-  const handleSignEds = async () => {
-    if (!calcDepartment) { showToast("Выберите отдел для расчёта", "error"); return; }
-    if (!timesheetFile && calcResults.length === 0) {
-      showToast("Выберите файлы табеля или восстановите расчёт из архива", "error");
-      return;
-    }
+  const doSignEds = async () => {
     try {
       showToast("Формирование PDF для подписания…");
       const blob = await buildSignablePdfBlob();
-      const monthName = MONTH_NAMES_RU[parseInt(month, 10)] || month;
-      const fileName = `KPI_Протокол_${calcDepartment}_${monthName}_${year}.pdf`;
-      const title = `KPI Протокол ${calcDepartment} ${monthName} ${year}`;
+      const { fileName, title } = buildFileNames();
       const file = new File([blob], fileName, { type: "application/pdf" });
       setEdsPdfFile(file);
       setEdsTitle(title);
@@ -846,6 +926,31 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     } catch (err) {
       showToast(err instanceof Error ? err.message : String(err) || "Ошибка формирования PDF", "error");
     }
+  };
+
+  const handleSendToSignDoc = () => {
+    if (!calcDepartment) { showToast("Выберите отдел для расчёта", "error"); return; }
+    if (!timesheetFile && calcResults.length === 0) {
+      showToast("Выберите файлы табеля или восстановите расчёт из архива", "error");
+      return;
+    }
+    setSignPreview({ action: "signdoc" });
+  };
+
+  const handleSignEds = () => {
+    if (!calcDepartment) { showToast("Выберите отдел для расчёта", "error"); return; }
+    if (!timesheetFile && calcResults.length === 0) {
+      showToast("Выберите файлы табеля или восстановите расчёт из архива", "error");
+      return;
+    }
+    setSignPreview({ action: "eds" });
+  };
+
+  const handleConfirmSign = async () => {
+    const action = signPreview?.action;
+    setSignPreview(null);
+    if (action === "signdoc") await doSendToSignDoc();
+    else if (action === "eds") await doSignEds();
   };
 
   const handleEdsComplete = (signedPdfBlob, cmsBlob, meta) => {
@@ -1224,6 +1329,34 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
               </div>
             ) : (
               <>
+                {/* Edit controls */}
+                {parsedDetails.length > 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                    <button
+                      className={editMode ? "btn btn-primary" : "btn btn-outline"}
+                      onClick={handleToggleEditMode}
+                    >
+                      {editMode ? "✓ Готово" : "✎ Редактировать"}
+                    </button>
+                    {editMode && (
+                      <span style={{ fontSize: 12, color: "#64748b" }}>
+                        Кликните по ячейке дня, чтобы изменить значение (буква или число)
+                      </span>
+                    )}
+                    {recalcLoading && (
+                      <span style={{ fontSize: 12, color: "#3b82f6" }}>Пересчёт…</span>
+                    )}
+                    {hasEdits && (
+                      <>
+                        <span style={{ fontSize: 12, color: "#b45309", fontWeight: 600 }}>● Есть несохранённые изменения</span>
+                        <button className="btn btn-primary" onClick={handleSaveEdited} style={{ marginLeft: "auto" }}>
+                          Сохранить в архив
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {/* Таблица с днями */}
                 {parsedDetails.length > 0 && (
                   <div className="results-block" style={{ marginBottom: "24px" }}>
@@ -1310,13 +1443,37 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                                 <td style={{ ...stickyBase, left: 0, background: rowBg, textAlign: "center", fontWeight: "600", fontSize: "11px", padding: "5px 3px" }}>{idx + 1}</td>
                                 <td style={{ ...stickyBase, left: "32px", background: rowBg, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "220px", padding: "5px 6px", fontWeight: "500", fontSize: "12px" }} title={p.fio}>{p.fio}</td>
                                 {dayColsMeta.map((dc, i) => {
-                                  const dv = dvMap[`${dc.year}-${dc.month}-${dc.day}`];
+                                  const dayKey = `${dc.year}-${dc.month}-${dc.day}`;
+                                  const dv = dvMap[dayKey];
                                   const isNewMonth = i === 0 || dc.month !== dayColsMeta[i - 1].month;
                                   const style = cellStyle(dv, dc);
                                   if (isNewMonth) style.borderLeft = "2px solid #94a3b8";
                                   else style.borderLeft = "1px solid #e2e8f0";
-                                  // If weekend and no value, keep weekend bg
                                   if (dc.isWeekend && (!dv || !dv.value)) style.background = weekendCellBg;
+                                  if (editMode) {
+                                    return (
+                                      <td key={i} style={{ ...style, padding: 0 }}
+                                          title={`${dc.day}.${String(dc.month).padStart(2,"0")} ${dc.dowName}`}>
+                                        <input
+                                          type="text"
+                                          value={dv?.value || ""}
+                                          onChange={(e) => handleCellChange(idx, dayKey, e.target.value)}
+                                          style={{
+                                            width: "100%",
+                                            minWidth: 28,
+                                            border: "1px dashed #3b82f6",
+                                            background: "transparent",
+                                            textAlign: "center",
+                                            fontWeight: style.fontWeight,
+                                            color: style.color,
+                                            padding: "4px 2px",
+                                            fontSize: 12,
+                                            outline: "none",
+                                          }}
+                                        />
+                                      </td>
+                                    );
+                                  }
                                   return (
                                     <td key={i} style={style}
                                         title={`${dc.day}.${String(dc.month).padStart(2,"0")} ${dc.dowName}${dv?.value ? " — " + dv.value : ""}`}>
@@ -1707,7 +1864,26 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                           </td>
                           <td>{item.calculatedBy || "—"}</td>
                           <td>{monthName} {item.year}</td>
-                          <td>{item.department || "—"}</td>
+                          <td>
+                            {item.department || "—"}
+                            {item.edited && (
+                              <span
+                                style={{
+                                  marginLeft: 8,
+                                  padding: "2px 6px",
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  color: "#92400e",
+                                  background: "#fef3c7",
+                                  borderRadius: 4,
+                                  border: "1px solid #fde68a",
+                                }}
+                                title="Этот расчёт был изменён вручную"
+                              >
+                                ✎ изменён
+                              </span>
+                            )}
+                          </td>
                           <td style={{ textAlign: "center" }}>{item.employeeCount || "—"}</td>
                           <td style={{ textAlign: "center" }}>{item.nchDay || 0} / {item.ndShift || 0}</td>
                           <td>
@@ -1771,6 +1947,62 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       <DeleteConfirmModal employee={deleteModalEmployee} onCancel={() => setDeleteModalEmployee(null)} onConfirm={handleDeleteConfirm} />
       <EmployeeFormModal initial={formInitial} mode={formMode} onCancel={() => { setFormMode(null); setFormInitial(null); }} onSave={handleFormSave} />
       <AccessModal user={accessModalUser} departments={allDepartments} onCancel={() => setAccessModalUser(null)} onSave={handleAccessSave} />
+
+      {/* Pre-sign confirmation modal */}
+      {signPreview && (
+        <div className="modal-overlay" onClick={() => setSignPreview(null)}>
+          <div className="modal modal-wide" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 1100, maxHeight: "90vh", overflow: "auto" }}>
+            <h3 className="modal-title">
+              {signPreview.action === "eds" ? "Проверьте данные перед подписанием ЭЦП" : "Проверьте данные перед отправкой на подпись"}
+            </h3>
+            <p style={{ color: "#b45309", fontWeight: 600, margin: "6px 0 14px" }}>
+              Проверьте пожалуйста данные. После нажатия «Подтверждаю» документ будет сформирован.
+            </p>
+            {hasEdits && (
+              <div style={{ background: "#fef3c7", border: "1px solid #fbbf24", borderRadius: 6, padding: "8px 12px", marginBottom: 12, fontSize: 13 }}>
+                В данных были изменения. Файл будет сохранён с пометкой <b>_edited</b>.
+              </div>
+            )}
+            <div style={{ maxHeight: "50vh", overflow: "auto", border: "1px solid #e2e8f0", borderRadius: 6, marginBottom: 16 }}>
+              <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
+                <thead style={{ background: "#f1f5f9", position: "sticky", top: 0 }}>
+                  <tr>
+                    <th style={{ padding: 6, textAlign: "left" }}>#</th>
+                    <th style={{ padding: 6, textAlign: "left" }}>ФИО</th>
+                    <th style={{ padding: 6, textAlign: "left" }}>Отдел</th>
+                    <th style={{ padding: 6, textAlign: "right" }}>Норма</th>
+                    <th style={{ padding: 6, textAlign: "right" }}>Факт</th>
+                    <th style={{ padding: 6, textAlign: "right" }}>%</th>
+                    <th style={{ padding: 6, textAlign: "right" }}>KPI сумм</th>
+                    <th style={{ padding: 6, textAlign: "right" }}>KPI итог</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {calcResults.map((r, i) => (
+                    <tr key={i} style={{ borderTop: "1px solid #e2e8f0" }}>
+                      <td style={{ padding: 6 }}>{i + 1}</td>
+                      <td style={{ padding: 6 }}>{r.fio}</td>
+                      <td style={{ padding: 6 }}>{r.department}</td>
+                      <td style={{ padding: 6, textAlign: "right" }}>{r.daysAssigned}</td>
+                      <td style={{ padding: 6, textAlign: "right" }}>{r.daysWorked}</td>
+                      <td style={{ padding: 6, textAlign: "right" }}>{r.workPercent}%</td>
+                      <td style={{ padding: 6, textAlign: "right" }}>{r.kpiSum}</td>
+                      <td style={{ padding: 6, textAlign: "right", fontWeight: 700, color: "#7c3aed" }}>{r.kpiFinal}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
+              Если нужно что-то изменить — нажмите «Назад» и воспользуйтесь кнопкой «Редактировать» в таблице результатов.
+            </p>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setSignPreview(null)}>Назад</button>
+              <button className="btn btn-primary" onClick={handleConfirmSign}>Подтверждаю</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* EDS signing modal */}
       {showEdsModal && (
