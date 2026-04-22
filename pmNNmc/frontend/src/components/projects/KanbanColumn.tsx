@@ -44,7 +44,7 @@ export default function KanbanColumn({
     <div
       ref={setNodeRef}
       className={`w-72 flex-shrink-0 flex flex-col rounded-xl transition-colors ${
-        isOver ? 'bg-primary-50' : 'bg-slate-100'
+        isOver ? 'bg-emerald-200' : 'bg-emerald-100'
       }`}
     >
       {/* Column Header */}
@@ -52,13 +52,13 @@ export default function KanbanColumn({
         <div className="flex items-center gap-2">
           {icon && (
             <span
-              className={`inline-flex h-7 w-7 items-center justify-center rounded-md border ${iconBgClassName ?? 'border-slate-200 bg-white'} ${iconClassName ?? 'text-slate-500'}`}
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-300 bg-white text-emerald-700"
             >
               {icon}
             </span>
           )}
-          <h3 className="font-semibold text-slate-700">{stageName}</h3>
-          <span className="ml-auto px-2 py-0.5 bg-white rounded-full text-xs font-medium text-slate-500">
+          <h3 className="font-semibold text-emerald-900">{stageName}</h3>
+          <span className="ml-auto px-2 py-0.5 bg-white rounded-full text-xs font-medium text-emerald-700">
             {projects.length}
           </span>
         </div>
