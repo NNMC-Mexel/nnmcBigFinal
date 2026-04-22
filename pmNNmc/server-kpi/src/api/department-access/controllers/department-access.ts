@@ -17,6 +17,55 @@ function normalizeDepartments(input: any): string[] {
   return [];
 }
 
+let lastUserSyncAt = 0;
+const USER_SYNC_TTL_MS = 30_000;
+
+async function syncUsersFromPmOnDemand() {
+  if (Date.now() - lastUserSyncAt < USER_SYNC_TTL_MS) return;
+  lastUserSyncAt = Date.now();
+  const pmUrl = process.env.SERVER_PM_URL;
+  if (!pmUrl) return;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch(
+      `${pmUrl}/api/users?pagination[pageSize]=500`,
+      { signal: ctrl.signal }
+    ).finally(() => clearTimeout(t));
+    if (!res.ok) return;
+    const items: any[] = (await res.json()) as any[];
+    if (!Array.isArray(items) || items.length === 0) return;
+    const authRole = await strapi.db
+      .query('plugin::users-permissions.role')
+      .findOne({ where: { type: 'authenticated' } });
+    if (!authRole) return;
+    for (const pmUser of items) {
+      const email = String(pmUser?.email || '').toLowerCase().trim();
+      if (!email) continue;
+      const username = String(pmUser?.username || email).trim();
+      const existing = await strapi.db
+        .query('plugin::users-permissions.user')
+        .findOne({ where: { email } });
+      if (!existing) {
+        try {
+          await (strapi.entityService as any).create('plugin::users-permissions.user', {
+            data: {
+              username,
+              email,
+              provider: 'keycloak',
+              password: `kc-${Math.random().toString(36).slice(2)}-${Date.now()}`,
+              confirmed: true,
+              blocked: false,
+              role: authRole.id,
+              allowedDepartments: [],
+            },
+          });
+        } catch {}
+      }
+    }
+  } catch {}
+}
+
 export default {
   // GET /api/department-access/users
   async listUsers(ctx: Context) {
@@ -24,6 +73,8 @@ export default {
     if (!access.isAdmin) {
       ctx.throw(403, 'Нет доступа');
     }
+
+    await syncUsersFromPmOnDemand();
 
     const users = await strapi.entityService.findMany('plugin::users-permissions.user', {
       populate: ['role'],
