@@ -36,6 +36,8 @@ export default factories.createCoreController('api::project.project', ({ strapi 
   // Custom create — bypass REST API sanitizer that rejects relation fields
   async create(ctx) {
     const data = ctx.request.body?.data || {};
+    const currentUserId = ctx.state.user?.id || null;
+    const ownerId = data.owner || currentUserId;
 
     const entry = await (strapi.entityService as any).create('api::project.project', {
       data: {
@@ -46,7 +48,7 @@ export default factories.createCoreController('api::project.project', ({ strapi 
         priorityLight: data.priorityLight || 'GREEN',
         status: data.status || 'ACTIVE',
         department: data.department || null,
-        owner: data.owner || null,
+        owner: ownerId,
         managers: data.managers || [],
         supportingSpecialists: data.supportingSpecialists || [],
         responsibleUsers: data.responsibleUsers || [],
