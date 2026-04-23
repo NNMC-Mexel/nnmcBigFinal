@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import type { Readable } from 'stream';
 
 export default (_config: unknown, { strapi }: { strapi: any }) => {
@@ -53,6 +53,19 @@ export default (_config: unknown, { strapi }: { strapi: any }) => {
       ctx.body = result.Body as Readable;
     } catch (err: any) {
       if (err?.name === 'NoSuchKey' || err?.$metadata?.httpStatusCode === 404) {
+        try {
+          const list = await getClient().send(
+            new ListObjectsV2Command({ Bucket: bucket, MaxKeys: 20 })
+          );
+          const keys = (list.Contents || []).map((o) => o.Key).join(', ');
+          strapi.log.warn(
+            `MinIO 404: requested key="${key}" not found in bucket="${bucket}". Available keys (max 20): [${keys}]`
+          );
+        } catch (listErr: any) {
+          strapi.log.warn(
+            `MinIO 404: requested key="${key}" not found in bucket="${bucket}". List failed: ${listErr?.message || listErr}`
+          );
+        }
         ctx.status = 404;
         return;
       }
