@@ -65,7 +65,7 @@ const isUnauthorizedError = (value) => {
   );
 };
 
-/** Calculate working days for the 25-25 period (25 prevMonth .. 25 currentMonth) */
+/** Calculate working days for the 26-25 period (26 prevMonth .. 25 currentMonth) */
 const calcWorkdaysForPeriod = (year, month, allHolidays) => {
   const y = parseInt(year, 10);
   const m = parseInt(month, 10);
@@ -88,9 +88,9 @@ const calcWorkdaysForPeriod = (year, month, allHolidays) => {
   });
 
   let weekdays = 0;
-  // Days 25..end of prev month
+  // Days 26..end of prev month
   const lastDayPrev = new Date(prevYear, prevMonth, 0).getDate();
-  for (let d = 25; d <= lastDayPrev; d++) {
+  for (let d = 26; d <= lastDayPrev; d++) {
     const date = new Date(prevYear, prevMonth - 1, d);
     const dow = date.getDay(); // 0=Sun, 6=Sat
     const dateStr = buildHolidayDate(prevYear, prevMonth, d);
@@ -399,7 +399,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     String(user?.role || "").toLowerCase().includes("admin") ||
     String(user?.login || "").toLowerCase().startsWith("admin");
 
-  // Auto-calculate working days for 25-25 period
+  // Auto-calculate working days for 26-25 period
   const autoWorkdays = useMemo(() => calcWorkdaysForPeriod(year, month, holidays), [year, month, holidays]);
   const nchDay = nchDayOverride !== null ? String(nchDayOverride) : String(autoWorkdays.day);
   const ndShift = ndShiftOverride !== null ? String(ndShiftOverride) : String(autoWorkdays.shift);
@@ -1090,13 +1090,13 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         {activeTab === "calc" && (
           <section className="card">
             <h2>Расчёт KPI по табелю</h2>
-            <p className="card-subtitle">Загрузите два табеля (прошлый и текущий месяц). Период расчёта: с 25 {prevMonthInfo.name} по 25 {currMonthName}.</p>
+            <p className="card-subtitle">Загрузите два табеля (прошлый и текущий месяц). Период расчёта: с 26 {prevMonthInfo.name} по 25 {currMonthName}.</p>
 
             <div className="form-grid">
               <div className="form-group file-field" style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
                 {/* Prev month file */}
                 <div style={{ flex: "1 1 280px" }}>
-                  <label>Табель за {prevMonthInfo.name} {prevMonthInfo.year} (дни 25-конец):</label>
+                  <label>Табель за {prevMonthInfo.name} {prevMonthInfo.year} (дни 26-конец):</label>
                   <div
                     className={`file-drop${isDragActivePrev ? " file-drop-active" : ""}`}
                     onDragOver={(e) => { e.preventDefault(); setIsDragActivePrev(true); }}
@@ -1135,7 +1135,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
               </div>
 
               <div className="form-group workdays-auto-field">
-                <label>Рабочие дни (период 25-25):</label>
+                <label>Рабочие дни (период 26-25):</label>
                 <div className="workdays-auto-card" style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                   <div className="workdays-auto-item">
                     <span className="workdays-auto-name">Дневные (Н.ч)</span>
@@ -1149,7 +1149,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                       value={ndShift} onChange={(e) => setNdShiftOverride(parseInt(e.target.value, 10) || 0)} />
                   </div>
                 </div>
-                <div className="workdays-auto-note">Рассчитано автоматически для периода 25 {prevMonthInfo.name} — 25 {currMonthName}. Можно скорректировать вручную.</div>
+                <div className="workdays-auto-note">Рассчитано автоматически для периода 26 {prevMonthInfo.name} — 25 {currMonthName}. Можно скорректировать вручную.</div>
               </div>
 
               <div className="form-group">
@@ -1256,14 +1256,14 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
 
         {/* =================== Результаты =================== */}
         {activeTab === "results" && (() => {
-          // Build day columns: 25..lastDay of prevMonth, then 1..25 of currentMonth
+          // Build day columns: 26..lastDay of prevMonth, then 1..25 of currentMonth
           const pm = parseInt(month, 10);
           const py = parseInt(year, 10);
           let prevM = pm - 1, prevY = py;
           if (prevM < 1) { prevM = 12; prevY--; }
           const lastDayPrev = new Date(prevY, prevM, 0).getDate();
           const dayCols = [];
-          for (let d = 25; d <= lastDayPrev; d++) dayCols.push({ day: d, month: prevM, year: prevY });
+          for (let d = 26; d <= lastDayPrev; d++) dayCols.push({ day: d, month: prevM, year: prevY });
           for (let d = 1; d <= 25; d++) dayCols.push({ day: d, month: pm, year: py });
 
           // Weekday info for each column
@@ -1315,7 +1315,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
               </div>
             )}
             <p className="card-subtitle">
-              Период: 25 {prevMonthInfo.name} — 25 {currMonthName} {year}.
+              Период: 26 {prevMonthInfo.name} — 25 {currMonthName} {year}.
               <span style={{ marginLeft: "8px", fontSize: "11px" }}>
                 <span style={{ display: "inline-block", width: 12, height: 12, background: "#f0fdf4", border: "1px solid #86efac", marginRight: 3, verticalAlign: "middle" }}></span>работал
                 <span style={{ display: "inline-block", width: 12, height: 12, background: "#fefce8", border: "1px solid #fde047", margin: "0 3px 0 10px", verticalAlign: "middle" }}></span>отсутствие
@@ -1360,7 +1360,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                 {/* Таблица с днями */}
                 {parsedDetails.length > 0 && (
                   <div className="results-block" style={{ marginBottom: "24px" }}>
-                    <h3>Табель по дням (25-25)</h3>
+                    <h3>Табель по дням (26-25)</h3>
                     <div className="table-wrapper" style={{ overflowX: "auto" }}>
                       <table style={{ fontSize: "12px", borderCollapse: "collapse", border: "2px solid #94a3b8" }}>
                         <thead>
@@ -1909,7 +1909,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         {activeTab === "settings" && isAdmin && (
           <section className="card">
             <h2>Настройки рабочих дней</h2>
-            <p className="card-subtitle">Автоматически рассчитанные рабочие дни для периода 25-25 на {year} год. Значения можно отредактировать.</p>
+            <p className="card-subtitle">Автоматически рассчитанные рабочие дни для периода 26-25 на {year} год. Значения можно отредактировать.</p>
             <div className="table-wrapper">
               <table>
                 <thead>

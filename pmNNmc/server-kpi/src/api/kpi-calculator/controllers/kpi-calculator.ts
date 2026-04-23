@@ -516,8 +516,8 @@ async function calcCore(ctx: Context) {
     });
     const allPrevHolidays = [...new Set(prevHolidayDates)];
 
-    // Parse prev month: days 25 to end
-    const prevParsed = await parseTimesheet(prevFileBuffer, prevYear, prevMonth, allPrevHolidays, { dayFrom: 25, dayTo: 31 });
+    // Parse prev month: days 26 to end
+    const prevParsed = await parseTimesheet(prevFileBuffer, prevYear, prevMonth, allPrevHolidays, { dayFrom: 26, dayTo: 31 });
     // Parse current month: days 1 to 25
     const currParsed = await parseTimesheet(fileBuffer, year, month, allHolidays, { dayFrom: 1, dayTo: 25 });
 
@@ -895,7 +895,7 @@ export default {
         row,
         1,
         totalColumns,
-        `Оцениваемый период: с 25 ${MONTHS_GENITIVE[((month - 2 + 12) % 12)]} ${month === 1 ? year - 1 : year} года - по 25 ${monthGen} ${year} г.`,
+        `Оцениваемый период: с 26 ${MONTHS_GENITIVE[((month - 2 + 12) % 12)]} ${month === 1 ? year - 1 : year} года - по 25 ${monthGen} ${year} г.`,
         {}
       );
       row += 2;
