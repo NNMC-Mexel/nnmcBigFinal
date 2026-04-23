@@ -3,17 +3,17 @@ export default ({ env }) => ({
     config: {
       provider: 'aws-s3',
       providerOptions: {
-        baseUrl: env('S3_PUBLIC_URL'),
-        rootPath: env('S3_ROOT_PATH', ''),
+        baseUrl: env('MINIO_PUBLIC_URL') || `${env('MINIO_ENDPOINT', '')}/${env('MINIO_BUCKET', '')}`,
+        rootPath: env('MINIO_ROOT_PATH', ''),
         s3Options: {
-          endpoint: env('S3_ENDPOINT'),
-          region: env('S3_REGION', 'us-east-1'),
+          endpoint: env('MINIO_ENDPOINT'),
+          region: env('MINIO_REGION', 'us-east-1'),
           credentials: {
-            accessKeyId: env('S3_ACCESS_KEY_ID'),
-            secretAccessKey: env('S3_SECRET_ACCESS_KEY'),
+            accessKeyId: env('MINIO_ACCESS_KEY'),
+            secretAccessKey: env('MINIO_SECRET_KEY'),
           },
           forcePathStyle: true,
-          params: { Bucket: env('S3_BUCKET') },
+          params: { Bucket: env('MINIO_BUCKET') },
         },
       },
       actionOptions: {
