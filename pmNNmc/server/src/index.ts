@@ -117,8 +117,12 @@ async function setupPermissions(strapi: any) {
       }
     }
 
-    // Users-permissions plugin: allow to get own profile and login
+    // Users-permissions plugin: allow to get own profile and login.
+    // find/findOne are required so Strapi's REST sanitizer does not strip
+    // populated user relations (e.g. project.owner) from responses.
     await ensurePermission(strapi, role.id, 'plugin::users-permissions.user', 'me');
+    await ensurePermission(strapi, role.id, 'plugin::users-permissions.user', 'find');
+    await ensurePermission(strapi, role.id, 'plugin::users-permissions.user', 'findOne');
     await ensurePermission(strapi, role.id, 'plugin::users-permissions.auth', 'callback');
   }
 
