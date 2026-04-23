@@ -159,7 +159,23 @@ export default {
    *
    * This gives you an opportunity to extend code.
    */
-  register(/* { strapi }: { strapi: Core.Strapi } */) {},
+  register({ strapi }: { strapi: any }) {
+    strapi.db.lifecycles.subscribe({
+      models: ['plugin::upload.file'],
+      async afterCreate(event: any) {
+        const f = event.result;
+        console.log(
+          `[upload-debug] afterCreate id=${f?.id} hash=${f?.hash} url=${f?.url} name=${f?.name} size=${f?.size}`
+        );
+      },
+      async afterUpdate(event: any) {
+        const f = event.result;
+        console.log(
+          `[upload-debug] afterUpdate id=${f?.id} hash=${f?.hash} url=${f?.url} name=${f?.name}`
+        );
+      },
+    });
+  },
 
   /**
    * An asynchronous bootstrap function that runs before
