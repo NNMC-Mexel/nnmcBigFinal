@@ -7,10 +7,26 @@ export default ({ env }) => {
     `http://192.168.101.25:${port}`,
   ]);
 
+  const s3PublicUrl = env('S3_PUBLIC_URL');
+  const s3Endpoint = env('S3_ENDPOINT');
+  const s3Hosts = [s3PublicUrl, s3Endpoint].filter(Boolean);
+
   return [
     'strapi::logger',
     'strapi::errors',
-    'strapi::security',
+    {
+      name: 'strapi::security',
+      config: {
+        contentSecurityPolicy: {
+          useDefaults: true,
+          directives: {
+            'connect-src': ["'self'", 'https:', ...s3Hosts],
+            'img-src': ["'self'", 'data:', 'blob:', 'market-assets.strapi.io', ...s3Hosts],
+            'media-src': ["'self'", 'data:', 'blob:', 'market-assets.strapi.io', ...s3Hosts],
+          },
+        },
+      },
+    },
     {
       name: 'strapi::cors',
       config: {
