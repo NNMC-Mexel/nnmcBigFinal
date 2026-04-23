@@ -35,6 +35,7 @@ export default ({ env }) => {
     'strapi::body',
     'strapi::session',
     'strapi::favicon',
+    'global::minio-proxy',
     'strapi::public',
   ];
 };

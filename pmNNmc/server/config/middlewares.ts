@@ -51,6 +51,7 @@ export default ({ env }) => {
       },
     },
     'strapi::favicon',
+    'global::minio-proxy',
     'strapi::public',
   ];
 };

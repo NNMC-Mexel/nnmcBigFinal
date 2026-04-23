@@ -3,7 +3,7 @@ export default ({ env }) => ({
     config: {
       provider: 'aws-s3',
       providerOptions: {
-        baseUrl: env('MINIO_PUBLIC_URL') || `${env('MINIO_ENDPOINT', '')}/${env('MINIO_BUCKET', '')}`,
+        baseUrl: env('MINIO_PUBLIC_URL') || `${env('SERVER_URL', '')}/uploads`,
         rootPath: env('MINIO_ROOT_PATH', ''),
         s3Options: {
           endpoint: env('MINIO_ENDPOINT'),
