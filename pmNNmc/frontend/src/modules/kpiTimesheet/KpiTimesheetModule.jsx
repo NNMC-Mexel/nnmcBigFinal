@@ -953,6 +953,36 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     else if (action === "eds") await doSignEds();
   };
 
+  const recomputePreSignRow = (row) => {
+    const daysAssigned = Math.max(0, Number(row.daysAssigned) || 0);
+    let daysWorked = Math.max(0, Number(row.daysWorked) || 0);
+    if (daysWorked > daysAssigned) daysWorked = daysAssigned;
+    let workPercent = daysAssigned > 0 ? (daysWorked / daysAssigned) * 100 : 0;
+    if (workPercent > 100) workPercent = 100;
+    if (workPercent < 0) workPercent = 0;
+    workPercent = Math.round(workPercent * 100) / 100;
+    const kpiSum = Math.max(0, Number(row.kpiSum) || 0);
+    const kpiFinal = Math.round((workPercent / 100) * kpiSum * 100) / 100;
+    return { ...row, daysAssigned, daysWorked, workPercent, kpiSum, kpiFinal };
+  };
+
+  const updatePreSignRow = (index, field, value) => {
+    setCalcResults((prev) => {
+      const next = [...prev];
+      const current = { ...next[index], [field]: value };
+      next[index] = (field === "fio" || field === "department")
+        ? current
+        : recomputePreSignRow(current);
+      return next;
+    });
+    setHasEdits(true);
+  };
+
+  const removePreSignRow = (index) => {
+    setCalcResults((prev) => prev.filter((_, i) => i !== index));
+    setHasEdits(true);
+  };
+
   const handleEdsComplete = (signedPdfBlob, cmsBlob, meta) => {
     setEdsResult({ signedPdfBlob, cmsBlob, meta });
   };
@@ -1965,7 +1995,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
             )}
             <div style={{ maxHeight: "50vh", overflow: "auto", border: "1px solid #e2e8f0", borderRadius: 6, marginBottom: 16 }}>
               <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse" }}>
-                <thead style={{ background: "#f1f5f9", position: "sticky", top: 0 }}>
+                <thead style={{ background: "#f1f5f9", position: "sticky", top: 0, zIndex: 1 }}>
                   <tr>
                     <th style={{ padding: 6, textAlign: "left" }}>#</th>
                     <th style={{ padding: 6, textAlign: "left" }}>ФИО</th>
@@ -1975,26 +2005,76 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                     <th style={{ padding: 6, textAlign: "right" }}>%</th>
                     <th style={{ padding: 6, textAlign: "right" }}>KPI сумм</th>
                     <th style={{ padding: 6, textAlign: "right" }}>KPI итог</th>
+                    <th style={{ padding: 6, width: 32 }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {calcResults.map((r, i) => (
                     <tr key={i} style={{ borderTop: "1px solid #e2e8f0" }}>
                       <td style={{ padding: 6 }}>{i + 1}</td>
-                      <td style={{ padding: 6 }}>{r.fio}</td>
-                      <td style={{ padding: 6 }}>{r.department}</td>
-                      <td style={{ padding: 6, textAlign: "right" }}>{r.daysAssigned}</td>
-                      <td style={{ padding: 6, textAlign: "right" }}>{r.daysWorked}</td>
-                      <td style={{ padding: 6, textAlign: "right" }}>{r.workPercent}%</td>
-                      <td style={{ padding: 6, textAlign: "right" }}>{r.kpiSum}</td>
+                      <td style={{ padding: 2 }}>
+                        <input
+                          type="text"
+                          value={r.fio ?? ""}
+                          onChange={(e) => updatePreSignRow(i, "fio", e.target.value)}
+                          style={{ width: "100%", border: "1px solid #e2e8f0", borderRadius: 4, padding: "3px 6px", fontSize: 12 }}
+                        />
+                      </td>
+                      <td style={{ padding: 2 }}>
+                        <input
+                          type="text"
+                          value={r.department ?? ""}
+                          onChange={(e) => updatePreSignRow(i, "department", e.target.value)}
+                          style={{ width: "100%", border: "1px solid #e2e8f0", borderRadius: 4, padding: "3px 6px", fontSize: 12 }}
+                        />
+                      </td>
+                      <td style={{ padding: 2, textAlign: "right" }}>
+                        <input
+                          type="number"
+                          min={0}
+                          value={r.daysAssigned ?? 0}
+                          onChange={(e) => updatePreSignRow(i, "daysAssigned", e.target.value)}
+                          style={{ width: 60, border: "1px solid #e2e8f0", borderRadius: 4, padding: "3px 6px", fontSize: 12, textAlign: "right" }}
+                        />
+                      </td>
+                      <td style={{ padding: 2, textAlign: "right" }}>
+                        <input
+                          type="number"
+                          min={0}
+                          value={r.daysWorked ?? 0}
+                          onChange={(e) => updatePreSignRow(i, "daysWorked", e.target.value)}
+                          style={{ width: 60, border: "1px solid #e2e8f0", borderRadius: 4, padding: "3px 6px", fontSize: 12, textAlign: "right" }}
+                        />
+                      </td>
+                      <td style={{ padding: 6, textAlign: "right", color: "#64748b" }}>{r.workPercent}%</td>
+                      <td style={{ padding: 2, textAlign: "right" }}>
+                        <input
+                          type="number"
+                          min={0}
+                          step={100}
+                          value={r.kpiSum ?? 0}
+                          onChange={(e) => updatePreSignRow(i, "kpiSum", e.target.value)}
+                          style={{ width: 90, border: "1px solid #e2e8f0", borderRadius: 4, padding: "3px 6px", fontSize: 12, textAlign: "right" }}
+                        />
+                      </td>
                       <td style={{ padding: 6, textAlign: "right", fontWeight: 700, color: "#7c3aed" }}>{r.kpiFinal}</td>
+                      <td style={{ padding: 2, textAlign: "center" }}>
+                        <button
+                          type="button"
+                          onClick={() => removePreSignRow(i)}
+                          title="Удалить из списка"
+                          style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer", fontSize: 16, lineHeight: 1, padding: "2px 6px" }}
+                        >
+                          ×
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
-              Если нужно что-то изменить — нажмите «Назад» и воспользуйтесь кнопкой «Редактировать» в таблице результатов.
+              Отредактируйте данные прямо в таблице: поменяйте ФИО, отдел, Норму/Факт или KPI сумм. Колонки % и KPI итог пересчитываются автоматически. Чтобы убрать строку — нажмите «×».
             </p>
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={() => setSignPreview(null)}>Назад</button>
