@@ -7,7 +7,7 @@ export default factories.createCoreController(
             const body = ctx.request.body;
             const data = (body as any)?.data || {};
 
-            const resolveFileRecord = async (ref: any) => {
+            const toDocumentId = async (ref: any): Promise<string | null> => {
                 if (ref == null) return null;
                 let file: any = null;
                 if (typeof ref === "number" || (typeof ref === "string" && /^\d+$/.test(ref))) {
@@ -15,55 +15,32 @@ export default factories.createCoreController(
                         .query("plugin::upload.file")
                         .findOne({ where: { id: Number(ref) } });
                 } else if (typeof ref === "string") {
-                    file = await strapi.db
-                        .query("plugin::upload.file")
-                        .findOne({ where: { documentId: ref } });
+                    return ref;
                 } else if (typeof ref === "object") {
+                    if (ref.documentId) return ref.documentId;
                     if (ref.id != null) {
                         file = await strapi.db
                             .query("plugin::upload.file")
                             .findOne({ where: { id: Number(ref.id) } });
-                    } else if (ref.documentId) {
-                        file = await strapi.db
-                            .query("plugin::upload.file")
-                            .findOne({ where: { documentId: ref.documentId } });
                     }
                 }
-                return file;
+                return file?.documentId ?? null;
             };
 
-            const currentFile = await resolveFileRecord(data.currentFile);
-            const originalFile = await resolveFileRecord(data.originalFile);
+            if (data.currentFile != null) {
+                const docId = await toDocumentId(data.currentFile);
+                if (docId) data.currentFile = docId;
+            }
+            if (data.originalFile != null) {
+                const docId = await toDocumentId(data.originalFile);
+                if (docId) data.originalFile = docId;
+            }
 
             console.log(
-                `[doc-create-debug] resolved currentFile.id=${currentFile?.id} hash=${currentFile?.hash}; originalFile.id=${originalFile?.id} hash=${originalFile?.hash}`
+                `[doc-create-debug] body.currentFile=${data.currentFile} body.originalFile=${data.originalFile}`
             );
 
-            const cleanData = { ...data };
-            delete cleanData.currentFile;
-            delete cleanData.originalFile;
-
-            const created = (await strapi.documents("api::document.document").create({
-                data: {
-                    ...cleanData,
-                    ...(currentFile && { currentFile: currentFile.documentId }),
-                    ...(originalFile && { originalFile: originalFile.documentId }),
-                },
-                populate: {
-                    currentFile: true,
-                    originalFile: true,
-                    creator: true,
-                    assigned_users: true,
-                    documentType: true,
-                    subdivision: true,
-                },
-            })) as any;
-
-            console.log(
-                `[doc-create-debug] created docId=${created?.documentId} currentFile.id=${created?.currentFile?.id} currentFile.hash=${created?.currentFile?.hash}`
-            );
-
-            return { data: created };
+            return await (super.create as any)(ctx);
         },
         /**
          * GET /api/documents/:id/file-url?file=current|original
