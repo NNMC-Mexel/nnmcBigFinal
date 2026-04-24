@@ -7,40 +7,65 @@ export default factories.createCoreController(
             const body = ctx.request.body;
             const data = (body as any)?.data || {};
 
-            const toDocumentId = async (ref: any): Promise<string | null> => {
+            const toFileId = async (ref: any): Promise<number | null> => {
                 if (ref == null) return null;
-                let file: any = null;
-                if (typeof ref === "number" || (typeof ref === "string" && /^\d+$/.test(ref))) {
-                    file = await strapi.db
+                if (typeof ref === "number") return ref;
+                if (typeof ref === "string" && /^\d+$/.test(ref)) return Number(ref);
+                if (typeof ref === "string") {
+                    const f = await strapi.db
                         .query("plugin::upload.file")
-                        .findOne({ where: { id: Number(ref) } });
-                } else if (typeof ref === "string") {
-                    return ref;
-                } else if (typeof ref === "object") {
-                    if (ref.documentId) return ref.documentId;
-                    if (ref.id != null) {
-                        file = await strapi.db
+                        .findOne({ where: { documentId: ref } });
+                    return f?.id ?? null;
+                }
+                if (typeof ref === "object") {
+                    if (ref.id != null) return Number(ref.id);
+                    if (ref.documentId) {
+                        const f = await strapi.db
                             .query("plugin::upload.file")
-                            .findOne({ where: { id: Number(ref.id) } });
+                            .findOne({ where: { documentId: ref.documentId } });
+                        return f?.id ?? null;
                     }
                 }
-                return file?.documentId ?? null;
+                return null;
             };
 
-            if (data.currentFile != null) {
-                const docId = await toDocumentId(data.currentFile);
-                if (docId) data.currentFile = docId;
-            }
-            if (data.originalFile != null) {
-                const docId = await toDocumentId(data.originalFile);
-                if (docId) data.originalFile = docId;
-            }
+            const currentFileId = await toFileId(data.currentFile);
+            const originalFileId = await toFileId(data.originalFile);
+
+            delete data.currentFile;
+            delete data.originalFile;
+
+            const result: any = await (super.create as any)(ctx);
+
+            const created = result?.data || result;
+            const docNumericId = created?.id;
 
             console.log(
-                `[doc-create-debug] body.currentFile=${data.currentFile} body.originalFile=${data.originalFile}`
+                `[doc-create-debug] super.create returned id=${docNumericId} currentFileId=${currentFileId} originalFileId=${originalFileId}`
             );
 
-            return await (super.create as any)(ctx);
+            if (docNumericId) {
+                const knex = (strapi.db as any).connection;
+                const attach = async (fileId: number, field: string) => {
+                    if (!fileId) return;
+                    await knex("files_related_morphs").insert({
+                        file_id: fileId,
+                        related_id: docNumericId,
+                        related_type: "api::document.document",
+                        field,
+                        order: 1,
+                    });
+                };
+                try {
+                    await attach(currentFileId!, "currentFile");
+                    await attach(originalFileId!, "originalFile");
+                    console.log(`[doc-create-debug] morph rows inserted for doc id=${docNumericId}`);
+                } catch (e: any) {
+                    console.error(`[doc-create-debug] morph insert failed:`, e?.message || e);
+                }
+            }
+
+            return result;
         },
         /**
          * GET /api/documents/:id/file-url?file=current|original
