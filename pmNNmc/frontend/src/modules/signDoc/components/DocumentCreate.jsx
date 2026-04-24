@@ -375,6 +375,7 @@ export default function DocumentCreate() {
 
                 try {
                     const uploadedFile = await uploadFile(signedFile.pdf);
+                    const uploadedFileRef = uploadedFile.documentId || uploadedFile.id;
 
                     let cmsFileUrl = null;
                     let cmsFileName = null;
@@ -398,8 +399,8 @@ export default function DocumentCreate() {
 
                     const documentData = {
                         title: signedFile.title,
-                        originalFile: uploadedFile.id,
-                        currentFile: uploadedFile.id,
+                        originalFile: uploadedFileRef,
+                        currentFile: uploadedFileRef,
                         status: "in_progress",
                         creator: currentUser.id,
                         documentType: documentTypeId || null,

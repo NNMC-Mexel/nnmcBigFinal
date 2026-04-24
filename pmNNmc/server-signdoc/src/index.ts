@@ -165,7 +165,7 @@ export default {
       async afterCreate(event: any) {
         const f = event.result;
         console.log(
-          `[upload-debug] afterCreate id=${f?.id} hash=${f?.hash} url=${f?.url} name=${f?.name} size=${f?.size}`
+          `[upload-debug] afterCreate id=${f?.id} documentId=${f?.documentId} hash=${f?.hash} url=${f?.url} name=${f?.name} size=${f?.size}`
         );
       },
       async afterUpdate(event: any) {
