@@ -159,33 +159,7 @@ export default {
    *
    * This gives you an opportunity to extend code.
    */
-  register({ strapi }: { strapi: any }) {
-    strapi.db.lifecycles.subscribe({
-      models: ['plugin::upload.file'],
-      async afterCreate(event: any) {
-        const f = event.result;
-        console.log(
-          `[upload-debug] afterCreate id=${f?.id} documentId=${f?.documentId} hash=${f?.hash} url=${f?.url} name=${f?.name} size=${f?.size}`
-        );
-      },
-      async afterUpdate(event: any) {
-        const f = event.result;
-        console.log(
-          `[upload-debug] afterUpdate id=${f?.id} hash=${f?.hash} url=${f?.url} name=${f?.name}`
-        );
-      },
-    });
-    strapi.db.lifecycles.subscribe({
-      models: ['api::document.document'],
-      async afterCreate(event: any) {
-        const d = event.result;
-        const p = event.params?.data || {};
-        console.log(
-          `[doc-debug] afterCreate docId=${d?.documentId} id=${d?.id} title=${d?.title} currentFile(param)=${JSON.stringify(p.currentFile)} originalFile(param)=${JSON.stringify(p.originalFile)}`
-        );
-      },
-    });
-  },
+  register(/* { strapi }: { strapi: Core.Strapi } */) {},
 
   /**
    * An asynchronous bootstrap function that runs before

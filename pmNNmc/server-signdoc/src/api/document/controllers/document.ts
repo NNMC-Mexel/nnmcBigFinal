@@ -40,71 +40,43 @@ export default factories.createCoreController(
             const created = result?.data || result;
             const docNumericId = created?.id;
 
-            console.log(
-                `[doc-create-debug] super.create returned id=${docNumericId} currentFileId=${currentFileId} originalFileId=${originalFileId}`
-            );
-
+            // Strapi V5 REST media-relation resolver is broken for numeric ids:
+            // POST /api/documents with `currentFile: 42` (numeric) silently links
+            // a different file. Workaround: strip media from body, then attach
+            // files manually via the polymorphic `file.related` field.
             if (docNumericId) {
-                const knex = (strapi.db as any).connection;
-                try {
-                    const tables = await knex.raw(
-                        `SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND (table_name LIKE '%file%' OR table_name LIKE '%morph%' OR table_name LIKE '%lnk%' OR table_name LIKE '%link%')`
-                    );
-                    const names = (tables.rows || tables[0] || []).map((r: any) => r.table_name);
-                    console.log(`[doc-create-debug] candidate tables: ${JSON.stringify(names)}`);
-                } catch (e: any) {
-                    console.error(`[doc-create-debug] table list failed:`, e?.message || e);
-                }
-                try {
+                const sameFile = currentFileId && originalFileId === currentFileId;
+                if (sameFile) {
+                    await strapi.db.query("plugin::upload.file").update({
+                        where: { id: currentFileId },
+                        data: {
+                            related: [
+                                { id: docNumericId, __type: "api::document.document", __pivot: { field: "currentFile" } },
+                                { id: docNumericId, __type: "api::document.document", __pivot: { field: "originalFile" } },
+                            ],
+                        },
+                    });
+                } else {
                     if (currentFileId) {
                         await strapi.db.query("plugin::upload.file").update({
                             where: { id: currentFileId },
                             data: {
                                 related: [
-                                    {
-                                        id: docNumericId,
-                                        __type: "api::document.document",
-                                        __pivot: { field: "currentFile" },
-                                    },
+                                    { id: docNumericId, __type: "api::document.document", __pivot: { field: "currentFile" } },
                                 ],
                             },
                         });
                     }
-                    if (originalFileId && originalFileId !== currentFileId) {
+                    if (originalFileId) {
                         await strapi.db.query("plugin::upload.file").update({
                             where: { id: originalFileId },
                             data: {
                                 related: [
-                                    {
-                                        id: docNumericId,
-                                        __type: "api::document.document",
-                                        __pivot: { field: "originalFile" },
-                                    },
-                                ],
-                            },
-                        });
-                    } else if (originalFileId === currentFileId && currentFileId) {
-                        await strapi.db.query("plugin::upload.file").update({
-                            where: { id: currentFileId },
-                            data: {
-                                related: [
-                                    {
-                                        id: docNumericId,
-                                        __type: "api::document.document",
-                                        __pivot: { field: "currentFile" },
-                                    },
-                                    {
-                                        id: docNumericId,
-                                        __type: "api::document.document",
-                                        __pivot: { field: "originalFile" },
-                                    },
+                                    { id: docNumericId, __type: "api::document.document", __pivot: { field: "originalFile" } },
                                 ],
                             },
                         });
                     }
-                    console.log(`[doc-create-debug] file.related updated for doc id=${docNumericId}`);
-                } catch (e: any) {
-                    console.error(`[doc-create-debug] file.related update failed:`, e?.message || e);
                 }
             }
 
@@ -150,12 +122,7 @@ export default factories.createCoreController(
 
             if (!file) return ctx.notFound("Файл не найден");
 
-            const f = file as any;
-            console.log(
-                `[file-url-debug] doc=${id} fileType=${fileType} file.id=${f?.id} file.documentId=${f?.documentId} file.hash=${f?.hash} file.url=${f?.url}`
-            );
-
-            const url = f.url;
+            const url = (file as any).url;
             return ctx.send({ url });
         },
 

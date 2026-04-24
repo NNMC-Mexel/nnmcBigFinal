@@ -375,7 +375,6 @@ export default function DocumentCreate() {
 
                 try {
                     const uploadedFile = await uploadFile(signedFile.pdf);
-                    console.log("[debug] uploadedFile:", uploadedFile);
 
                     let cmsFileUrl = null;
                     let cmsFileName = null;
