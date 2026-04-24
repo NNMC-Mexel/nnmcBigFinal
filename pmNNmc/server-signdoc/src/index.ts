@@ -175,6 +175,16 @@ export default {
         );
       },
     });
+    strapi.db.lifecycles.subscribe({
+      models: ['api::document.document'],
+      async afterCreate(event: any) {
+        const d = event.result;
+        const p = event.params?.data || {};
+        console.log(
+          `[doc-debug] afterCreate docId=${d?.documentId} id=${d?.id} title=${d?.title} currentFile(param)=${JSON.stringify(p.currentFile)} originalFile(param)=${JSON.stringify(p.originalFile)}`
+        );
+      },
+    });
   },
 
   /**
