@@ -43,7 +43,12 @@ export default factories.createCoreController(
 
             if (!file) return ctx.notFound("Файл не найден");
 
-            const url = (file as any).url;
+            const f = file as any;
+            console.log(
+                `[file-url-debug] doc=${id} fileType=${fileType} file.id=${f?.id} file.documentId=${f?.documentId} file.hash=${f?.hash} file.url=${f?.url}`
+            );
+
+            const url = f.url;
             return ctx.send({ url });
         },
 
