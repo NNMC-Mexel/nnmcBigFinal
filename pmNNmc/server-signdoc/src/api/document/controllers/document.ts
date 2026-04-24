@@ -7,56 +7,60 @@ export default factories.createCoreController(
             const body = ctx.request.body;
             const data = (body as any)?.data || {};
 
-            const resolveFileId = async (ref: any): Promise<number | null> => {
+            const resolveFileRecord = async (ref: any) => {
                 if (ref == null) return null;
-                if (typeof ref === "number") return ref;
-                if (typeof ref === "string") {
-                    if (/^\d+$/.test(ref)) return Number(ref);
-                    const file = await strapi.db
+                let file: any = null;
+                if (typeof ref === "number" || (typeof ref === "string" && /^\d+$/.test(ref))) {
+                    file = await strapi.db
+                        .query("plugin::upload.file")
+                        .findOne({ where: { id: Number(ref) } });
+                } else if (typeof ref === "string") {
+                    file = await strapi.db
                         .query("plugin::upload.file")
                         .findOne({ where: { documentId: ref } });
-                    return file?.id ?? null;
-                }
-                if (typeof ref === "object") {
-                    if (ref.id != null) return Number(ref.id);
-                    if (ref.documentId) {
-                        const file = await strapi.db
+                } else if (typeof ref === "object") {
+                    if (ref.id != null) {
+                        file = await strapi.db
+                            .query("plugin::upload.file")
+                            .findOne({ where: { id: Number(ref.id) } });
+                    } else if (ref.documentId) {
+                        file = await strapi.db
                             .query("plugin::upload.file")
                             .findOne({ where: { documentId: ref.documentId } });
-                        return file?.id ?? null;
                     }
                 }
-                return null;
+                return file;
             };
 
-            const currentFileId = await resolveFileId(data.currentFile);
-            const originalFileId = await resolveFileId(data.originalFile);
+            const currentFile = await resolveFileRecord(data.currentFile);
+            const originalFile = await resolveFileRecord(data.originalFile);
+
+            console.log(
+                `[doc-create-debug] resolved currentFile.id=${currentFile?.id} hash=${currentFile?.hash}; originalFile.id=${originalFile?.id} hash=${originalFile?.hash}`
+            );
 
             const cleanData = { ...data };
             delete cleanData.currentFile;
             delete cleanData.originalFile;
 
-            const created = await strapi.entityService.create(
-                "api::document.document",
-                {
-                    data: {
-                        ...cleanData,
-                        ...(currentFileId != null && { currentFile: currentFileId }),
-                        ...(originalFileId != null && { originalFile: originalFileId }),
-                    },
-                    populate: {
-                        currentFile: true,
-                        originalFile: true,
-                        creator: true,
-                        assigned_users: true,
-                        documentType: true,
-                        subdivision: true,
-                    },
-                }
-            );
+            const created = (await strapi.documents("api::document.document").create({
+                data: {
+                    ...cleanData,
+                    ...(currentFile && { currentFile: currentFile.documentId }),
+                    ...(originalFile && { originalFile: originalFile.documentId }),
+                },
+                populate: {
+                    currentFile: true,
+                    originalFile: true,
+                    creator: true,
+                    assigned_users: true,
+                    documentType: true,
+                    subdivision: true,
+                },
+            })) as any;
 
             console.log(
-                `[doc-create-debug] created docId=${(created as any)?.documentId} currentFile.id=${(created as any)?.currentFile?.id} currentFile.hash=${(created as any)?.currentFile?.hash}`
+                `[doc-create-debug] created docId=${created?.documentId} currentFile.id=${created?.currentFile?.id} currentFile.hash=${created?.currentFile?.hash}`
             );
 
             return { data: created };
