@@ -15,6 +15,16 @@ const seedData = async () => {
     { key: 'DIGITALIZATION', name_ru: 'Отдел цифровизации', name_kz: 'Цифрландыру бөлімі' },
     { key: 'MEDICAL_EQUIPMENT', name_ru: 'Служба медицинского оборудования', name_kz: 'Медициналық жабдық қызметі' },
     { key: 'ENGINEERING', name_ru: 'Инженерная служба', name_kz: 'Инженерлік қызмет' },
+    { key: 'RADIOLOGY', name_ru: 'Лучевая (ВМП)', name_kz: 'Сәулелік (ЖМК)' },
+    { key: 'ECONOMICS', name_ru: 'Экономика', name_kz: 'Экономика' },
+    { key: 'CLEANING', name_ru: 'Клининг', name_kz: 'Клининг' },
+    { key: 'CLINICAL_PHARMACOLOGY', name_ru: 'Клинико-фармакологический отдел', name_kz: 'Клиникалық-фармакологиялық бөлім' },
+    { key: 'CLINIC_ADMINISTRATION', name_ru: 'Администрация (клиника)', name_kz: 'Әкімшілік (клиника)' },
+    { key: 'PATIENT_SUPPORT', name_ru: 'Служба поддержки пациента и внутренней экспертизы', name_kz: 'Пациентті қолдау және ішкі сараптама қызметі' },
+    { key: 'HR', name_ru: 'Отдел управления персоналом', name_kz: 'Персоналды басқару бөлімі' },
+    { key: 'ACCOUNTING', name_ru: 'Отдел бухгалтерского учета и отчетности', name_kz: 'Бухгалтерлік есеп және есептілік бөлімі' },
+    { key: 'RECEPTION', name_ru: 'Приемный отдел', name_kz: 'Қабылдау бөлімі' },
+    { key: 'MARKETING', name_ru: 'Отдел маркетинга', name_kz: 'Маркетинг бөлімі' },
   ];
 
   const createdDepartments: Record<string, any> = {};

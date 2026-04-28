@@ -1,42 +1,59 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { useAuthStore, useUserRole } from './store/authStore';
 
-// Layouts
+// Layouts (small, eagerly loaded)
 import AuthLayout from './layouts/AuthLayout';
 import AppLayout from './layouts/AppLayout';
 
-// Auth pages
+// Auth pages (small, on critical path)
 import LoginPage from './pages/auth/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
-import ResetPasswordPage from './pages/auth/ResetPasswordPage';
-import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import KeycloakCallbackPage from './pages/auth/KeycloakCallbackPage';
 
-// App pages
-import DashboardPage from './pages/app/DashboardPage';
-import NewsFeedPage from './pages/app/NewsFeedPage';
-import NewsAdminPage from './pages/app/NewsAdminPage';
-import BoardPage from './pages/app/BoardPage';
-import TablePage from './pages/app/TablePage';
-import ProjectDetailPage from './pages/app/ProjectDetailPage';
-import ActivityLogPage from './pages/app/ActivityLogPage';
-import ProfilePage from './pages/app/ProfilePage';
-import AdminPanelPage from './pages/app/AdminPanelPage';
+// Lazy auth pages (rarely visited)
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
+const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage'));
 
-// Public pages
-import PublicSurveyPage from './pages/public/PublicSurveyPage';
-import PublicTicketPage from './pages/public/PublicTicketPage';
+// Lazy app pages — split each module into its own chunk.
+// Heavy modules (KPI, SignDoc, Admin) carry pdf-lib, fontkit, NCALayer, etc.
+// and must NOT be in the initial bundle.
+const NewsFeedPage = lazy(() => import('./pages/app/NewsFeedPage'));
+const NewsAdminPage = lazy(() => import('./pages/app/NewsAdminPage'));
+const DashboardPage = lazy(() => import('./pages/app/DashboardPage'));
+const BoardPage = lazy(() => import('./pages/app/BoardPage'));
+const TablePage = lazy(() => import('./pages/app/TablePage'));
+const ProjectDetailPage = lazy(() => import('./pages/app/ProjectDetailPage'));
+const ActivityLogPage = lazy(() => import('./pages/app/ActivityLogPage'));
+const ProfilePage = lazy(() => import('./pages/app/ProfilePage'));
+const AdminPanelPage = lazy(() => import('./pages/app/AdminPanelPage'));
+const HelpdeskPage = lazy(() => import('./pages/app/HelpdeskPage'));
+const TicketDetailPage = lazy(() => import('./pages/app/TicketDetailPage'));
+const KpiItPage = lazy(() => import('./pages/app/KpiItPage'));
+const KpiTimesheetPage = lazy(() => import('./pages/app/KpiTimesheetPage'));
+const ConferenceRoomsPage = lazy(() => import('./pages/app/ConferenceRoomsPage'));
+const JournalPage = lazy(() => import('./pages/app/JournalPage'));
+const SignDocPage = lazy(() => import('./pages/app/SignDocPage'));
 
-// Helpdesk pages
-import HelpdeskPage from './pages/app/HelpdeskPage';
-import TicketDetailPage from './pages/app/TicketDetailPage';
-import KpiItPage from './pages/app/KpiItPage';
-import KpiTimesheetPage from './pages/app/KpiTimesheetPage';
-import ConferenceRoomsPage from './pages/app/ConferenceRoomsPage';
-import JournalPage from './pages/app/JournalPage';
-import SignDocPage from './pages/app/SignDocPage';
+// Lazy public pages
+const PublicSurveyPage = lazy(() => import('./pages/public/PublicSurveyPage'));
+const PublicTicketPage = lazy(() => import('./pages/public/PublicTicketPage'));
+
+// Loader shown while a lazy chunk is being fetched.
+const PageLoader = () => (
+  <div className="min-h-[60vh] flex items-center justify-center">
+    <div className="text-center">
+      <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+      <p className="text-slate-500 text-sm">Загрузка модуля…</p>
+    </div>
+  </div>
+);
+
+// Wrap a lazy element in Suspense.
+const withSuspense = (node: React.ReactNode) => (
+  <Suspense fallback={<PageLoader />}>{node}</Suspense>
+);
 
 // Protected Route component — redirects to Keycloak SSO
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -88,14 +105,6 @@ const DefaultAppRedirect = () => {
 
 const FeatureRoute = ({ allow, children }: { allow: boolean; children: React.ReactNode }) => {
   if (!allow) {
-    return <DefaultAppRedirect />;
-  }
-  return <>{children}</>;
-};
-
-const AdminRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAdmin, isSuperAdmin } = useUserRole();
-  if (!isAdmin && !isSuperAdmin) {
     return <DefaultAppRedirect />;
   }
   return <>{children}</>;
@@ -176,14 +185,12 @@ function App() {
         <Route
           path="/register"
           element={
-            <PublicRoute>
-              <RegisterPage />
-            </PublicRoute>
+            <PublicRoute>{withSuspense(<RegisterPage />)}</PublicRoute>
           }
         />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/forgot-password" element={withSuspense(<ForgotPasswordPage />)} />
+        <Route path="/reset-password" element={withSuspense(<ResetPasswordPage />)} />
+        <Route path="/verify-email" element={withSuspense(<VerifyEmailPage />)} />
       </Route>
 
       {/* Keycloak SSO callback */}
@@ -201,128 +208,102 @@ function App() {
         <Route index element={<DefaultAppRedirect />} />
 
         {/* News feed — accessible to all authenticated users */}
-        <Route path="news" element={<NewsFeedPage />} />
+        <Route path="news" element={withSuspense(<NewsFeedPage />)} />
         <Route
           path="news-admin"
           element={
-            <FeatureRoute allow={canManageNews}>
-              <NewsAdminPage />
-            </FeatureRoute>
+            <FeatureRoute allow={canManageNews}>{withSuspense(<NewsAdminPage />)}</FeatureRoute>
           }
         />
 
         <Route
           path="dashboard"
           element={
-            <FeatureRoute allow={canViewDashboard}>
-              <DashboardPage />
-            </FeatureRoute>
+            <FeatureRoute allow={canViewDashboard}>{withSuspense(<DashboardPage />)}</FeatureRoute>
           }
         />
         <Route
           path="board"
           element={
-            <FeatureRoute allow={canViewBoard}>
-              <BoardPage />
-            </FeatureRoute>
+            <FeatureRoute allow={canViewBoard}>{withSuspense(<BoardPage />)}</FeatureRoute>
           }
         />
         <Route
           path="table"
           element={
-            <FeatureRoute allow={canViewTable}>
-              <TablePage />
-            </FeatureRoute>
+            <FeatureRoute allow={canViewTable}>{withSuspense(<TablePage />)}</FeatureRoute>
           }
         />
         <Route
           path="projects/:id"
           element={
-            <FeatureRoute allow={canViewBoard || canViewTable}>
-              <ProjectDetailPage />
-            </FeatureRoute>
+            <FeatureRoute allow={canViewBoard || canViewTable}>{withSuspense(<ProjectDetailPage />)}</FeatureRoute>
           }
         />
         <Route
           path="activity"
           element={
-            <FeatureRoute allow={canViewActivityLog}>
-              <ActivityLogPage />
-            </FeatureRoute>
+            <FeatureRoute allow={canViewActivityLog}>{withSuspense(<ActivityLogPage />)}</FeatureRoute>
           }
         />
-        <Route path="profile" element={<ProfilePage />} />
+        <Route path="profile" element={withSuspense(<ProfilePage />)} />
         <Route
           path="admin"
           element={
-            <SuperAdminRoute>
-              <AdminPanelPage />
-            </SuperAdminRoute>
+            <SuperAdminRoute>{withSuspense(<AdminPanelPage />)}</SuperAdminRoute>
           }
         />
         <Route
           path="helpdesk"
           element={
-            <FeatureRoute allow={canViewHelpdesk}>
-              <HelpdeskPage />
-            </FeatureRoute>
+            <FeatureRoute allow={canViewHelpdesk}>{withSuspense(<HelpdeskPage />)}</FeatureRoute>
           }
         />
         <Route
           path="helpdesk/:id"
           element={
-            <FeatureRoute allow={canViewHelpdesk}>
-              <TicketDetailPage />
-            </FeatureRoute>
+            <FeatureRoute allow={canViewHelpdesk}>{withSuspense(<TicketDetailPage />)}</FeatureRoute>
           }
         />
         <Route
           path="kpi-it"
           element={
-            <FeatureRoute allow={canViewKpiIt}>
-              <KpiItPage forcedDepartmentKey="IT" title="KPI IT" />
-            </FeatureRoute>
+            <FeatureRoute allow={canViewKpiIt}>{withSuspense(<KpiItPage forcedDepartmentKey="IT" title="KPI IT" />)}</FeatureRoute>
           }
         />
         <Route
           path="kpi-medical"
           element={
-            <FeatureRoute allow={canViewKpiMedical}>
-              <KpiItPage forcedDepartmentKey="MEDICAL_EQUIPMENT" title="KPI Медоборудование" />
-            </FeatureRoute>
+            <FeatureRoute allow={canViewKpiMedical}>{withSuspense(<KpiItPage forcedDepartmentKey="MEDICAL_EQUIPMENT" title="KPI Медоборудование" />)}</FeatureRoute>
           }
         />
         <Route
           path="kpi-engineering"
           element={
-            <FeatureRoute allow={canViewKpiEngineering}>
-              <KpiItPage forcedDepartmentKey="ENGINEERING" title="KPI Инженерная служба" />
-            </FeatureRoute>
+            <FeatureRoute allow={canViewKpiEngineering}>{withSuspense(<KpiItPage forcedDepartmentKey="ENGINEERING" title="KPI Инженерная служба" />)}</FeatureRoute>
           }
         />
         <Route
           path="kpi-timesheet"
           element={
-            <FeatureRoute allow={canViewKpiTimesheet}>
-              <KpiTimesheetPage />
-            </FeatureRoute>
+            <FeatureRoute allow={canViewKpiTimesheet}>{withSuspense(<KpiTimesheetPage />)}</FeatureRoute>
           }
         />
-        <Route path="rooms" element={<FeatureRoute allow={canAccessConf}><ConferenceRoomsPage /></FeatureRoute>} />
-        <Route path="journal" element={<FeatureRoute allow={canAccessJournal}><JournalPage /></FeatureRoute>} />
-        <Route path="signdoc/*" element={<FeatureRoute allow={canAccessSigndoc}><SignDocPage /></FeatureRoute>} />
+        <Route path="rooms" element={<FeatureRoute allow={canAccessConf}>{withSuspense(<ConferenceRoomsPage />)}</FeatureRoute>} />
+        <Route path="journal" element={<FeatureRoute allow={canAccessJournal}>{withSuspense(<JournalPage />)}</FeatureRoute>} />
+        <Route path="signdoc/*" element={<FeatureRoute allow={canAccessSigndoc}>{withSuspense(<SignDocPage />)}</FeatureRoute>} />
       </Route>
 
       {/* Logged out page — not protected, cleans up tokens on mount */}
       <Route path="/logged-out" element={<LoggedOutPage />} />
 
       {/* Public pages (no auth required) */}
-      <Route path="/survey/:token" element={<PublicSurveyPage />} />
-      <Route path="/helpdesk/submit" element={<PublicTicketPage />} />
+      <Route path="/survey/:token" element={withSuspense(<PublicSurveyPage />)} />
+      <Route path="/helpdesk/submit" element={withSuspense(<PublicTicketPage />)} />
 
       {/* Redirect root — if not authenticated, ProtectedRoute will redirect to Keycloak */}
       <Route path="/" element={<ProtectedRoute><DefaultAppRedirect /></ProtectedRoute>} />
-      
+
       {/* 404 */}
       <Route path="*" element={<DefaultAppRedirect />} />
     </Routes>

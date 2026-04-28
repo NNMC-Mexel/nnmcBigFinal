@@ -67,6 +67,37 @@ async function syncUsersFromPm(strapi: any) {
   }
 }
 
+// Public role must be empty: no public access to KPI data.
+// Only Keycloak/auth callbacks remain available without login.
+async function lockPublicRole(strapi: any) {
+  const publicRole = await strapi.db
+    .query('plugin::users-permissions.role')
+    .findOne({ where: { type: 'public' } });
+  if (!publicRole) return;
+
+  const ALLOWED = new Set([
+    'plugin::users-permissions.auth.callback',
+    'plugin::users-permissions.auth.connect',
+  ]);
+
+  const all = await strapi.db
+    .query('plugin::users-permissions.permission')
+    .findMany({ where: { role: publicRole.id } });
+
+  let removed = 0;
+  for (const perm of all) {
+    if (!ALLOWED.has(perm.action)) {
+      await strapi.db
+        .query('plugin::users-permissions.permission')
+        .delete({ where: { id: perm.id } });
+      removed += 1;
+    }
+  }
+  if (removed > 0) {
+    console.log(`🔒 Public role locked: removed ${removed} permissions in server-kpi`);
+  }
+}
+
 async function ensureAuthenticatedPermissions(strapi: any) {
   const role = await strapi
     .query('plugin::users-permissions.role')
@@ -136,6 +167,7 @@ export default {
    * run jobs, or perform some special logic.
    */
   async bootstrap({ strapi }: { strapi: any }) {
+    await lockPublicRole(strapi);
     await ensureAuthenticatedPermissions(strapi);
     await syncUsersFromPm(strapi);
   },

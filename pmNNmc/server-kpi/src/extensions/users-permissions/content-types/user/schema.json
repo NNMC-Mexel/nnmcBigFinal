@@ -67,6 +67,10 @@
     },
     "allowedDepartments": {
       "type": "json"
+    },
+    "isKpiResponsible": {
+      "type": "boolean",
+      "default": false
     }
   }
 }

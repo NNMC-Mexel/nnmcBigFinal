@@ -54,12 +54,15 @@ async function setupPermissions(strapi: any) {
   const leadRole = roles.find((r: any) => r.type === 'lead');
   const memberRole = roles.find((r: any) => r.type === 'member');
 
-  // Public role permissions
+  // Public role: minimum required for anonymous helpdesk ticket submission
+  // and Keycloak/auth callbacks. NO access to user data, projects, KPI, etc.
   const publicPermissions: Record<string, string[]> = {
     'api::ticket.ticket': ['publicSubmit', 'publicCategories'],
-    'api::department.department': ['find', 'findOne'],
-    'plugin::users-permissions.user': ['find', 'findOne'],
   };
+  const publicAuthActions = [
+    'plugin::users-permissions.auth.callback',
+    'plugin::users-permissions.auth.connect',
+  ];
 
   // Full permissions for all content types
   const fullPermissions: Record<string, string[]> = {
@@ -92,18 +95,36 @@ async function setupPermissions(strapi: any) {
     ],
   };
 
-  // Apply public permissions
+  // Apply public permissions and remove anything not on the allowlist
   if (publicRole) {
+    const allowedActions = new Set<string>(publicAuthActions);
     for (const [contentType, actions] of Object.entries(publicPermissions)) {
       for (const action of actions) {
+        allowedActions.add(`${contentType}.${action}`);
         await ensurePermission(strapi, publicRole.id, contentType, action);
       }
     }
-    // Auth endpoints for public
-    await ensurePermission(strapi, publicRole.id, 'plugin::users-permissions.auth', 'callback');
-    await ensurePermission(strapi, publicRole.id, 'plugin::users-permissions.auth', 'register');
-    await ensurePermission(strapi, publicRole.id, 'plugin::users-permissions.auth', 'forgotPassword');
-    await ensurePermission(strapi, publicRole.id, 'plugin::users-permissions.auth', 'resetPassword');
+    for (const action of publicAuthActions) {
+      const [ct, act] = action.split(/\.(?=[^.]+$)/);
+      await ensurePermission(strapi, publicRole.id, ct, act);
+    }
+
+    // Strip any legacy public perms not in allowlist
+    const existing = await strapi.db
+      .query('plugin::users-permissions.permission')
+      .findMany({ where: { role: publicRole.id } });
+    let stripped = 0;
+    for (const perm of existing) {
+      if (!allowedActions.has(perm.action)) {
+        await strapi.db
+          .query('plugin::users-permissions.permission')
+          .delete({ where: { id: perm.id } });
+        stripped += 1;
+      }
+    }
+    if (stripped > 0) {
+      console.log(`  🔒 Public role hardened: removed ${stripped} legacy permissions`);
+    }
   }
 
   // Apply permissions to all authenticated-type roles
@@ -213,24 +234,47 @@ async function migrateDepartmentPermissions(strapi: any) {
     'canManageProjectAssignments', 'canManageTickets', 'canViewActivityLog',
   ];
 
+  // Базовый набор для всех отделов: новости, заявки, конференц-залы, документооборот
+  const BASE: Record<string, boolean> = {
+    canViewNews: true,
+    canViewDashboard: true,
+    canAccessConf: true,
+    canAccessSigndoc: true,
+    canViewHelpdesk: true,
+  };
+
   const deptDefaults: Record<string, Record<string, boolean>> = {
-    IT: {
-      canViewNews: true, canViewDashboard: true, canViewBoard: true, canViewTable: true,
-      canViewHelpdesk: true, canViewKpiIt: true, canViewKpiTimesheet: true,
-      canAccessConf: true, canAccessJournal: true, canAccessSigndoc: true,
+    // SuperAdmin отдел — отдельно (через isSuperAdmin), флаги тоже на всякий случай
+    DIGITALIZATION: {
+      ...BASE,
+      canViewBoard: true, canViewTable: true,
       canManageNews: true, canDeleteProject: true, canDragProjects: true,
       canManageProjectAssignments: true, canManageTickets: true, canViewActivityLog: true,
     },
-    DIGITALIZATION: {
-      canViewNews: true, canViewDashboard: true, canViewBoard: true, canViewTable: true,
-      canAccessConf: true,
+    // IT — без KPI Табеля, но с админкой helpdesk и проектов
+    IT: {
+      ...BASE,
+      canViewBoard: true, canViewTable: true,
+      canManageNews: true, canDeleteProject: true, canDragProjects: true,
+      canManageProjectAssignments: true, canManageTickets: true, canViewActivityLog: true,
     },
-    MEDICAL_EQUIPMENT: {
-      canViewNews: true, canViewHelpdesk: true, canViewKpiMedical: true,
-    },
-    ENGINEERING: {
-      canViewNews: true, canViewHelpdesk: true, canViewKpiEngineering: true,
-    },
+    // Инженерная и Медоборудование — без KPI Табеля
+    MEDICAL_EQUIPMENT: { ...BASE },
+    ENGINEERING: { ...BASE },
+    // Отделы с KPI Табелем (включаем только Клининг и Лучевую сейчас)
+    CLEANING: { ...BASE, canViewKpiTimesheet: true },
+    RADIOLOGY: { ...BASE, canViewKpiTimesheet: true },
+    // KPI-eligible отделы (флаг включим позже, по мере готовности)
+    ECONOMICS: { ...BASE },
+    CLINICAL_PHARMACOLOGY: { ...BASE },
+    CLINIC_ADMINISTRATION: { ...BASE },
+    PATIENT_SUPPORT: { ...BASE },
+    HR: { ...BASE },
+    ACCOUNTING: { ...BASE },
+    // Приёмная — единственный отдел с журналом приёмной
+    RECEPTION: { ...BASE, canAccessJournal: true },
+    // Маркетинг — может публиковать новости
+    MARKETING: { ...BASE, canManageNews: true, canViewBoard: true, canViewTable: true },
   };
 
   const departments = await strapi.entityService.findMany('api::department.department');

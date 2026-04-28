@@ -1,5 +1,36 @@
 // import type { Core } from '@strapi/strapi';
 
+// Public role must be empty: no public access to documents.
+// Only Keycloak/auth callbacks remain available without login.
+async function lockPublicRole(strapi: any) {
+  const publicRole = await strapi.db
+    .query('plugin::users-permissions.role')
+    .findOne({ where: { type: 'public' } });
+  if (!publicRole) return;
+
+  const ALLOWED = new Set([
+    'plugin::users-permissions.auth.callback',
+    'plugin::users-permissions.auth.connect',
+  ]);
+
+  const all = await strapi.db
+    .query('plugin::users-permissions.permission')
+    .findMany({ where: { role: publicRole.id } });
+
+  let removed = 0;
+  for (const perm of all) {
+    if (!ALLOWED.has(perm.action)) {
+      await strapi.db
+        .query('plugin::users-permissions.permission')
+        .delete({ where: { id: perm.id } });
+      removed += 1;
+    }
+  }
+  if (removed > 0) {
+    console.log(`🔒 Public role locked: removed ${removed} permissions in server-signdoc`);
+  }
+}
+
 async function seedDocumentTypes(strapi: any) {
   const types = ['Табель', 'Отчёт', 'Тестирование'];
   for (const name of types) {
@@ -57,6 +88,7 @@ async function syncUsersFromPm(strapi: any) {
       const username = String(pmUser?.username || email).trim();
       const fullName = String(pmUser?.fullName || '').trim();
       const deptName = String(pmUser?.department?.name_ru || '').trim();
+      const isKpiResponsible = Boolean(pmUser?.isKpiResponsible);
 
       let departmentId: number | null = null;
       if (deptName) {
@@ -77,6 +109,7 @@ async function syncUsersFromPm(strapi: any) {
             email,
             fullName,
             department: departmentId,
+            isKpiResponsible,
             provider: 'local',
             password: `kc-${Math.random().toString(36).slice(2)}-${Date.now()}`,
             confirmed: true,
@@ -89,6 +122,7 @@ async function syncUsersFromPm(strapi: any) {
         const patch: Record<string, any> = {};
         if (fullName && fullName !== existing.fullName) patch.fullName = fullName;
         if (departmentId && existing.department !== departmentId) patch.department = departmentId;
+        if (isKpiResponsible !== existing.isKpiResponsible) patch.isKpiResponsible = isKpiResponsible;
         if (Object.keys(patch).length > 0) {
           await strapi.entityService.update('plugin::users-permissions.user', existing.id, {
             data: patch,
@@ -169,6 +203,7 @@ export default {
    * run jobs, or perform some special logic.
    */
   async bootstrap({ strapi }: { strapi: any }) {
+    await lockPublicRole(strapi);
     await seedDocumentTypes(strapi);
     await syncDepartmentsFromPm(strapi);
     await syncUsersFromPm(strapi);
