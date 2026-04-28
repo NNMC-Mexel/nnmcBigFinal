@@ -24,13 +24,14 @@ async function syncUsersFromPmOnDemand() {
   if (Date.now() - lastUserSyncAt < USER_SYNC_TTL_MS) return;
   lastUserSyncAt = Date.now();
   const pmUrl = process.env.SERVER_PM_URL;
-  if (!pmUrl) return;
+  const token = process.env.INTERNAL_SYNC_TOKEN;
+  if (!pmUrl || !token) return;
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 5000);
     const res = await fetch(
-      `${pmUrl}/api/users?pagination[pageSize]=500`,
-      { signal: ctrl.signal }
+      `${pmUrl}/api/internal-sync/users`,
+      { signal: ctrl.signal, headers: { 'X-Internal-Token': token } }
     ).finally(() => clearTimeout(t));
     if (!res.ok) return;
     const items: any[] = (await res.json()) as any[];
@@ -43,6 +44,7 @@ async function syncUsersFromPmOnDemand() {
       const email = String(pmUser?.email || '').toLowerCase().trim();
       if (!email) continue;
       const username = String(pmUser?.username || email).trim();
+      const isKpiResponsible = Boolean(pmUser?.isKpiResponsible);
       const existing = await strapi.db
         .query('plugin::users-permissions.user')
         .findOne({ where: { email } });
@@ -58,7 +60,14 @@ async function syncUsersFromPmOnDemand() {
               blocked: false,
               role: authRole.id,
               allowedDepartments: [],
+              isKpiResponsible,
             },
+          });
+        } catch {}
+      } else if (isKpiResponsible !== existing.isKpiResponsible) {
+        try {
+          await strapi.entityService.update('plugin::users-permissions.user', existing.id, {
+            data: { isKpiResponsible },
           });
         } catch {}
       }

@@ -2,16 +2,21 @@
 
 async function syncUsersFromPm(strapi: any) {
   const pmUrl = process.env.SERVER_PM_URL;
+  const token = process.env.INTERNAL_SYNC_TOKEN;
   if (!pmUrl) {
     console.warn('⚠️ SERVER_PM_URL not set — skipping user sync from server-pm');
+    return;
+  }
+  if (!token) {
+    console.warn('⚠️ INTERNAL_SYNC_TOKEN not set — skipping user sync from server-pm');
     return;
   }
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 15000);
     const res = await fetch(
-      `${pmUrl}/api/users?pagination[pageSize]=500`,
-      { signal: ctrl.signal }
+      `${pmUrl}/api/internal-sync/users`,
+      { signal: ctrl.signal, headers: { 'X-Internal-Token': token } }
     ).finally(() => clearTimeout(t));
     if (!res.ok) {
       console.warn(`⚠️ sync users: HTTP ${res.status} from ${pmUrl}`);
@@ -32,10 +37,12 @@ async function syncUsersFromPm(strapi: any) {
     }
 
     let created = 0;
+    let updated = 0;
     for (const pmUser of items) {
       const email = String(pmUser?.email || '').toLowerCase().trim();
       if (!email) continue;
       const username = String(pmUser?.username || email).trim();
+      const isKpiResponsible = Boolean(pmUser?.isKpiResponsible);
 
       const existing = await strapi.db
         .query('plugin::users-permissions.user')
@@ -53,15 +60,23 @@ async function syncUsersFromPm(strapi: any) {
               blocked: false,
               role: authRole.id,
               allowedDepartments: [],
+              isKpiResponsible,
             },
           });
           created += 1;
         } catch (e: any) {
           console.warn(`⚠️ sync users: failed to create ${email}:`, e?.message || e);
         }
+      } else if (isKpiResponsible !== existing.isKpiResponsible) {
+        try {
+          await strapi.entityService.update('plugin::users-permissions.user', existing.id, {
+            data: { isKpiResponsible },
+          });
+          updated += 1;
+        } catch {}
       }
     }
-    console.log(`👥 Users synced from server-pm: +${created} created`);
+    console.log(`👥 Users synced from server-pm: +${created} created, ${updated} updated`);
   } catch (err) {
     console.warn('⚠️ Failed to sync users from server-pm:', err);
   }

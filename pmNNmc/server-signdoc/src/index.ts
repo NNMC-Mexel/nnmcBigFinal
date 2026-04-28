@@ -54,13 +54,18 @@ async function seedDocumentTypes(strapi: any) {
 
 async function syncUsersFromPm(strapi: any) {
   const pmUrl = process.env.SERVER_PM_URL;
+  const token = process.env.INTERNAL_SYNC_TOKEN;
   if (!pmUrl) return;
+  if (!token) {
+    console.warn('⚠️ INTERNAL_SYNC_TOKEN not set — skipping user sync from server-pm');
+    return;
+  }
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 15000);
     const res = await fetch(
-      `${pmUrl}/api/users?populate=department&pagination[pageSize]=500`,
-      { signal: ctrl.signal }
+      `${pmUrl}/api/internal-sync/users`,
+      { signal: ctrl.signal, headers: { 'X-Internal-Token': token } }
     ).finally(() => clearTimeout(t));
     if (!res.ok) {
       console.warn(`⚠️ sync users: HTTP ${res.status} from ${pmUrl}`);
@@ -139,23 +144,28 @@ async function syncUsersFromPm(strapi: any) {
 
 async function syncDepartmentsFromPm(strapi: any) {
   const pmUrl = process.env.SERVER_PM_URL;
+  const token = process.env.INTERNAL_SYNC_TOKEN;
   if (!pmUrl) {
     console.warn('⚠️ SERVER_PM_URL not set — skipping department sync from server-pm');
+    return;
+  }
+  if (!token) {
+    console.warn('⚠️ INTERNAL_SYNC_TOKEN not set — skipping department sync from server-pm');
     return;
   }
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 15000);
     const res = await fetch(
-      `${pmUrl}/api/departments?pagination[pageSize]=500&fields[0]=name_ru&fields[1]=name_kz&fields[2]=key`,
-      { signal: ctrl.signal }
+      `${pmUrl}/api/internal-sync/departments`,
+      { signal: ctrl.signal, headers: { 'X-Internal-Token': token } }
     ).finally(() => clearTimeout(t));
     if (!res.ok) {
       console.warn(`⚠️ sync departments: HTTP ${res.status} from ${pmUrl}`);
       return;
     }
     const json: any = await res.json();
-    const items: any[] = Array.isArray(json?.data) ? json.data : [];
+    const items: any[] = Array.isArray(json) ? json : Array.isArray(json?.data) ? json.data : [];
     if (items.length === 0) {
       console.warn('⚠️ sync departments: empty list from server-pm');
       return;

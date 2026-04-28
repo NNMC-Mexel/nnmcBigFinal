@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { adminUsersApi, AdminUser } from '../../api/adminUsers';
 import { projectsApi } from '../../api/projects';
+import { departmentsApi } from '../../api/departments';
 import type { Project, Department } from '../../types';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -130,31 +131,50 @@ export default function AdminPanelPage() {
   }, []);
 
   const loadKpiDepartments = async () => {
+    const collected = new Set<string>();
+
+    // Source 1: legacy KPI departments from server-kpi (deduced from existing employees)
     try {
       const base = `${window.location.protocol}//${window.location.hostname}:12011/api`;
       const token = localStorage.getItem('kpi_token');
       const res = await fetch(`${base}/kpi-list`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) {
-        console.warn('loadKpiDepartments: HTTP', res.status);
-        return;
+      if (res.ok) {
+        const json: any = await res.json();
+        const items: any[] = Array.isArray(json)
+          ? json
+          : Array.isArray(json?.items)
+          ? json.items
+          : Array.isArray(json?.data)
+          ? json.data
+          : [];
+        for (const x of items) {
+          const name = String(x?.department || '').trim();
+          if (name) collected.add(name);
+        }
+      } else {
+        console.warn('loadKpiDepartments: kpi-list HTTP', res.status);
       }
-      const json: any = await res.json();
-      const items: any[] = Array.isArray(json)
-        ? json
-        : Array.isArray(json?.items)
-        ? json.items
-        : Array.isArray(json?.data)
-        ? json.data
-        : [];
-      const names = Array.from(
-        new Set(items.map((x: any) => String(x?.department || '').trim()).filter(Boolean))
-      ).sort((a, b) => a.localeCompare(b, 'ru'));
-      setKpiDepartments(names);
     } catch (err) {
-      console.warn('loadKpiDepartments failed:', err);
+      console.warn('loadKpiDepartments: kpi-list failed:', err);
     }
+
+    // Source 2: server-pm departments where canViewKpiTimesheet=true
+    try {
+      const list = await departmentsApi.getAll();
+      for (const dept of list) {
+        if ((dept as any).canViewKpiTimesheet) {
+          const name = String((dept as any).name_ru || '').trim();
+          if (name) collected.add(name);
+        }
+      }
+    } catch (err) {
+      console.warn('loadKpiDepartments: pm departments failed:', err);
+    }
+
+    const names = Array.from(collected).sort((a, b) => a.localeCompare(b, 'ru'));
+    setKpiDepartments(names);
   };
 
   useEffect(() => {
