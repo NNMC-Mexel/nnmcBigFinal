@@ -5,7 +5,9 @@
  */
 
 export const getUserFlags = (user?: { isSuperAdmin?: boolean } | null) => {
-  const isSuperAdmin = user?.isSuperAdmin === true;
+  const isSuperAdmin =
+    user?.isSuperAdmin === true ||
+    getRoleFlags((user as any)?.role).isSuperAdmin;
   return { isSuperAdmin };
 };
 

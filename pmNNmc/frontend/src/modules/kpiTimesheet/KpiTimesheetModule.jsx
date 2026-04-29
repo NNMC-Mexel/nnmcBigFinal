@@ -18,6 +18,10 @@ import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import EdsSignature from "../signDoc/components/EdsSignature";
 import {
+  getMyDocuments as getSignDocDocuments,
+  revokeDocument as revokeSignDocDocument,
+} from "../signDoc/api/signdocClient";
+import {
   apiCalcKpiJson,
   apiCalcKpiExcel,
   apiCalcKpiBuhPdf,
@@ -323,6 +327,7 @@ function AccessModal({ user, departments, onCancel, onSave }) {
 // ======================= Основной модуль =======================
 
 const MONTH_NAMES_RU = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+const ACTIVE_KPI_DOCUMENT_STATUSES = new Set(["pending", "in_progress"]);
 
 export default function KpiTimesheetModule({ user, onKpiLogout }) {
   const navigate = useNavigate();
@@ -394,6 +399,9 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
 
   // Pre-sign confirmation modal
   const [signPreview, setSignPreview] = useState(null); // null or { action: 'signdoc'|'eds' }
+  const [duplicateWarning, setDuplicateWarning] = useState(null);
+  const [sentProtocols, setSentProtocols] = useState([]);
+  const [sentProtocolsLoading, setSentProtocolsLoading] = useState(false);
 
   const isAdmin =
     String(user?.role || "").toLowerCase().includes("admin") ||
@@ -901,6 +909,81 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     };
   };
 
+  const buildKpiDocumentMetadata = () => ({
+    source: "kpi-timesheet",
+    department: calcDepartment,
+    period: {
+      year: parseInt(year, 10),
+      month: parseInt(month, 10),
+    },
+    nchDay: parseInt(nchDay, 10) || 0,
+    ndShift: parseInt(ndShift, 10) || 0,
+    edited: hasEdits,
+    generatedAt: new Date().toISOString(),
+    results: (calcResults || []).map((row) => ({
+      fio: row.fio || "",
+      department: row.department || calcDepartment,
+      kpiFinal: Number(row.kpiFinal || 0),
+    })),
+  });
+
+  const getKpiMetadata = (doc) => doc?.metadata?.kpi || doc?.metadata || {};
+
+  const isSameKpiPeriod = (doc) => {
+    const meta = getKpiMetadata(doc);
+    const period = meta?.period || {};
+    return (
+      meta?.source === "kpi-timesheet" &&
+      String(meta?.department || "").toLowerCase() === String(calcDepartment || "").toLowerCase() &&
+      Number(period?.year) === Number(year) &&
+      Number(period?.month) === Number(month)
+    );
+  };
+
+  const findDuplicateKpiDocuments = async () => {
+    const token = localStorage.getItem("signdoc_token");
+    if (!token) return [];
+    try {
+      const docs = await getSignDocDocuments();
+      return (docs || []).filter(
+        (doc) => isSameKpiPeriod(doc) && ACTIVE_KPI_DOCUMENT_STATUSES.has(doc.status)
+      );
+    } catch (err) {
+      console.warn("KPI duplicate check skipped:", err);
+      return [];
+    }
+  };
+
+  const loadSentProtocols = async () => {
+    setSentProtocolsLoading(true);
+    try {
+      const docs = await getSignDocDocuments();
+      const items = (docs || [])
+        .filter((doc) => getKpiMetadata(doc)?.source === "kpi-timesheet")
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setSentProtocols(items);
+    } catch (err) {
+      console.warn("KPI protocol list failed:", err);
+      setSentProtocols([]);
+      showToast("Не удалось загрузить протоколы SignDoc", "error");
+    } finally {
+      setSentProtocolsLoading(false);
+    }
+  };
+
+  const handleRevokeProtocol = async (doc) => {
+    if (!doc) return;
+    const confirmed = window.confirm(`Отозвать протокол "${doc.title}" на пересчёт?`);
+    if (!confirmed) return;
+    try {
+      await revokeSignDocDocument(doc.documentId || doc.id, "Отозван KPI-ответственным на пересчёт");
+      showToast("Протокол отозван");
+      await loadSentProtocols();
+    } catch (err) {
+      showToast(err?.message || "Ошибка отзыва протокола", "error");
+    }
+  };
+
   const doSendToSignDoc = async () => {
     try {
       showToast("Формирование PDF для подписания…");
@@ -943,6 +1026,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
           pendingTitle: title,
           pendingSigners,
           pendingSequential: true,
+          pendingMetadata: buildKpiDocumentMetadata(),
         },
       });
     } catch (err) {
@@ -985,9 +1069,23 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
 
   const handleConfirmSign = async () => {
     const action = signPreview?.action;
+    if (action === "signdoc") {
+      const duplicates = await findDuplicateKpiDocuments();
+      if (duplicates.length > 0) {
+        setDuplicateWarning({ action, duplicates });
+        return;
+      }
+    }
     setSignPreview(null);
     if (action === "signdoc") await doSendToSignDoc();
     else if (action === "eds") await doSignEds();
+  };
+
+  const continueAfterDuplicateWarning = async () => {
+    const action = duplicateWarning?.action;
+    setDuplicateWarning(null);
+    setSignPreview(null);
+    if (action === "signdoc") await doSendToSignDoc();
   };
 
   const recomputePreSignRow = (row) => {
@@ -1048,6 +1146,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         pendingCms: edsResult.cmsBlob,
         pendingMeta: edsResult.meta,
         pendingPreSigned: true,
+        pendingMetadata: buildKpiDocumentMetadata(),
       },
     });
   };
@@ -1131,6 +1230,9 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         </button>
         <button className={`kpi-module-nav-tab${activeTab === "archive" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => { setActiveTab("archive"); loadArchive(); }}>
           Архив расчётов
+        </button>
+        <button className={`kpi-module-nav-tab${activeTab === "protocols" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => { setActiveTab("protocols"); loadSentProtocols(); }}>
+          Протоколы на подписи
         </button>
         <button className={`kpi-module-nav-tab${activeTab === "kpi" ? " kpi-module-nav-tab-active" : ""}`} onClick={() => setActiveTab("kpi")}>
           Справочник сотрудников
@@ -1894,6 +1996,61 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
           </section>
         )}
 
+        {/* =================== Протоколы SignDoc =================== */}
+        {activeTab === "protocols" && (
+          <section className="card">
+            <div className="card-header-row">
+              <div>
+                <h2>Протоколы на подписи</h2>
+                <p className="card-subtitle">KPI-протоколы, отправленные в SignDoc. Отозванные документы остаются в архиве документооборота.</p>
+              </div>
+              <button className="btn btn-secondary" onClick={loadSentProtocols} disabled={sentProtocolsLoading}>Обновить</button>
+            </div>
+            {sentProtocolsLoading ? (
+              <div className="empty-state">Загрузка протоколов...</div>
+            ) : sentProtocols.length === 0 ? (
+              <div className="empty-state">Отправленных KPI-протоколов нет.</div>
+            ) : (
+              <div className="table-wrapper">
+                <table>
+                  <thead>
+                    <tr><th>Дата</th><th>Документ</th><th>Период</th><th>Отдел</th><th>Статус</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    {sentProtocols.map((doc) => {
+                      const meta = getKpiMetadata(doc);
+                      const period = meta?.period || {};
+                      const monthName = MONTH_NAMES_RU[Number(period.month)] || period.month || "—";
+                      const canRevoke = ACTIVE_KPI_DOCUMENT_STATUSES.has(doc.status);
+                      return (
+                        <tr key={doc.documentId || doc.id}>
+                          <td>{doc.createdAt ? new Date(doc.createdAt).toLocaleString("ru-RU") : "—"}</td>
+                          <td>
+                            <div style={{ fontWeight: 600 }}>{doc.title}</div>
+                            <div style={{ fontSize: 12, color: "#64748b" }}>{doc.documentId || doc.id}</div>
+                          </td>
+                          <td>{monthName} {period.year || ""}</td>
+                          <td>{meta?.department || "—"}</td>
+                          <td>{doc.status === "in_progress" ? "В процессе" : doc.status === "pending" ? "Ожидает" : doc.status === "completed" ? "Подписан" : doc.status === "revoked" ? "Отозван" : doc.status}</td>
+                          <td style={{ textAlign: "right" }}>
+                            {canRevoke ? (
+                              <button className="btn btn-danger btn-sm" onClick={() => handleRevokeProtocol(doc)}>
+                                Отозвать
+                              </button>
+                            ) : (
+                              <span className="muted">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
         {/* =================== Архив расчётов =================== */}
         {activeTab === "archive" && (
           <section className="card">
@@ -2116,6 +2273,32 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={() => setSignPreview(null)}>Назад</button>
               <button className="btn btn-primary" onClick={handleConfirmSign}>Подтверждаю</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {duplicateWarning && (
+        <div className="modal-overlay" onClick={() => setDuplicateWarning(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">Протокол уже отправлен</h3>
+            <p className="modal-text">
+              За {MONTH_NAMES_RU[Number(month)] || month} {year} по отделу {calcDepartment} уже есть протокол в статусе pending/in_progress.
+            </p>
+            <div style={{ margin: "12px 0", maxHeight: 180, overflow: "auto" }}>
+              {(duplicateWarning.duplicates || []).map((doc) => (
+                <div key={doc.documentId || doc.id} style={{ padding: "8px 0", borderBottom: "1px solid #e2e8f0" }}>
+                  <div style={{ fontWeight: 600 }}>{doc.title}</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>
+                    {doc.status} • {doc.createdAt ? new Date(doc.createdAt).toLocaleString("ru-RU") : ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="modal-subtext">Продолжить отправку нового протокола?</p>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setDuplicateWarning(null)}>Отмена</button>
+              <button className="btn btn-primary" onClick={continueAfterDuplicateWarning}>Продолжить</button>
             </div>
           </div>
         </div>

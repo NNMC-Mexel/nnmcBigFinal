@@ -1,5 +1,6 @@
 import { errors } from '@strapi/utils';
 import { getRequestUserId } from '../../../../utils/activity-log';
+import { createAuditEvent } from '../../../../utils/audit-event';
 
 const { ValidationError } = errors;
 
@@ -24,6 +25,39 @@ const resolveProjectByWhere = async (where: any, strapi: any) => {
     });
   }
   return null;
+};
+
+const resolveProjectForAudit = async (where: any, strapi: any) => {
+  if (!where) return null;
+  const populate = ['department', 'owner', 'managers', 'supportingSpecialists', 'responsibleUsers'];
+  if (where.id) {
+    return await strapi.entityService.findOne('api::project.project', where.id, { populate });
+  }
+  if (where.documentId) {
+    return await strapi.documents('api::project.project').findOne({
+      documentId: where.documentId,
+      populate,
+    });
+  }
+  return null;
+};
+
+const projectAuditSnapshot = (project: any) => {
+  if (!project) return null;
+  return {
+    id: project.id,
+    documentId: project.documentId,
+    title: project.title,
+    status: project.status,
+    department: project.department?.id || project.department || null,
+    owner: project.owner?.id || project.owner || null,
+    managers: (project.managers || []).map((u: any) => u?.id || u),
+    supportingSpecialists: (project.supportingSpecialists || []).map((u: any) => u?.id || u),
+    responsibleUsers: (project.responsibleUsers || []).map((u: any) => u?.id || u),
+    startDate: project.startDate,
+    dueDate: project.dueDate,
+    priorityLight: project.priorityLight,
+  };
 };
 
 const validateProjectDates = async (event: any, strapi: any) => {
@@ -90,6 +124,13 @@ export default {
           metadata: { projectTitle: result.title },
         },
       });
+      await createAuditEvent(strapi, {
+        action: 'create',
+        entityType: 'api::project.project',
+        entityId: result.documentId || result.id,
+        actor: userId,
+        newData: projectAuditSnapshot(result),
+      });
     } catch (error) {
       console.error('Failed to log activity:', error);
     }
@@ -97,6 +138,8 @@ export default {
 
   async beforeUpdate(event: any) {
     const strapi = (global as any).strapi;
+    event.state = event.state || {};
+    event.state.auditOldData = await resolveProjectForAudit(event?.params?.where, strapi);
     const data = event?.params?.data || {};
     if (data.status === 'DELETED') return;
     await validateProjectDates(event, strapi);
@@ -164,8 +207,35 @@ export default {
           },
         });
       }
+
+      await createAuditEvent(strapi, {
+        action: data?.status === 'DELETED' ? 'delete' : 'update',
+        entityType: 'api::project.project',
+        entityId: result.documentId || result.id,
+        actor: userId,
+        oldData: projectAuditSnapshot(event?.state?.auditOldData),
+        newData: projectAuditSnapshot(result),
+      });
     } catch (error) {
       console.error('Failed to log activity:', error);
     }
+  },
+
+  async beforeDelete(event: any) {
+    const strapi = (global as any).strapi;
+    event.state = event.state || {};
+    event.state.auditOldData = await resolveProjectForAudit(event?.params?.where, strapi);
+  },
+
+  async afterDelete(event: any) {
+    const strapi = (global as any).strapi;
+    const userId = event?.state?.user?.id ?? getRequestUserId(strapi);
+    await createAuditEvent(strapi, {
+      action: 'delete',
+      entityType: 'api::project.project',
+      entityId: event?.result?.documentId || event?.result?.id || event?.params?.where?.id,
+      actor: userId,
+      oldData: projectAuditSnapshot(event?.state?.auditOldData || event?.result),
+    });
   },
 };

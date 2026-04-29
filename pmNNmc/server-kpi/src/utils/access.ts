@@ -7,6 +7,9 @@ type UserAccess = {
   roleName: string;
   allowedDepartments: string[];
   userId?: number;
+  departmentKey?: string;
+  departmentName?: string;
+  isKpiResponsible?: boolean;
 };
 
 const ADMIN_ROLE_HINTS = ['admin', 'administrator', 'super admin', 'superadmin'];
@@ -36,6 +39,11 @@ function isAdminLogin(user: any): boolean {
   );
 }
 
+function hasGlobalDepartmentAccess(departmentKey: string): boolean {
+  const normalized = String(departmentKey || '').trim().toUpperCase();
+  return normalized === 'ACCOUNTING' || normalized === 'DIGITALIZATION';
+}
+
 export async function getUserAccess(ctx: Context): Promise<UserAccess> {
   const user = (ctx.state as any)?.user;
   if (!user) {
@@ -45,6 +53,9 @@ export async function getUserAccess(ctx: Context): Promise<UserAccess> {
   let roleName = '';
   let allowedDepartments: string[] | null = null;
   let isSuperAdmin = Boolean((user as any)?.isSuperAdmin);
+  let isKpiResponsible = Boolean((user as any)?.isKpiResponsible);
+  let departmentKey = String((user as any)?.departmentKey || '').trim();
+  let departmentName = String((user as any)?.departmentName || '').trim();
 
   if (user.role && typeof user.role === 'object') {
     roleName = String(user.role.name || user.role.type || '');
@@ -54,7 +65,7 @@ export async function getUserAccess(ctx: Context): Promise<UserAccess> {
     allowedDepartments = normalizeDepartments(user.allowedDepartments);
   }
 
-  if (!roleName || allowedDepartments === null || !isSuperAdmin) {
+  if (!roleName || allowedDepartments === null || !isSuperAdmin || !departmentKey || !departmentName || !isKpiResponsible) {
     const fullUser = await strapi.entityService.findOne(
       'plugin::users-permissions.user',
       user.id,
@@ -72,14 +83,40 @@ export async function getUserAccess(ctx: Context): Promise<UserAccess> {
     if (!isSuperAdmin) {
       isSuperAdmin = Boolean(fullUser?.isSuperAdmin);
     }
+
+    if (!isKpiResponsible) {
+      isKpiResponsible = Boolean(fullUser?.isKpiResponsible);
+    }
+
+    if (!departmentKey) {
+      departmentKey = String(fullUser?.departmentKey || '').trim();
+    }
+
+    if (!departmentName) {
+      departmentName = String(fullUser?.departmentName || '').trim();
+    }
   }
 
-  const normalized = allowedDepartments || [];
+  let normalized = allowedDepartments || [];
+  if (isKpiResponsible && departmentKey && !normalized.includes(departmentKey)) {
+    normalized.push(departmentKey);
+  }
+  const isAdminAccess =
+    isSuperAdmin ||
+    isAdminRole(roleName) ||
+    isAdminLogin(user) ||
+    hasGlobalDepartmentAccess(departmentKey);
+  if (!isAdminAccess && !isKpiResponsible) {
+    normalized = [];
+  }
 
   return {
-    isAdmin: isSuperAdmin || isAdminRole(roleName) || isAdminLogin(user),
+    isAdmin: isAdminAccess,
     roleName,
     allowedDepartments: normalized,
     userId: user.id,
+    departmentKey,
+    departmentName,
+    isKpiResponsible,
   };
 }

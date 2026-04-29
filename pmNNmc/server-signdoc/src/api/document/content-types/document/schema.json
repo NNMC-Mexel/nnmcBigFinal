@@ -18,7 +18,7 @@
     },
     "status": {
       "type": "enumeration",
-      "enum": ["pending", "in_progress", "completed", "cancelled", "revision"],
+      "enum": ["pending", "in_progress", "completed", "cancelled", "revision", "revoked"],
       "default": "pending",
       "required": true
     },
@@ -54,6 +54,9 @@
       "type": "json"
     },
     "signatureHistory": {
+      "type": "json"
+    },
+    "metadata": {
       "type": "json"
     },
     "documentType": {

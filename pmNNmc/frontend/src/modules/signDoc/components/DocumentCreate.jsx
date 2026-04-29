@@ -46,6 +46,7 @@ export default function DocumentCreate() {
 
     // Pre-signed data from KPI or other modules (already signed with EDS before entering wizard)
     const [preSignedData, setPreSignedData] = useState(null);
+    const [pendingMetadata, setPendingMetadata] = useState(null);
 
     // Массовое подписание ЭЦП
     const [currentSigningIndex, setCurrentSigningIndex] = useState(0);
@@ -81,6 +82,7 @@ export default function DocumentCreate() {
                 cmsBlob: state.pendingCms,
                 meta: state.pendingMeta,
             });
+            setPendingMetadata(state.pendingMetadata || null);
             setSignedFiles([{
                 pdf: file,
                 cms: state.pendingCms,
@@ -92,6 +94,7 @@ export default function DocumentCreate() {
                     timestamp: state.pendingMeta?.timestamp || new Date().toISOString(),
                 },
                 title,
+                metadata: state.pendingMetadata || null,
             }]);
             setStep(4);
             navigate(location.pathname, { replace: true, state: {} });
@@ -106,6 +109,7 @@ export default function DocumentCreate() {
             if (state.pendingSequential != null) {
                 setSequential(Boolean(state.pendingSequential));
             }
+            setPendingMetadata(state.pendingMetadata || null);
             navigate(location.pathname, { replace: true, state: {} });
         }
     }, []);
@@ -126,6 +130,8 @@ export default function DocumentCreate() {
                     documentId: u.documentId || null,
                     fullName: u.fullName || p.fullName || u.username || u.email,
                     email: u.email,
+                    userName: u.fullName || p.fullName || u.username || u.email,
+                    userEmail: u.email,
                     role: p.role || "Подписант",
                     order: p.order,
                     department: u.department?.name || u.departmentName || "",
@@ -339,13 +345,14 @@ export default function DocumentCreate() {
         signatureData
     ) => {
         setSignedFiles([
-            {
-                pdf: signedPdfBlob,
-                cms: cmsBlob,
-                signature: signatureData,
-                title: titles[0],
-            },
-        ]);
+                {
+                    pdf: signedPdfBlob,
+                    cms: cmsBlob,
+                    signature: signatureData,
+                    title: titles[0],
+                    metadata: pendingMetadata,
+                },
+            ]);
         setStep(4);
         toast.success("Документ успешно подписан");
     };
@@ -381,6 +388,7 @@ export default function DocumentCreate() {
                     cms: cmsBlob,
                     signature: signatureData,
                     title: titles[sourceIndex],
+                    metadata: sourceIndex === 0 ? pendingMetadata : null,
                 },
             ];
         });
@@ -447,6 +455,7 @@ export default function DocumentCreate() {
                         signers: selectedSigners,
                         signatureSequential: sequential,
                         signatureType: signatureType,
+                        metadata: signedFile.metadata || null,
                         signatureHistory: [
                             {
                                 userId: currentUser.id,

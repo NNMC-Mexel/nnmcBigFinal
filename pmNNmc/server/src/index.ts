@@ -73,6 +73,7 @@ async function setupPermissions(strapi: any) {
     'api::board-stage.board-stage': ['find', 'findOne'],
     'api::meeting.meeting': ['find', 'findOne', 'create', 'update', 'delete'],
     'api::activity-log.activity-log': ['find', 'findOne'],
+    'api::audit-event.audit-event': ['find', 'findOne'],
     'api::document.document': ['find', 'findOne', 'create', 'update', 'delete'],
     'api::survey-response.survey-response': ['create'],
     // Analytics

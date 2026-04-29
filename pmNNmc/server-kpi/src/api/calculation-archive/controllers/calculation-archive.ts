@@ -1,3 +1,137 @@
 import { factories } from '@strapi/strapi';
+import { getUserAccess } from '../../../utils/access';
 
-export default factories.createCoreController('api::calculation-archive.calculation-archive' as any);
+const UID = 'api::calculation-archive.calculation-archive' as any;
+
+function canAccessDepartment(access: any, department: string): boolean {
+  if (access.isAdmin) return true;
+  return (access.allowedDepartments || []).includes(String(department || '').trim());
+}
+
+function applyDepartmentFilter(ctx: any, allowedDepartments: string[]) {
+  const accessFilter = { department: { $in: allowedDepartments } };
+  ctx.query.filters = ctx.query.filters
+    ? { $and: [ctx.query.filters, accessFilter] }
+    : accessFilter;
+}
+
+async function findArchive(strapi: any, id: any) {
+  const rawId = String(id || '');
+  if (/^\d+$/.test(rawId)) {
+    return await strapi.entityService.findOne(UID, Number(rawId));
+  }
+  return await strapi.documents(UID).findOne({ documentId: rawId });
+}
+
+function pushAuditEvent(strapi: any, payload: any) {
+  const pmUrl = process.env.SERVER_PM_URL;
+  const token = process.env.INTERNAL_SYNC_TOKEN;
+  if (!pmUrl || !token) return;
+  fetch(`${pmUrl}/api/internal-audit-events`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Internal-Token': token,
+    },
+    body: JSON.stringify(payload),
+  }).catch((e: any) => strapi.log?.warn?.(`[audit] failed: ${e?.message || e}`));
+}
+
+function snapshotArchive(item: any) {
+  if (!item) return null;
+  return {
+    id: item.id,
+    documentId: item.documentId,
+    year: item.year,
+    month: item.month,
+    department: item.department,
+    calculatedBy: item.calculatedBy,
+    employeeCount: item.employeeCount,
+    edited: item.edited,
+  };
+}
+
+export default factories.createCoreController(UID, ({ strapi }) => ({
+  async find(ctx) {
+    const access = await getUserAccess(ctx);
+    if (!access.isAdmin) {
+      const allowedDepartments = access.allowedDepartments || [];
+      if (allowedDepartments.length === 0) {
+        ctx.body = { data: [], meta: { pagination: { page: 1, pageSize: 0, pageCount: 0, total: 0 } } };
+        return;
+      }
+      applyDepartmentFilter(ctx, allowedDepartments);
+    }
+    return await super.find(ctx);
+  },
+
+  async findOne(ctx) {
+    const access = await getUserAccess(ctx);
+    const archive = await findArchive(strapi, ctx.params.id);
+    if (!archive) return ctx.notFound('Расчёт не найден');
+    if (!canAccessDepartment(access, archive.department)) {
+      return ctx.forbidden('Нет доступа к этому отделу');
+    }
+    return await super.findOne(ctx);
+  },
+
+  async create(ctx) {
+    const access = await getUserAccess(ctx);
+    const data = ctx.request.body?.data || {};
+    if (!canAccessDepartment(access, data.department)) {
+      return ctx.forbidden('Нет доступа к этому отделу');
+    }
+    const result: any = await super.create(ctx);
+    const created = result?.data || result;
+    pushAuditEvent(strapi, {
+      action: 'create',
+      entityType: UID,
+      entityId: String(created?.documentId || created?.id || ''),
+      actorEmail: ctx.state.user?.email || null,
+      newData: snapshotArchive(created),
+    });
+    return result;
+  },
+
+  async update(ctx) {
+    const access = await getUserAccess(ctx);
+    const before = await findArchive(strapi, ctx.params.id);
+    if (!before) return ctx.notFound('Расчёт не найден');
+    if (!canAccessDepartment(access, before.department)) {
+      return ctx.forbidden('Нет доступа к этому отделу');
+    }
+    const nextDepartment = ctx.request.body?.data?.department;
+    if (nextDepartment && !canAccessDepartment(access, nextDepartment)) {
+      return ctx.forbidden('Нет доступа к указанному отделу');
+    }
+    const result: any = await super.update(ctx);
+    const after = result?.data || result;
+    pushAuditEvent(strapi, {
+      action: 'update',
+      entityType: UID,
+      entityId: String(after?.documentId || after?.id || ctx.params.id),
+      actorEmail: ctx.state.user?.email || null,
+      oldData: snapshotArchive(before),
+      newData: snapshotArchive(after),
+    });
+    return result;
+  },
+
+  async delete(ctx) {
+    const access = await getUserAccess(ctx);
+    const before = await findArchive(strapi, ctx.params.id);
+    if (!before) return ctx.notFound('Расчёт не найден');
+    if (!canAccessDepartment(access, before.department)) {
+      return ctx.forbidden('Нет доступа к этому отделу');
+    }
+    const result = await super.delete(ctx);
+    pushAuditEvent(strapi, {
+      action: 'delete',
+      entityType: UID,
+      entityId: String(before?.documentId || before?.id),
+      actorEmail: ctx.state.user?.email || null,
+      oldData: snapshotArchive(before),
+    });
+    return result;
+  },
+}));

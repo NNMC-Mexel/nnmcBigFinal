@@ -32,6 +32,72 @@ async function checkSuperAdmin(
   return true;
 }
 
+async function getFullCurrentUser(ctx: any, strapi: any) {
+  const user = ctx.state.user;
+  if (!user?.id) return null;
+  return await strapi.entityService.findOne('plugin::users-permissions.user', user.id, {
+    fields: ['id', 'isSuperAdmin'],
+    populate: ['department'],
+  }) as any;
+}
+
+function buildProjectAccessFilter(user: any) {
+  const userId = user?.id;
+  const departmentId = user?.department?.id || user?.department || null;
+  const filters: any[] = [
+    { owner: { id: { $eq: userId } } },
+    { managers: { id: { $eq: userId } } },
+    { supportingSpecialists: { id: { $eq: userId } } },
+    { responsibleUsers: { id: { $eq: userId } } },
+  ];
+  if (departmentId) {
+    filters.push({ department: { id: { $eq: departmentId } } });
+  }
+  return { $or: filters };
+}
+
+function mergeProjectFilters(existing: any, accessFilter: any) {
+  if (!existing || Object.keys(existing).length === 0) return accessFilter;
+  return { $and: [existing, accessFilter] };
+}
+
+function relationHasUser(relation: any, userId: number) {
+  if (!relation) return false;
+  const list = Array.isArray(relation) ? relation : [relation];
+  return list.some((item) => Number(item?.id || item) === Number(userId));
+}
+
+function projectDepartmentId(project: any) {
+  return Number(project?.department?.id || project?.department || 0) || null;
+}
+
+function userCanAccessProject(project: any, user: any) {
+  if (!project || !user) return false;
+  if (user?.isSuperAdmin === true) return true;
+  if (project.status === 'DELETED') return false;
+  const userId = Number(user.id);
+  const userDepartmentId = Number(user?.department?.id || user?.department || 0) || null;
+  return (
+    relationHasUser(project.owner, userId) ||
+    relationHasUser(project.managers, userId) ||
+    relationHasUser(project.supportingSpecialists, userId) ||
+    relationHasUser(project.responsibleUsers, userId) ||
+    (userDepartmentId !== null && projectDepartmentId(project) === userDepartmentId)
+  );
+}
+
+async function findProjectForAccess(strapi: any, id: any) {
+  const populate = ['department', 'owner', 'managers', 'supportingSpecialists', 'responsibleUsers'];
+  const rawId = String(id || '');
+  if (/^\d+$/.test(rawId)) {
+    return await strapi.entityService.findOne('api::project.project', Number(rawId), { populate }) as any;
+  }
+  return await strapi.documents('api::project.project').findOne({
+    documentId: rawId,
+    populate,
+  }) as any;
+}
+
 export default factories.createCoreController('api::project.project', ({ strapi }) => ({
   // Custom create — bypass REST API sanitizer that rejects relation fields
   async create(ctx) {
@@ -64,6 +130,20 @@ export default factories.createCoreController('api::project.project', ({ strapi 
   async update(ctx) {
     const paramId = ctx.params.id;
     const data = ctx.request.body?.data || {};
+    const currentUser = await getFullCurrentUser(ctx, strapi);
+    if (!currentUser) {
+      ctx.throw(401, 'Not authenticated');
+      return;
+    }
+    const existingForAccess = await findProjectForAccess(strapi, paramId);
+    if (!existingForAccess) {
+      ctx.throw(404, 'Project not found');
+      return;
+    }
+    if (!userCanAccessProject(existingForAccess, currentUser)) {
+      ctx.throw(403, 'Access denied');
+      return;
+    }
 
     // Resolve documentId → numeric id if needed
     let numericId = Number(paramId);
@@ -96,11 +176,22 @@ export default factories.createCoreController('api::project.project', ({ strapi 
   },
 
   async find(ctx) {
-    const isSuperAdmin = await checkSuperAdmin(ctx, strapi, { throwOnFail: false });
+    const currentUser = await getFullCurrentUser(ctx, strapi);
+    if (!currentUser) {
+      ctx.throw(401, 'Not authenticated');
+      return;
+    }
+    const isSuperAdmin = currentUser.isSuperAdmin === true;
+    if (!isSuperAdmin) {
+      const accessFilter = buildProjectAccessFilter(currentUser);
+      const notDeletedFilter = { status: { $ne: 'DELETED' } };
+      ctx.query.filters = mergeProjectFilters(
+        ctx.query.filters,
+        { $and: [accessFilter, notDeletedFilter] }
+      );
+    }
     const { data, meta } = await super.find(ctx);
-    const visibleData = isSuperAdmin
-      ? data
-      : data.filter((project: any) => project?.status !== 'DELETED');
+    const visibleData = isSuperAdmin ? data : data;
 
     const enrichedData = await Promise.all(
       visibleData.map(async (project: any) => {
@@ -112,6 +203,21 @@ export default factories.createCoreController('api::project.project', ({ strapi 
   },
 
   async findOne(ctx) {
+    const currentUser = await getFullCurrentUser(ctx, strapi);
+    if (!currentUser) {
+      ctx.throw(401, 'Not authenticated');
+      return;
+    }
+    const existingForAccess = await findProjectForAccess(strapi, ctx.params.id);
+    if (!existingForAccess) {
+      ctx.throw(404, 'Project not found');
+      return;
+    }
+    if (!userCanAccessProject(existingForAccess, currentUser)) {
+      ctx.throw(403, 'Access denied');
+      return;
+    }
+
     if (ctx.query.populate) {
       if (Array.isArray(ctx.query.populate)) {
         if (!ctx.query.populate.includes('meetings.author')) {
@@ -133,7 +239,7 @@ export default factories.createCoreController('api::project.project', ({ strapi 
 
     const response = await super.findOne(ctx);
     if (response?.data) {
-      const isSuperAdmin = await checkSuperAdmin(ctx, strapi, { throwOnFail: false });
+      const isSuperAdmin = currentUser.isSuperAdmin === true;
       if (!isSuperAdmin && response.data.status === 'DELETED') {
         ctx.throw(404, 'Project not found');
         return;

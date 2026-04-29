@@ -4,9 +4,11 @@ import {
     getMyDocuments,
     getPendingDocuments,
     updateDocument,
+    revokeDocument,
     uploadFile,
     getDocumentFileUrl,
     presignDocumentFile,
+    downloadAccountantExcel,
     getUser as getCurrentUser,
 } from "../api/signdocClient";
 import {
@@ -24,6 +26,7 @@ import {
     RotateCcw,
     Upload,
     AlertTriangle,
+    PauseCircle,
 } from "lucide-react";
 import DocumentSignatureApp from "./DocumentSignatureApp";
 import ConfirmModal from "./ConfirmModal";
@@ -113,7 +116,9 @@ export default function DocumentView() {
                 }
             });
 
-            const doc = allDocs.find((d) => d.id === parseInt(id));
+            const doc = allDocs.find(
+                (d) => String(d.id) === String(id) || String(d.documentId) === String(id)
+            );
 
             if (!doc) {
                 toast.error("Документ не найден");
@@ -129,7 +134,10 @@ export default function DocumentView() {
             if (mySigner) {
                 setMySignerInfo(mySigner);
 
-                if (mySigner.status === "pending") {
+                if (
+                    mySigner.status === "pending" &&
+                    !["completed", "cancelled", "revision", "revoked"].includes(doc.status)
+                ) {
                     if (doc.signatureSequential) {
                         const myIndex = signers.findIndex(
                             (s) => s.userId === currentUser.id,
@@ -242,6 +250,25 @@ export default function DocumentView() {
         } catch (error) {
             console.error("Ошибка скачивания:", error);
             toast.error("Ошибка при скачивании файла");
+        }
+    };
+
+    const handleDownloadAccountantExcel = async () => {
+        try {
+            const blob = await downloadAccountantExcel(documentData.documentId || documentData.id);
+            const url = window.URL.createObjectURL(blob);
+            const link = window.document.createElement("a");
+            link.href = url;
+            link.download =
+                documentData.metadata?.accountantExcel?.fileName ||
+                `${documentData.title}_accounting.xls`;
+            window.document.body.appendChild(link);
+            link.click();
+            window.document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Ошибка скачивания Excel:", error);
+            toast.error("Ошибка при скачивании Excel для бухгалтерии");
         }
     };
 
@@ -383,24 +410,9 @@ export default function DocumentView() {
     const handleRecall = async () => {
         setActionLoading(true);
         try {
-            const updatedHistory = [
-                ...(documentData.signatureHistory || []),
-                {
-                    type: "recall",
-                    userId: currentUser.id,
-                    userName:
-                        currentUser.fullName || currentUser.username,
-                    comment: recallComment || null,
-                    date: new Date().toISOString(),
-                },
-            ];
+            await revokeDocument(documentData.documentId || documentData.id, recallComment || "");
 
-            await updateDocument(documentData.documentId, {
-                status: "in_progress",
-                signatureHistory: updatedHistory,
-            });
-
-            toast.success("Документ отозван на корректировку");
+            toast.success("Документ отозван на пересчёт");
             setShowRecallModal(false);
             setRecallComment("");
             loadDocument();
@@ -536,13 +548,60 @@ export default function DocumentView() {
             signed: "text-green-600 bg-green-100",
             rejected: "text-red-600 bg-red-100",
             skipped: "text-gray-600 bg-gray-100",
+            current: "text-blue-600 bg-blue-100",
+            queued: "text-gray-600 bg-gray-100",
         };
         return colors[status] || colors.pending;
+    };
+
+    const getSequentialSignerStage = (signer, index) => {
+        if (signer.status === "signed") {
+            return {
+                status: "signed",
+                label: "Подписано",
+                description: signer.signedAt
+                    ? new Date(signer.signedAt).toLocaleString("ru-RU")
+                    : "",
+                icon: <CheckCircle className='w-4 h-4' />,
+            };
+        }
+        if (signer.status === "rejected") {
+            return {
+                status: "rejected",
+                label: "Отклонил",
+                description: "",
+                icon: <XCircle className='w-4 h-4' />,
+            };
+        }
+        const signers = sortedSigners;
+        const firstPendingIndex = signers.findIndex((s) => s.status === "pending");
+        const isCurrent = firstPendingIndex === index;
+        return {
+            status: isCurrent ? "current" : "queued",
+            label: isCurrent ? "Ожидает подписи" : "В очереди",
+            description: isCurrent ? "Текущий этап" : "",
+            icon: isCurrent ? (
+                <Clock className='w-4 h-4' />
+            ) : (
+                <PauseCircle className='w-4 h-4' />
+            ),
+        };
     };
 
     const signatureType = documentData.signatureType;
     const signatureHistory = documentData.signatureHistory || [];
     const hasCmsFiles = signatureHistory.some((sig) => sig.cmsFileUrl);
+    const isKpiDocument =
+        documentData.metadata?.source === "kpi-timesheet" ||
+        documentData.metadata?.kpi?.source === "kpi-timesheet";
+    const canDownloadAccountantExcel =
+        documentData.status === "completed" &&
+        (isKpiDocument || documentData.metadata?.accountantExcel);
+    const sortedSigners = documentData.signatureSequential
+        ? [...(documentData.signers || [])].sort(
+              (a, b) => (a.order ?? 9999) - (b.order ?? 9999)
+          )
+        : documentData.signers || [];
 
     return (
         <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8'>
@@ -584,10 +643,19 @@ export default function DocumentView() {
                                     Все CMS
                                 </button>
                             )}
+                            {canDownloadAccountantExcel && (
+                                <button
+                                    onClick={handleDownloadAccountantExcel}
+                                    className='flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors'>
+                                    <Download className='w-5 h-5' />
+                                    Excel для бухгалтерии
+                                </button>
+                            )}
                             {isCreator &&
                                 documentData.status !== "completed" &&
                                 documentData.status !== "cancelled" &&
-                                documentData.status !== "revision" && (
+                                documentData.status !== "revision" &&
+                                documentData.status !== "revoked" && (
                                     <button
                                         onClick={() =>
                                             setShowRecallModal(true)
@@ -617,6 +685,8 @@ export default function DocumentView() {
                                         "Отменён"}
                                     {documentData.status === "revision" &&
                                         "На корректировке"}
+                                    {documentData.status === "revoked" &&
+                                        "Отозван"}
                                 </p>
                             </div>
                             <div>
@@ -738,7 +808,9 @@ export default function DocumentView() {
                         </div>
                     )}
 
-                    {mySignerInfo && mySignerInfo.status === "pending" && (
+                    {mySignerInfo &&
+                        mySignerInfo.status === "pending" &&
+                        !["completed", "cancelled", "revision", "revoked"].includes(documentData.status) && (
                         <div className='mb-6'>
                             {canSign ? (
                                 <div className='flex gap-3'>
@@ -787,10 +859,39 @@ export default function DocumentView() {
                             Подписанты
                         </h2>
                         <div className='space-y-3'>
-                            {documentData.signers?.map((signer, index) => (
+                            {sortedSigners?.map((signer, index) => {
+                                const stage = documentData.signatureSequential
+                                    ? getSequentialSignerStage(signer, index)
+                                    : {
+                                          status: signer.status,
+                                          label:
+                                              signer.status === "signed"
+                                                  ? "Подписан"
+                                                  : signer.status === "rejected"
+                                                  ? "Отклонил"
+                                                  : "Ожидает",
+                                          description: signer.signedAt
+                                              ? new Date(signer.signedAt).toLocaleString("ru-RU")
+                                              : "",
+                                          icon:
+                                              signer.status === "signed" ? (
+                                                  <CheckCircle className='w-4 h-4' />
+                                              ) : signer.status === "rejected" ? (
+                                                  <XCircle className='w-4 h-4' />
+                                              ) : (
+                                                  <Clock className='w-4 h-4' />
+                                              ),
+                                      };
+                                return (
                                 <div
                                     key={signer.userId}
-                                    className='p-4 border border-gray-200 rounded-lg'>
+                                    className={`p-4 border rounded-lg ${
+                                        stage.status === "current"
+                                            ? "border-blue-200 bg-blue-50"
+                                            : stage.status === "signed"
+                                            ? "border-green-200 bg-green-50"
+                                            : "border-gray-200"
+                                    }`}>
                                     <div className='flex items-center justify-between'>
                                         <div className='flex items-center gap-3'>
                                             {documentData.signatureSequential && (
@@ -815,37 +916,21 @@ export default function DocumentView() {
                                         <div className='text-right'>
                                             <span
                                                 className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                                                    signer.status,
+                                                    stage.status,
                                                 )}`}>
-                                                {signer.status === "signed" && (
-                                                    <CheckCircle className='w-3 h-3' />
-                                                )}
-                                                {signer.status ===
-                                                    "pending" && (
-                                                    <Clock className='w-3 h-3' />
-                                                )}
-                                                {signer.status ===
-                                                    "rejected" && (
-                                                    <XCircle className='w-3 h-3' />
-                                                )}
-                                                {signer.status === "signed"
-                                                    ? "Подписан"
-                                                    : signer.status ===
-                                                      "rejected"
-                                                    ? "Отклонил"
-                                                    : "Ожидает"}
+                                                {stage.icon}
+                                                {stage.label}
                                             </span>
-                                            {signer.signedAt && (
+                                            {stage.description && (
                                                 <p className='text-xs text-gray-500 mt-1'>
-                                                    {new Date(
-                                                        signer.signedAt,
-                                                    ).toLocaleString("ru-RU")}
+                                                    {stage.description}
                                                 </p>
                                             )}
                                         </div>
                                     </div>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
 

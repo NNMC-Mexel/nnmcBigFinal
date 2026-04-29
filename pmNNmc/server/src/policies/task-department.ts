@@ -144,5 +144,19 @@ export default async (policyContext: any, _config: any, { strapi }: any) => {
     return false;
   }
 
+  const assigneeIds = extractIdsFromValue(data.assignee);
+  for (const assigneeId of assigneeIds) {
+    const assignee = (await strapi.entityService.findOne(
+      'plugin::users-permissions.user',
+      assigneeId,
+      { populate: ['department'] }
+    )) as any;
+    const assigneeDepartmentKey = assignee?.department?.key ?? null;
+    if (assigneeDepartmentKey && assigneeDepartmentKey !== projectDepartmentKey) {
+      ctx.throw(403, 'Task assignee must be from the project department');
+      return false;
+    }
+  }
+
   return true;
 };

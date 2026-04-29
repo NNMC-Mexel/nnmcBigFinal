@@ -44,6 +44,8 @@ async function syncUsersFromPm(strapi: any) {
       const username = String(pmUser?.username || email).trim();
       const isKpiResponsible = Boolean(pmUser?.isKpiResponsible);
       const isSuperAdmin = Boolean(pmUser?.isSuperAdmin);
+      const departmentKey = String(pmUser?.department?.key || '').trim();
+      const departmentName = String(pmUser?.department?.name_ru || '').trim();
 
       const existing = await strapi.db
         .query('plugin::users-permissions.user')
@@ -61,6 +63,8 @@ async function syncUsersFromPm(strapi: any) {
               blocked: false,
               role: authRole.id,
               allowedDepartments: [],
+              departmentKey,
+              departmentName,
               isKpiResponsible,
               isSuperAdmin,
             },
@@ -73,6 +77,8 @@ async function syncUsersFromPm(strapi: any) {
         const patch: Record<string, any> = {};
         if (isKpiResponsible !== existing.isKpiResponsible) patch.isKpiResponsible = isKpiResponsible;
         if (isSuperAdmin !== existing.isSuperAdmin) patch.isSuperAdmin = isSuperAdmin;
+        if (departmentKey !== existing.departmentKey) patch.departmentKey = departmentKey;
+        if (departmentName !== existing.departmentName) patch.departmentName = departmentName;
         if (Object.keys(patch).length > 0) {
           try {
             await strapi.entityService.update('plugin::users-permissions.user', existing.id, {

@@ -68,6 +68,12 @@
     "allowedDepartments": {
       "type": "json"
     },
+    "departmentKey": {
+      "type": "string"
+    },
+    "departmentName": {
+      "type": "string"
+    },
     "isKpiResponsible": {
       "type": "boolean",
       "default": false

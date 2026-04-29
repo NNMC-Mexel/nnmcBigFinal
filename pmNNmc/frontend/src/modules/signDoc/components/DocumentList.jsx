@@ -569,6 +569,11 @@ export default function DocumentList({ type = "my" }) {
                 color: "bg-amber-100 text-amber-800",
                 icon: AlertTriangle,
             },
+            revoked: {
+                text: "Отозван",
+                color: "bg-gray-100 text-gray-800",
+                icon: XCircle,
+            },
         };
 
         const badge = badges[status] || badges.draft;
@@ -739,6 +744,9 @@ export default function DocumentList({ type = "my" }) {
                                     </option>
                                     <option value='revision'>
                                         На корректировке
+                                    </option>
+                                    <option value='revoked'>
+                                        Отозванные
                                     </option>
                                 </select>
                             </div>
@@ -1131,7 +1139,9 @@ export default function DocumentList({ type = "my" }) {
                                                         doc.status !==
                                                             "completed" &&
                                                         doc.status !==
-                                                            "cancelled" && (
+                                                            "cancelled" &&
+                                                        doc.status !==
+                                                            "revoked" && (
                                                             <button
                                                                 onClick={() =>
                                                                     handleCancelClick(

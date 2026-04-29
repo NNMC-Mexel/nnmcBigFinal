@@ -12,5 +12,17 @@ export default {
             handler: "api::document.document.presignUrl",
             config: { policies: [], middlewares: [] },
         },
+        {
+            method: "POST",
+            path: "/documents/:id/revoke",
+            handler: "api::document.document.revoke",
+            config: { policies: [], middlewares: [] },
+        },
+        {
+            method: "GET",
+            path: "/documents/:id/accountant-excel",
+            handler: "api::document.document.downloadAccountantExcel",
+            config: { policies: [], middlewares: [] },
+        },
     ],
 };

@@ -17,6 +17,10 @@
       "required": true,
       "unique": true
     },
+    "key": {
+      "type": "string",
+      "unique": true
+    },
     "users": {
       "type": "relation",
       "relation": "oneToMany",

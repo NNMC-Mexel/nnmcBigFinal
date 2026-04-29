@@ -164,6 +164,16 @@ export async function cancelDocument(documentId) {
   return updateDocument(documentId, { status: "cancelled" });
 }
 
+export async function revokeDocument(documentId, reason = "") {
+  const res = await fetch(`${API_BASE}/documents/${documentId}/revoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    body: JSON.stringify({ reason }),
+  });
+  const json = await handleResponse(res);
+  return json.data;
+}
+
 // ─── File upload ─────────────────────────────────────────────
 export async function uploadFile(file) {
   const formData = new FormData();
@@ -199,6 +209,17 @@ export async function presignDocumentFile(documentId, key) {
   const url = json.url;
   if (url && !url.startsWith("http")) return `${SERVER_BASE}${url}`;
   return url;
+}
+
+export async function downloadAccountantExcel(documentId) {
+  const res = await fetch(`${API_BASE}/documents/${documentId}/accountant-excel`, {
+    headers: { ...getAuthHeader() },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  return res.blob();
 }
 
 // ─── Users ───────────────────────────────────────────────────

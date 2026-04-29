@@ -93,10 +93,18 @@ async function syncUsersFromPm(strapi: any) {
       const username = String(pmUser?.username || email).trim();
       const fullName = String(pmUser?.fullName || '').trim();
       const deptName = String(pmUser?.department?.name_ru || '').trim();
+      const deptKey = String(pmUser?.department?.key || '').trim();
       const isKpiResponsible = Boolean(pmUser?.isKpiResponsible);
+      const isSuperAdmin = Boolean(pmUser?.isSuperAdmin);
 
       let departmentId: number | null = null;
-      if (deptName) {
+      if (deptKey) {
+        const dept = await strapi.db
+          .query('api::department.department')
+          .findOne({ where: { key: deptKey } });
+        departmentId = dept?.id || null;
+      }
+      if (!departmentId && deptName) {
         const dept = await strapi.db
           .query('api::department.department')
           .findOne({ where: { name: deptName } });
@@ -115,6 +123,7 @@ async function syncUsersFromPm(strapi: any) {
             fullName,
             department: departmentId,
             isKpiResponsible,
+            isSuperAdmin,
             provider: 'local',
             password: `kc-${Math.random().toString(36).slice(2)}-${Date.now()}`,
             confirmed: true,
@@ -128,6 +137,7 @@ async function syncUsersFromPm(strapi: any) {
         if (fullName && fullName !== existing.fullName) patch.fullName = fullName;
         if (departmentId && existing.department !== departmentId) patch.department = departmentId;
         if (isKpiResponsible !== existing.isKpiResponsible) patch.isKpiResponsible = isKpiResponsible;
+        if (isSuperAdmin !== existing.isSuperAdmin) patch.isSuperAdmin = isSuperAdmin;
         if (Object.keys(patch).length > 0) {
           await strapi.entityService.update('plugin::users-permissions.user', existing.id, {
             data: patch,
@@ -175,18 +185,25 @@ async function syncDepartmentsFromPm(strapi: any) {
     for (const item of items) {
       const attrs = item?.attributes || item;
       const name = String(attrs?.name_ru || '').trim();
+      const key = String(attrs?.key || '').trim();
       if (!name) continue;
+      const filters = key ? { $or: [{ key }, { name }] } : { name };
       const existing = await (strapi.entityService as any).findMany(
         'api::department.department',
-        { filters: { name }, limit: 1 }
+        { filters, limit: 1 }
       );
       const list = Array.isArray(existing) ? existing : [];
       if (list.length === 0) {
         await (strapi.entityService as any).create('api::department.department', {
-          data: { name },
+          data: { name, key: key || null },
         });
         created += 1;
       } else {
+        if (key && list[0]?.key !== key) {
+          await strapi.entityService.update('api::department.department', list[0].id, {
+            data: { key },
+          });
+        }
         updated += 1;
       }
     }
