@@ -31,6 +31,55 @@ async function lockPublicRole(strapi: any) {
   }
 }
 
+async function ensureAuthenticatedPermissions(strapi: any) {
+  const role = await strapi.db
+    .query('plugin::users-permissions.role')
+    .findOne({ where: { type: 'authenticated' } });
+  if (!role) return;
+
+  const actions = [
+    'api::document.document.find',
+    'api::document.document.findOne',
+    'api::document.document.create',
+    'api::document.document.update',
+    'api::document.document.delete',
+    'api::document.document.getFileUrl',
+    'api::document.document.presignUrl',
+    'api::document.document.revoke',
+    'api::document.document.downloadAccountantExcel',
+    'api::document-type.document-type.find',
+    'api::document-type.document-type.findOne',
+    'api::department.department.find',
+    'api::department.department.findOne',
+    'api::subdivision.subdivision.find',
+    'api::subdivision.subdivision.findOne',
+  ];
+
+  for (const action of actions) {
+    const existing = await strapi.db
+      .query('plugin::users-permissions.permission')
+      .findOne({ where: { role: role.id, action } });
+
+    if (!existing) {
+      await strapi.db.query('plugin::users-permissions.permission').create({
+        data: {
+          role: role.id,
+          action,
+          enabled: true,
+        },
+      });
+      continue;
+    }
+
+    if (!existing.enabled) {
+      await strapi.db.query('plugin::users-permissions.permission').update({
+        where: { id: existing.id },
+        data: { enabled: true },
+      });
+    }
+  }
+}
+
 async function seedDocumentTypes(strapi: any) {
   const types = ['Табель', 'Отчёт', 'Тестирование'];
   for (const name of types) {
@@ -231,6 +280,7 @@ export default {
    */
   async bootstrap({ strapi }: { strapi: any }) {
     await lockPublicRole(strapi);
+    await ensureAuthenticatedPermissions(strapi);
     await seedDocumentTypes(strapi);
     await syncDepartmentsFromPm(strapi);
     await syncUsersFromPm(strapi);
