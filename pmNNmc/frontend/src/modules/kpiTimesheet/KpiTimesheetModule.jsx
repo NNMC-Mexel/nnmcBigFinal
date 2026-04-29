@@ -907,7 +907,44 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       const blob = await buildSignablePdfBlob();
       const { fileName, title } = buildFileNames();
       const file = new File([blob], fileName, { type: "application/pdf" });
-      navigate("/app/signdoc/documents/new", { state: { pendingFile: file, pendingTitle: title } });
+
+      // Pull static signers from per-department protocol template (if configured).
+      // Each commissionMember can include an email so SignDoc can map to user accounts.
+      let pendingSigners = [];
+      try {
+        const templates = await apiTemplateList();
+        const tpl = templates.find((t) => {
+          const a = t?.attributes || t;
+          return (
+            String(a?.departmentName || "").toLowerCase() === String(calcDepartment || "").toLowerCase() ||
+            String(a?.departmentKey || "").toLowerCase() === String(calcDepartment || "").toLowerCase()
+          );
+        });
+        if (tpl) {
+          const a = tpl.attributes || tpl;
+          const members = Array.isArray(a?.commissionMembers) ? a.commissionMembers : [];
+          pendingSigners = members
+            .filter((m) => m?.email)
+            .sort((x, y) => (x?.order ?? 99) - (y?.order ?? 99))
+            .map((m, idx) => ({
+              email: String(m.email).trim().toLowerCase(),
+              role: m.role || "",
+              fullName: m.name || "",
+              order: m.order ?? idx + 1,
+            }));
+        }
+      } catch (err) {
+        console.warn("template signers fetch failed:", err);
+      }
+
+      navigate("/app/signdoc/documents/new", {
+        state: {
+          pendingFile: file,
+          pendingTitle: title,
+          pendingSigners,
+          pendingSequential: true,
+        },
+      });
     } catch (err) {
       showToast(err instanceof Error ? err.message : String(err) || "Ошибка формирования PDF", "error");
     }

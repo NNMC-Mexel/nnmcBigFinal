@@ -98,9 +98,49 @@ export default function DocumentCreate() {
         } else if (state?.pendingFile) {
             setFiles([state.pendingFile]);
             setTitles([state.pendingTitle || state.pendingFile.name.replace(/\.pdf$/i, "")]);
+            // Pre-fill signers from per-department template (KPI flow).
+            // Match users by email — must come from a loaded users list.
+            if (Array.isArray(state.pendingSigners) && state.pendingSigners.length > 0) {
+                window.__pendingSignerEmails = state.pendingSigners;
+            }
+            if (state.pendingSequential != null) {
+                setSequential(Boolean(state.pendingSequential));
+            }
             navigate(location.pathname, { replace: true, state: {} });
         }
     }, []);
+
+    // Resolve pending signer emails once users list is loaded.
+    useEffect(() => {
+        if (!Array.isArray(users) || users.length === 0) return;
+        const pending = (window).__pendingSignerEmails;
+        if (!Array.isArray(pending) || pending.length === 0) return;
+
+        const matched = pending
+            .map((p) => {
+                const email = String(p.email || "").toLowerCase();
+                const u = users.find((x) => String(x.email || "").toLowerCase() === email);
+                if (!u) return null;
+                return {
+                    userId: u.id,
+                    documentId: u.documentId || null,
+                    fullName: u.fullName || p.fullName || u.username || u.email,
+                    email: u.email,
+                    role: p.role || "Подписант",
+                    order: p.order,
+                    department: u.department?.name || u.departmentName || "",
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => (a.order || 99) - (b.order || 99))
+            .map((s, idx) => ({ ...s, order: idx + 1 }));
+
+        if (matched.length > 0) {
+            setSelectedSigners(matched);
+            setSignatureType((prev) => prev || "eds");
+        }
+        delete (window).__pendingSignerEmails;
+    }, [users]);
 
     const loadUsers = async () => {
         try {
