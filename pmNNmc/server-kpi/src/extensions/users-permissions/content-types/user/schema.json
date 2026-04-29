@@ -71,6 +71,10 @@
     "isKpiResponsible": {
       "type": "boolean",
       "default": false
+    },
+    "isSuperAdmin": {
+      "type": "boolean",
+      "default": false
     }
   }
 }

@@ -43,6 +43,7 @@ async function syncUsersFromPm(strapi: any) {
       if (!email) continue;
       const username = String(pmUser?.username || email).trim();
       const isKpiResponsible = Boolean(pmUser?.isKpiResponsible);
+      const isSuperAdmin = Boolean(pmUser?.isSuperAdmin);
 
       const existing = await strapi.db
         .query('plugin::users-permissions.user')
@@ -61,19 +62,25 @@ async function syncUsersFromPm(strapi: any) {
               role: authRole.id,
               allowedDepartments: [],
               isKpiResponsible,
+              isSuperAdmin,
             },
           });
           created += 1;
         } catch (e: any) {
           console.warn(`⚠️ sync users: failed to create ${email}:`, e?.message || e);
         }
-      } else if (isKpiResponsible !== existing.isKpiResponsible) {
-        try {
-          await strapi.entityService.update('plugin::users-permissions.user', existing.id, {
-            data: { isKpiResponsible },
-          });
-          updated += 1;
-        } catch {}
+      } else {
+        const patch: Record<string, any> = {};
+        if (isKpiResponsible !== existing.isKpiResponsible) patch.isKpiResponsible = isKpiResponsible;
+        if (isSuperAdmin !== existing.isSuperAdmin) patch.isSuperAdmin = isSuperAdmin;
+        if (Object.keys(patch).length > 0) {
+          try {
+            await strapi.entityService.update('plugin::users-permissions.user', existing.id, {
+              data: patch,
+            });
+            updated += 1;
+          } catch {}
+        }
       }
     }
     console.log(`👥 Users synced from server-pm: +${created} created, ${updated} updated`);

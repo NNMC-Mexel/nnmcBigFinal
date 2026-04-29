@@ -354,8 +354,11 @@ const PM_API_BASE = `${window.location.protocol}//${window.location.hostname}:12
 
 export async function apiPmDepartments() {
   try {
+    // server-pm uses its own JWT key 'jwt' (or sessionStorage), NOT kpi_token.
+    const pmToken = localStorage.getItem('jwt') || sessionStorage.getItem('jwt');
+    const headers = pmToken ? { Authorization: `Bearer ${pmToken}` } : {};
     const res = await fetch(`${PM_API_BASE}/departments?fields[0]=key&fields[1]=name_ru&fields[2]=name_kz&sort=name_ru:asc&pagination[pageSize]=100`, {
-      headers: { ...getAuthHeader() },
+      headers,
     });
     const data = await handleResponse(res);
     return data?.data || [];

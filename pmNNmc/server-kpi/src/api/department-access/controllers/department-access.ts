@@ -45,6 +45,7 @@ async function syncUsersFromPmOnDemand() {
       if (!email) continue;
       const username = String(pmUser?.username || email).trim();
       const isKpiResponsible = Boolean(pmUser?.isKpiResponsible);
+      const isSuperAdmin = Boolean(pmUser?.isSuperAdmin);
       const existing = await strapi.db
         .query('plugin::users-permissions.user')
         .findOne({ where: { email } });
@@ -61,15 +62,21 @@ async function syncUsersFromPmOnDemand() {
               role: authRole.id,
               allowedDepartments: [],
               isKpiResponsible,
+              isSuperAdmin,
             },
           });
         } catch {}
-      } else if (isKpiResponsible !== existing.isKpiResponsible) {
-        try {
-          await strapi.entityService.update('plugin::users-permissions.user', existing.id, {
-            data: { isKpiResponsible },
-          });
-        } catch {}
+      } else {
+        const patch: Record<string, any> = {};
+        if (isKpiResponsible !== existing.isKpiResponsible) patch.isKpiResponsible = isKpiResponsible;
+        if (isSuperAdmin !== existing.isSuperAdmin) patch.isSuperAdmin = isSuperAdmin;
+        if (Object.keys(patch).length > 0) {
+          try {
+            await strapi.entityService.update('plugin::users-permissions.user', existing.id, {
+              data: patch,
+            });
+          } catch {}
+        }
       }
     }
   } catch {}

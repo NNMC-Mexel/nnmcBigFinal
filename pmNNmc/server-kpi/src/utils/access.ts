@@ -44,6 +44,7 @@ export async function getUserAccess(ctx: Context): Promise<UserAccess> {
 
   let roleName = '';
   let allowedDepartments: string[] | null = null;
+  let isSuperAdmin = Boolean((user as any)?.isSuperAdmin);
 
   if (user.role && typeof user.role === 'object') {
     roleName = String(user.role.name || user.role.type || '');
@@ -53,7 +54,7 @@ export async function getUserAccess(ctx: Context): Promise<UserAccess> {
     allowedDepartments = normalizeDepartments(user.allowedDepartments);
   }
 
-  if (!roleName || allowedDepartments === null) {
+  if (!roleName || allowedDepartments === null || !isSuperAdmin) {
     const fullUser = await strapi.entityService.findOne(
       'plugin::users-permissions.user',
       user.id,
@@ -67,12 +68,16 @@ export async function getUserAccess(ctx: Context): Promise<UserAccess> {
     if (allowedDepartments === null) {
       allowedDepartments = normalizeDepartments(fullUser?.allowedDepartments);
     }
+
+    if (!isSuperAdmin) {
+      isSuperAdmin = Boolean(fullUser?.isSuperAdmin);
+    }
   }
 
   const normalized = allowedDepartments || [];
 
   return {
-    isAdmin: isAdminRole(roleName) || isAdminLogin(user),
+    isAdmin: isSuperAdmin || isAdminRole(roleName) || isAdminLogin(user),
     roleName,
     allowedDepartments: normalized,
     userId: user.id,
