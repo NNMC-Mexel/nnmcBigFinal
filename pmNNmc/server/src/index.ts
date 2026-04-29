@@ -93,6 +93,8 @@ async function setupPermissions(strapi: any) {
       'getDepartments', 'createDepartment', 'updateDepartment', 'deleteDepartment',
       'updateDepartmentPermissions',
     ],
+    // In-app notifications (own only — see controller for row-level filter)
+    'api::notification.notification': ['mine', 'unreadCount', 'markRead', 'markAllRead'],
   };
 
   // Apply public permissions and remove anything not on the allowlist

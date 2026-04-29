@@ -22,6 +22,7 @@ import {
 import { useState } from "react";
 import { useAuthStore, useUserRole } from "../store/authStore";
 import LanguageSwitcher from "../components/ui/LanguageSwitcher";
+import NotificationsBell from "../components/NotificationsBell";
 
 export default function AppLayout() {
     const { t } = useTranslation();
@@ -434,7 +435,10 @@ export default function AppLayout() {
                         )}
                     </button>
 
-                    <LanguageSwitcher />
+                    <div className="flex items-center gap-2">
+                        <NotificationsBell />
+                        <LanguageSwitcher />
+                    </div>
                 </header>
 
                 {/* Page content */}

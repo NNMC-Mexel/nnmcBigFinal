@@ -27,6 +27,7 @@ const TablePage = lazy(() => import('./pages/app/TablePage'));
 const ProjectDetailPage = lazy(() => import('./pages/app/ProjectDetailPage'));
 const ActivityLogPage = lazy(() => import('./pages/app/ActivityLogPage'));
 const ProfilePage = lazy(() => import('./pages/app/ProfilePage'));
+const NotificationsPage = lazy(() => import('./pages/app/NotificationsPage'));
 const AdminPanelPage = lazy(() => import('./pages/app/AdminPanelPage'));
 const HelpdeskPage = lazy(() => import('./pages/app/HelpdeskPage'));
 const TicketDetailPage = lazy(() => import('./pages/app/TicketDetailPage'));
@@ -247,6 +248,7 @@ function App() {
           }
         />
         <Route path="profile" element={withSuspense(<ProfilePage />)} />
+        <Route path="notifications" element={withSuspense(<NotificationsPage />)} />
         <Route
           path="admin"
           element={

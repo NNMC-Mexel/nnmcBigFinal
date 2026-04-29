@@ -1,5 +1,35 @@
 import { factories } from "@strapi/strapi";
 
+// Fire-and-forget notification push to server-pm.
+function notifyViaPm(
+    strapi: any,
+    payload: {
+        recipientEmail: string;
+        title: string;
+        body?: string;
+        type?: string;
+        link?: string;
+        metadata?: any;
+    }
+) {
+    const pmUrl = process.env.SERVER_PM_URL;
+    const token = process.env.INTERNAL_SYNC_TOKEN;
+    if (!pmUrl || !token) return;
+
+    fetch(`${pmUrl}/api/internal-notifications`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Internal-Token": token,
+        },
+        body: JSON.stringify(payload),
+    }).catch((e: any) => {
+        try {
+            strapi.log.warn(`[notify] failed: ${e?.message || e}`);
+        } catch {}
+    });
+}
+
 export default factories.createCoreController(
     "api::document.document",
     ({ strapi }) => ({
@@ -77,6 +107,37 @@ export default factories.createCoreController(
                             },
                         });
                     }
+                }
+
+                // Notify the first signer (sequential mode) or all signers (parallel mode).
+                // Fire-and-forget — failure here must not break the create response.
+                try {
+                    const created = result?.data || result;
+                    const docId = created?.documentId || docNumericId;
+                    const title = created?.title || "Новый документ";
+                    const sequential = Boolean(created?.signatureSequential);
+                    const signersList = Array.isArray((created as any)?.signers)
+                        ? (created as any).signers
+                        : [];
+                    const sortedSigners = [...signersList].sort(
+                        (a: any, b: any) => (a?.order ?? 99) - (b?.order ?? 99)
+                    );
+                    const targets = sequential ? sortedSigners.slice(0, 1) : sortedSigners;
+
+                    for (const s of targets) {
+                        const email = String(s?.email || "").trim().toLowerCase();
+                        if (!email) continue;
+                        notifyViaPm(strapi, {
+                            recipientEmail: email,
+                            title: `На подпись: ${title}`,
+                            body: `Вам пришёл документ на подпись. Откройте «Документооборот» чтобы подписать.`,
+                            type: "signdoc_signature_request",
+                            link: `/app/signdoc/documents/${docId}`,
+                            metadata: { documentId: docId, role: s?.role || "" },
+                        });
+                    }
+                } catch (e: any) {
+                    console.warn("[notify] post-create notify failed:", e?.message || e);
                 }
             }
 
