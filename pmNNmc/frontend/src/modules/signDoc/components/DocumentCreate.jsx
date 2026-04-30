@@ -62,10 +62,12 @@ export default function DocumentCreate() {
     const isMultipleFiles = files.length > 1;
 
     useEffect(() => {
-        loadUsers();
         loadDocumentTypes();
-        loadDepartments();
         loadSubdivisions();
+        (async () => {
+            await loadDepartments();
+            await loadUsers();
+        })();
     }, []);
 
     // Accept pre-loaded file from KPI or other modules via route state
@@ -134,7 +136,7 @@ export default function DocumentCreate() {
                     userEmail: u.email,
                     role: p.role || "Подписант",
                     order: p.order,
-                    department: u.department?.name || u.departmentName || "",
+                    department: u.department?.name || u.department?.name_ru || u.departmentName || "",
                 };
             })
             .filter(Boolean)
@@ -165,8 +167,14 @@ export default function DocumentCreate() {
                         null;
                     const deptName =
                         dept?.name ||
+                        dept?.name_ru ||
+                        dept?.name_kz ||
                         dept?.data?.name ||
+                        dept?.data?.name_ru ||
+                        dept?.data?.name_kz ||
                         dept?.attributes?.name ||
+                        dept?.attributes?.name_ru ||
+                        dept?.attributes?.name_kz ||
                         "";
 
                     return {
@@ -214,12 +222,12 @@ export default function DocumentCreate() {
                 if (dept?.attributes) {
                     return {
                         id: dept.id || dept.attributes.documentId,
-                        name: dept.attributes.name,
+                        name: dept.attributes.name || dept.attributes.name_ru || dept.attributes.name_kz,
                     };
                 }
                 return {
                     id: dept.id || dept.documentId,
-                    name: dept.name,
+                    name: dept.name || dept.name_ru || dept.name_kz,
                 };
             });
             normalized.sort((a, b) =>

@@ -299,21 +299,32 @@ async function migrateDepartmentPermissions(strapi: any) {
 
 async function ensurePermission(strapi: any, roleId: number, contentType: string, action: string) {
   try {
-    // Find existing permission
+    const permissionAction = `${contentType}.${action}`;
     const existing = await strapi.db.query('plugin::users-permissions.permission').findMany({
       where: {
         role: roleId,
-        action: `${contentType}.${action}`,
+        action: permissionAction,
       },
     });
 
     if (existing.length === 0) {
       await strapi.db.query('plugin::users-permissions.permission').create({
         data: {
-          action: `${contentType}.${action}`,
+          action: permissionAction,
           role: roleId,
+          enabled: true,
         },
       });
+      return;
+    }
+
+    for (const perm of existing) {
+      if (!perm.enabled) {
+        await strapi.db.query('plugin::users-permissions.permission').update({
+          where: { id: perm.id },
+          data: { enabled: true },
+        });
+      }
     }
   } catch (err) {
     // Silently skip if the action doesn't exist (e.g., content type not yet registered)

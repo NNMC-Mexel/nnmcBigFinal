@@ -162,7 +162,7 @@ async function syncUsersFromPm(strapi: any) {
 
       const existing = await strapi.db
         .query('plugin::users-permissions.user')
-        .findOne({ where: { email } });
+        .findOne({ where: { email }, populate: ['department'] });
 
       if (!existing) {
         await (strapi.entityService as any).create('plugin::users-permissions.user', {
@@ -183,8 +183,9 @@ async function syncUsersFromPm(strapi: any) {
         created += 1;
       } else {
         const patch: Record<string, any> = {};
+        const existingDepartmentId = Number(existing?.department?.id || existing?.department || 0) || null;
         if (fullName && fullName !== existing.fullName) patch.fullName = fullName;
-        if (departmentId && existing.department !== departmentId) patch.department = departmentId;
+        if ((departmentId || null) !== existingDepartmentId) patch.department = departmentId;
         if (isKpiResponsible !== existing.isKpiResponsible) patch.isKpiResponsible = isKpiResponsible;
         if (isSuperAdmin !== existing.isSuperAdmin) patch.isSuperAdmin = isSuperAdmin;
         if (Object.keys(patch).length > 0) {
