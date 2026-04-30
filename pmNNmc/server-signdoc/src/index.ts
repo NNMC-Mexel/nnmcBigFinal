@@ -1,5 +1,10 @@
 // import type { Core } from '@strapi/strapi';
 
+const RADIOLOGY_DEPARTMENT = {
+  key: 'RADIOLOGY',
+  name: 'Лучевая',
+};
+
 // Public role must be empty: no public access to documents.
 // Only Keycloak/auth callbacks remain available without login.
 async function lockPublicRole(strapi: any) {
@@ -237,21 +242,33 @@ async function syncDepartmentsFromPm(strapi: any) {
       const name = String(attrs?.name_ru || '').trim();
       const key = String(attrs?.key || '').trim();
       if (!name) continue;
-      const filters = key ? { $or: [{ key }, { name }] } : { name };
-      const existing = await (strapi.entityService as any).findMany(
-        'api::department.department',
-        { filters, limit: 1 }
-      );
-      const list = Array.isArray(existing) ? existing : [];
+      let list: any[] = [];
+      if (key) {
+        const byKey = await (strapi.entityService as any).findMany(
+          'api::department.department',
+          { filters: { key }, limit: 1 }
+        );
+        list = Array.isArray(byKey) ? byKey : [];
+      }
+      if (list.length === 0) {
+        const byName = await (strapi.entityService as any).findMany(
+          'api::department.department',
+          { filters: { name }, limit: 1 }
+        );
+        list = Array.isArray(byName) ? byName : [];
+      }
       if (list.length === 0) {
         await (strapi.entityService as any).create('api::department.department', {
           data: { name, key: key || null },
         });
         created += 1;
       } else {
-        if (key && list[0]?.key !== key) {
+        const patch: Record<string, any> = {};
+        if (name && list[0]?.name !== name) patch.name = name;
+        if (key && list[0]?.key !== key) patch.key = key;
+        if (Object.keys(patch).length > 0) {
           await strapi.entityService.update('api::department.department', list[0].id, {
-            data: { key },
+            data: patch,
           });
         }
         updated += 1;
@@ -261,6 +278,76 @@ async function syncDepartmentsFromPm(strapi: any) {
   } catch (err) {
     console.warn('⚠️ Failed to sync departments from server-pm:', err);
   }
+}
+
+function isRadiologyDepartment(dept: any): boolean {
+  const key = String(dept?.key || '').trim().toUpperCase();
+  const name = String(dept?.name || '').trim().toLowerCase();
+  return (
+    key === RADIOLOGY_DEPARTMENT.key ||
+    key.includes('RADIOLOGY') ||
+    name.includes('лучевая') ||
+    name.includes('лучевой')
+  );
+}
+
+async function moveSignDocDepartmentRelations(strapi: any, fromId: number, toId: number) {
+  const users = await strapi.entityService.findMany('plugin::users-permissions.user', {
+    filters: { department: { id: fromId } },
+    pagination: { pageSize: 1000 },
+  });
+  for (const user of users || []) {
+    await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+      data: { department: toId },
+    });
+  }
+
+  const subdivisions = await strapi.entityService.findMany('api::subdivision.subdivision', {
+    filters: { department: { id: fromId } },
+    pagination: { pageSize: 1000 },
+  });
+  for (const subdivision of subdivisions || []) {
+    await strapi.entityService.update('api::subdivision.subdivision', subdivision.id, {
+      data: { department: toId },
+    });
+  }
+}
+
+async function mergeRadiologyDepartments(strapi: any) {
+  const departments = await strapi.entityService.findMany('api::department.department', {
+    pagination: { pageSize: 1000 },
+  });
+  const list = Array.isArray(departments) ? departments : [];
+  const canonical =
+    list.find((dept: any) => String(dept?.key || '').toUpperCase() === RADIOLOGY_DEPARTMENT.key) ||
+    list.find((dept: any) => String(dept?.name || '').trim().toLowerCase() === RADIOLOGY_DEPARTMENT.name.toLowerCase()) ||
+    list.find(isRadiologyDepartment);
+
+  if (!canonical?.id) {
+    await strapi.entityService.create('api::department.department', {
+      data: RADIOLOGY_DEPARTMENT,
+    });
+    return;
+  }
+
+  const duplicates = list.filter(
+    (dept: any) => Number(dept.id) !== Number(canonical.id) && isRadiologyDepartment(dept)
+  );
+  for (const duplicate of duplicates) {
+    await moveSignDocDepartmentRelations(strapi, duplicate.id, canonical.id);
+    try {
+      await strapi.entityService.delete('api::department.department', duplicate.id);
+      strapi.log.info(`[departments] Merged and deleted duplicate SignDoc radiology department ${duplicate.id}`);
+    } catch (error: any) {
+      strapi.log.warn(
+        `[departments] Could not delete duplicate SignDoc radiology department ${duplicate.id}: ${error?.message || error}`
+      );
+    }
+  }
+
+  await strapi.entityService.update('api::department.department', canonical.id, {
+    data: RADIOLOGY_DEPARTMENT,
+  });
 }
 
 export default {
@@ -284,6 +371,7 @@ export default {
     await ensureAuthenticatedPermissions(strapi);
     await seedDocumentTypes(strapi);
     await syncDepartmentsFromPm(strapi);
+    await mergeRadiologyDepartments(strapi);
     await syncUsersFromPm(strapi);
   },
 };

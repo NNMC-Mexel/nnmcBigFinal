@@ -27,20 +27,34 @@ async function syncDepartmentsFromPm(strapi: any, pmUrl: string) {
       const name = String(attrs?.name_ru || "").trim();
       const key = String(attrs?.key || "").trim();
       if (!name) continue;
-      const filters = key ? { $or: [{ key }, { name }] } : { name };
-      const existing = await (strapi.entityService as any).findMany(
-        "api::department.department",
-        { filters, limit: 1 }
-      );
-      const list = Array.isArray(existing) ? existing : [];
+      let list: any[] = [];
+      if (key) {
+        const byKey = await (strapi.entityService as any).findMany(
+          "api::department.department",
+          { filters: { key }, limit: 1 }
+        );
+        list = Array.isArray(byKey) ? byKey : [];
+      }
+      if (list.length === 0) {
+        const byName = await (strapi.entityService as any).findMany(
+          "api::department.department",
+          { filters: { name }, limit: 1 }
+        );
+        list = Array.isArray(byName) ? byName : [];
+      }
       if (list.length === 0) {
         await (strapi.entityService as any).create("api::department.department", {
           data: { name, key: key || null },
         });
-      } else if (key && list[0]?.key !== key) {
-        await strapi.entityService.update("api::department.department", list[0].id, {
-          data: { key },
-        });
+      } else {
+        const patch: Record<string, any> = {};
+        if (name && list[0]?.name !== name) patch.name = name;
+        if (key && list[0]?.key !== key) patch.key = key;
+        if (Object.keys(patch).length > 0) {
+          await strapi.entityService.update("api::department.department", list[0].id, {
+            data: patch,
+          });
+        }
       }
     }
   } catch {

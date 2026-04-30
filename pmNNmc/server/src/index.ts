@@ -2,12 +2,15 @@ import seedData from '../scripts/seed';
 
 const PROTOCOL_USER_PASSWORD = process.env.NNMC_PROTOCOL_USER_PASSWORD || 'Aa123123!';
 const PROTOCOL_USER_SEED_VERSION = 'radiology-kpi-protocol-2026-04-30';
+const RADIOLOGY_DEPARTMENT = {
+  key: 'RADIOLOGY',
+  name_ru: 'Лучевая',
+  name_kz: 'Сәулелік',
+};
 
 const protocolDepartments = [
   {
-    key: 'RADIOLOGY',
-    name_ru: 'Лучевая (ВМП)',
-    name_kz: 'Сәулелік (ЖМК)',
+    ...RADIOLOGY_DEPARTMENT,
     canViewKpiTimesheet: true,
   },
   {
@@ -507,7 +510,89 @@ async function ensureProtocolDepartments(strapi: any) {
     );
   }
 
+  if (byKey.RADIOLOGY) {
+    byKey.RADIOLOGY = await mergeRadiologyDepartments(strapi, byKey.RADIOLOGY);
+  }
+
   return byKey;
+}
+
+function isRadiologyDepartment(dept: any): boolean {
+  const key = String(dept?.key || '').trim().toUpperCase();
+  const name = String(dept?.name_ru || '').trim().toLowerCase();
+  return (
+    key === RADIOLOGY_DEPARTMENT.key ||
+    key.includes('RADIOLOGY') ||
+    name.includes('лучевая') ||
+    name.includes('лучевой')
+  );
+}
+
+async function moveDepartmentRelations(strapi: any, fromId: number, toId: number) {
+  const users = await strapi.entityService.findMany('plugin::users-permissions.user', {
+    filters: { department: { id: fromId } },
+    pagination: { pageSize: 1000 },
+  });
+  for (const user of users || []) {
+    await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+      data: { department: toId },
+    });
+  }
+
+  const projects = await strapi.entityService.findMany('api::project.project', {
+    filters: { department: { id: fromId } },
+    pagination: { pageSize: 1000 },
+  });
+  for (const project of projects || []) {
+    await strapi.entityService.update('api::project.project', project.id, {
+      data: { department: toId },
+    });
+  }
+
+  const serviceGroups = await strapi.entityService.findMany('api::service-group.service-group', {
+    filters: { department: { id: fromId } },
+    pagination: { pageSize: 1000 },
+  });
+  for (const serviceGroup of serviceGroups || []) {
+    await strapi.entityService.update('api::service-group.service-group', serviceGroup.id, {
+      data: { department: toId },
+    });
+  }
+}
+
+async function mergeRadiologyDepartments(strapi: any, initialCanonical: any) {
+  let canonical = initialCanonical;
+  const departments = await strapi.entityService.findMany('api::department.department', {
+    pagination: { pageSize: 1000 },
+  });
+
+  const radiologyDepartments = (departments || []).filter(isRadiologyDepartment);
+  const duplicateDepartments = radiologyDepartments.filter(
+    (dept: any) => Number(dept.id) !== Number(canonical.id)
+  );
+
+  for (const duplicate of duplicateDepartments) {
+    await moveDepartmentRelations(strapi, duplicate.id, canonical.id);
+    try {
+      await strapi.entityService.delete('api::department.department', duplicate.id);
+      strapi.log.info(`[departments] Merged and deleted duplicate radiology department ${duplicate.id}`);
+    } catch (error: any) {
+      strapi.log.warn(
+        `[departments] Could not delete duplicate radiology department ${duplicate.id}: ${error?.message || error}`
+      );
+    }
+  }
+
+  canonical = await strapi.entityService.update('api::department.department', canonical.id, {
+    data: {
+      ...protocolDepartmentDefaults({
+        ...RADIOLOGY_DEPARTMENT,
+        canViewKpiTimesheet: true,
+      }),
+    },
+  });
+
+  return canonical;
 }
 
 async function getKeycloakAdminToken(strapi: any): Promise<string | null> {

@@ -15,7 +15,7 @@ const seedData = async () => {
     { key: 'DIGITALIZATION', name_ru: 'Отдел цифровизации', name_kz: 'Цифрландыру бөлімі' },
     { key: 'MEDICAL_EQUIPMENT', name_ru: 'Служба медицинского оборудования', name_kz: 'Медициналық жабдық қызметі' },
     { key: 'ENGINEERING', name_ru: 'Инженерная служба', name_kz: 'Инженерлік қызмет' },
-    { key: 'RADIOLOGY', name_ru: 'Лучевая (ВМП)', name_kz: 'Сәулелік (ЖМК)' },
+    { key: 'RADIOLOGY', name_ru: 'Лучевая', name_kz: 'Сәулелік' },
     { key: 'ECONOMICS', name_ru: 'Экономика', name_kz: 'Экономика' },
     { key: 'CLEANING', name_ru: 'Клининг', name_kz: 'Клининг' },
     { key: 'CLINICAL_PHARMACOLOGY', name_ru: 'Клинико-фармакологический отдел', name_kz: 'Клиникалық-фармакологиялық бөлім' },

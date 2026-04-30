@@ -2,7 +2,7 @@
 
 const RADIOLOGY_PROTOCOL_TEMPLATE = {
   departmentKey: 'RADIOLOGY',
-  departmentName: 'Лучевая (ВМП)',
+  departmentName: 'Лучевая',
   meetingTitle: 'Протокол ОЦМК по KPI отдела лучевой диагностики',
   place: 'ННМЦ',
   agendaText: 'Рассмотрение результатов KPI отдела лучевой диагностики.',
@@ -78,6 +78,11 @@ const RADIOLOGY_PROTOCOL_TEMPLATE = {
     },
   ],
 };
+
+function isLegacyRadiologyDepartmentName(value: any): boolean {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized.includes('лучев') && (normalized.includes('вмп') || normalized.includes('смп'));
+}
 
 async function syncUsersFromPm(strapi: any) {
   const pmUrl = process.env.SERVER_PM_URL;
@@ -286,6 +291,63 @@ async function seedRadiologyProtocolTemplate(strapi: any) {
   }
 }
 
+async function normalizeRadiologyKpiData(strapi: any) {
+  try {
+    const employees = await strapi.entityService.findMany('api::employee.employee', {
+      pagination: { pageSize: 1000 },
+    });
+    let employeeUpdates = 0;
+    for (const employee of employees || []) {
+      if (!isLegacyRadiologyDepartmentName((employee as any).department)) continue;
+      await strapi.entityService.update('api::employee.employee', (employee as any).id, {
+        data: { department: RADIOLOGY_PROTOCOL_TEMPLATE.departmentName },
+      });
+      employeeUpdates += 1;
+    }
+
+    const archives = await strapi.entityService.findMany(
+      'api::calculation-archive.calculation-archive',
+      { pagination: { pageSize: 1000 } }
+    );
+    let archiveUpdates = 0;
+    for (const archive of archives || []) {
+      if (!isLegacyRadiologyDepartmentName((archive as any).department)) continue;
+      await strapi.entityService.update(
+        'api::calculation-archive.calculation-archive',
+        (archive as any).id,
+        { data: { department: RADIOLOGY_PROTOCOL_TEMPLATE.departmentName } }
+      );
+      archiveUpdates += 1;
+    }
+
+    const templates = await strapi.entityService.findMany(
+      'api::department-template.department-template',
+      { pagination: { pageSize: 1000 } }
+    );
+    for (const template of templates || []) {
+      const key = String((template as any).departmentKey || '').trim().toUpperCase();
+      const name = String((template as any).departmentName || '').trim();
+      if (
+        key !== RADIOLOGY_PROTOCOL_TEMPLATE.departmentKey &&
+        (key.includes('RADIOLOGY') || isLegacyRadiologyDepartmentName(name))
+      ) {
+        await strapi.entityService.delete(
+          'api::department-template.department-template',
+          (template as any).id
+        );
+      }
+    }
+
+    if (employeeUpdates || archiveUpdates) {
+      strapi.log.info(
+        `[radiology-normalize] KPI data moved to Лучевая: ${employeeUpdates} employees, ${archiveUpdates} archives`
+      );
+    }
+  } catch (error: any) {
+    strapi.log.warn(`[radiology-normalize] failed: ${error?.message || error}`);
+  }
+}
+
 export default {
   /**
    * An asynchronous register function that runs before
@@ -307,5 +369,6 @@ export default {
     await ensureAuthenticatedPermissions(strapi);
     await syncUsersFromPm(strapi);
     await seedRadiologyProtocolTemplate(strapi);
+    await normalizeRadiologyKpiData(strapi);
   },
 };
