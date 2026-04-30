@@ -10,6 +10,7 @@ import {
     presignDocumentFile,
     downloadAccountantExcel,
     getUser as getCurrentUser,
+    apiMe,
 } from "../api/signdocClient";
 import {
     FileText,
@@ -58,7 +59,7 @@ export default function DocumentView() {
     const [actionLoading, setActionLoading] = useState(false);
     const [signFileUrl, setSignFileUrl] = useState(null);
 
-    const currentUser = getCurrentUser();
+    const [currentUser, setCurrentUser] = useState(getCurrentUser());
 
     // Extracts the MinIO object key from a full MinIO URL (removes endpoint+bucket prefix)
     const extractMinioKey = (url) => {
@@ -83,6 +84,12 @@ export default function DocumentView() {
     useEffect(() => {
         loadDocument();
     }, [id]);
+
+    useEffect(() => {
+        apiMe()
+            .then((user) => setCurrentUser(user))
+            .catch(() => {});
+    }, []);
 
     useEffect(() => {
         if (!documentData) return;
@@ -594,8 +601,16 @@ export default function DocumentView() {
     const isKpiDocument =
         documentData.metadata?.source === "kpi-timesheet" ||
         documentData.metadata?.kpi?.source === "kpi-timesheet";
+    const currentDepartmentKey = String(currentUser?.department?.key || "").toUpperCase();
+    const currentDepartmentName = String(currentUser?.department?.name || "").toLowerCase();
+    const canSeeAccountantExcel =
+        currentDepartmentKey === "ACCOUNTING" ||
+        currentDepartmentKey === "DIGITALIZATION" ||
+        currentDepartmentName.includes("бухгалтер") ||
+        currentDepartmentName.includes("цифров");
     const canDownloadAccountantExcel =
         documentData.status === "completed" &&
+        canSeeAccountantExcel &&
         (isKpiDocument || documentData.metadata?.accountantExcel);
     const sortedSigners = documentData.signatureSequential
         ? [...(documentData.signers || [])].sort(

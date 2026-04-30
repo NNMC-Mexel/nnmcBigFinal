@@ -130,9 +130,9 @@ export default function DocumentCreate() {
                 return {
                     userId: u.id,
                     documentId: u.documentId || null,
-                    fullName: u.fullName || p.fullName || u.username || u.email,
+                    fullName: p.fullName || u.fullName || u.username || u.email,
                     email: u.email,
-                    userName: u.fullName || p.fullName || u.username || u.email,
+                    userName: p.fullName || u.fullName || u.username || u.email,
                     userEmail: u.email,
                     role: p.role || "Подписант",
                     order: p.order,

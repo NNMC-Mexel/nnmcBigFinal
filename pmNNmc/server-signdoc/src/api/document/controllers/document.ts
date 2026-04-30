@@ -229,6 +229,17 @@ function isAccountingUser(user: any): boolean {
     return key === "ACCOUNTING" || name.includes("бухгалтер");
 }
 
+function canDownloadAccountantExcel(user: any): boolean {
+    const key = String(user?.department?.key || "").toUpperCase();
+    const name = String(user?.department?.name || "").toLowerCase();
+    return (
+        key === "ACCOUNTING" ||
+        key === "DIGITALIZATION" ||
+        name.includes("бухгалтер") ||
+        name.includes("цифров")
+    );
+}
+
 async function canAccessDocument(strapi: any, document: any, requestUser: any): Promise<boolean> {
     const fullUser = await getFullUser(strapi, requestUser);
     if (!fullUser || !document) return false;
@@ -368,6 +379,79 @@ function notifyNextSequentialSigner(strapi: any, before: any, after: any) {
 async function appendAccountingAssignees(strapi: any, document: any, accountingUsers: any[]) {
     const emails = accountingUsers.map((u) => normalizeEmail(u?.email)).filter(Boolean);
     if (emails.length === 0 || !document?.id) return;
+
+    const authRole = await strapi.db
+        .query("plugin::users-permissions.role")
+        .findOne({ where: { type: "authenticated" } });
+
+    for (const pmUser of accountingUsers) {
+        const email = normalizeEmail(pmUser?.email);
+        if (!email) continue;
+
+        const deptKey = String(pmUser?.department?.key || "").trim();
+        const deptName = String(pmUser?.department?.name_ru || "").trim();
+        let departmentId: number | null = null;
+
+        if (deptKey || deptName) {
+            const filters = deptKey ? { $or: [{ key: deptKey }, { name: deptName }] } : { name: deptName };
+            const existingDepartments = await strapi.entityService.findMany("api::department.department", {
+                filters,
+                limit: 1,
+            });
+            const dept = Array.isArray(existingDepartments) ? existingDepartments[0] : null;
+            if (dept?.id) {
+                departmentId = dept.id;
+                if (deptKey && dept.key !== deptKey) {
+                    await strapi.entityService.update("api::department.department", dept.id, {
+                        data: { key: deptKey },
+                    });
+                }
+            } else if (deptName) {
+                const createdDept = await strapi.entityService.create("api::department.department", {
+                    data: { name: deptName, key: deptKey || null },
+                });
+                departmentId = createdDept?.id || null;
+            }
+        }
+
+        const existingUser = await strapi.db
+            .query("plugin::users-permissions.user")
+            .findOne({ where: { email }, populate: ["department"] });
+
+        const userPatch = {
+            username: String(pmUser?.username || email).trim(),
+            email,
+            fullName: String(pmUser?.fullName || "").trim(),
+            department: departmentId,
+            isKpiResponsible: Boolean(pmUser?.isKpiResponsible),
+            isSuperAdmin: Boolean(pmUser?.isSuperAdmin),
+        };
+
+        if (!existingUser && authRole?.id) {
+            await strapi.entityService.create("plugin::users-permissions.user", {
+                data: {
+                    ...userPatch,
+                    provider: "keycloak",
+                    password: `kc-${Math.random().toString(36).slice(2)}-${Date.now()}`,
+                    confirmed: true,
+                    blocked: false,
+                    role: authRole.id,
+                },
+            });
+        } else if (existingUser) {
+            const currentDepartmentId = Number(existingUser?.department?.id || existingUser?.department || 0) || null;
+            const patch: Record<string, any> = {
+                username: userPatch.username,
+                fullName: userPatch.fullName,
+                isKpiResponsible: userPatch.isKpiResponsible,
+                isSuperAdmin: userPatch.isSuperAdmin,
+            };
+            if ((departmentId || null) !== currentDepartmentId) patch.department = departmentId;
+            await strapi.entityService.update("plugin::users-permissions.user", existingUser.id, {
+                data: patch,
+            });
+        }
+    }
 
     const localUsers = await strapi.entityService.findMany("plugin::users-permissions.user", {
         filters: { email: { $in: emails } },
@@ -677,10 +761,9 @@ export default factories.createCoreController(
             if (!document) return ctx.notFound("Документ не найден");
 
             const fullUser = await getFullUser(strapi, requestUser);
-            const canAccess =
-                (await canAccessDocument(strapi, document, requestUser)) ||
-                (document.status === "completed" && isAccountingUser(fullUser));
-            if (!canAccess) return ctx.forbidden("Нет доступа к этому документу");
+            if (!canDownloadAccountantExcel(fullUser)) {
+                return ctx.forbidden("Excel доступен только бухгалтерии и отделу цифровизации");
+            }
             if (document.status !== "completed") {
                 return ctx.badRequest("Excel доступен только после полного подписания");
             }

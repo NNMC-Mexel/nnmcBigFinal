@@ -1,5 +1,141 @@
 import seedData from '../scripts/seed';
 
+const PROTOCOL_USER_PASSWORD = process.env.NNMC_PROTOCOL_USER_PASSWORD || 'Aa123123!';
+const PROTOCOL_USER_SEED_VERSION = 'radiology-kpi-protocol-2026-04-30';
+
+const protocolDepartments = [
+  {
+    key: 'RADIOLOGY',
+    name_ru: 'Лучевая (ВМП)',
+    name_kz: 'Сәулелік (ЖМК)',
+    canViewKpiTimesheet: true,
+  },
+  {
+    key: 'HR',
+    name_ru: 'Отдел управления персоналом',
+    name_kz: 'Персоналды басқару бөлімі',
+  },
+  {
+    key: 'ECONOMICS',
+    name_ru: 'Экономика',
+    name_kz: 'Экономика',
+  },
+  {
+    key: 'CLINICAL_PHARMACOLOGY',
+    name_ru: 'Клинико-фармакологический отдел',
+    name_kz: 'Клиникалық-фармакологиялық бөлім',
+  },
+  {
+    key: 'PATIENT_SUPPORT',
+    name_ru: 'Служба поддержки пациента и внутренней экспертизы',
+    name_kz: 'Пациентті қолдау және ішкі сараптама қызметі',
+  },
+  {
+    key: 'CLINIC_ADMINISTRATION',
+    name_ru: 'Администрация (клиника)',
+    name_kz: 'Әкімшілік (клиника)',
+  },
+  {
+    key: 'ACCOUNTING',
+    name_ru: 'Отдел бухгалтерского учета и отчетности',
+    name_kz: 'Бухгалтерлік есеп және есептілік бөлімі',
+  },
+];
+
+const radiologyProtocolUsers = [
+  {
+    username: 'orazbekova.z',
+    email: 'orazbekova.z@nnmc.kz',
+    firstName: 'Жанар Оримбековна',
+    lastName: 'Оразбекова',
+    departmentKey: 'RADIOLOGY',
+  },
+  {
+    username: 'eleusizova.l',
+    email: 'eleusizova.l@nnmc.kz',
+    firstName: 'Ляззат Сарановна',
+    lastName: 'Елеусизова',
+    departmentKey: 'HR',
+  },
+  {
+    username: 'mikhailov.a',
+    email: 'mikhailov.a@nnmc.kz',
+    firstName: 'Азат Игоревич',
+    lastName: 'Михайлов',
+    departmentKey: 'RADIOLOGY',
+  },
+  {
+    username: 'aitymbetova.g',
+    email: 'aitymbetova.g@nnmc.kz',
+    firstName: 'Гульмира Меирбековна',
+    lastName: 'Айтымбетова',
+    departmentKey: 'ECONOMICS',
+  },
+  {
+    username: 'kenzhebaeva.s',
+    email: 'kenzhebaeva.s@nnmc.kz',
+    firstName: 'Шайзат Тукеновна',
+    lastName: 'Кенжебаева',
+    departmentKey: 'HR',
+  },
+  {
+    username: 'kushenova.s',
+    email: 'kushenova.s@nnmc.kz',
+    firstName: 'Сауле Жолдасбековна',
+    lastName: 'Кушенова',
+    departmentKey: 'CLINICAL_PHARMACOLOGY',
+  },
+  {
+    username: 'kurzhukova.a',
+    email: 'kurzhukova.a@nnmc.kz',
+    firstName: 'Асель Куанышевна',
+    lastName: 'Куржукова',
+    departmentKey: 'PATIENT_SUPPORT',
+  },
+  {
+    username: 'achkasov.v',
+    email: 'achkasov.v@nnmc.kz',
+    firstName: 'Владислав Борисович',
+    lastName: 'Ачкасов',
+    departmentKey: 'PATIENT_SUPPORT',
+  },
+  {
+    username: 'zhumagulov.a',
+    email: 'zhumagulov.a@nnmc.kz',
+    firstName: 'Алмат Бахчанович',
+    lastName: 'Жумагулов',
+    departmentKey: 'CLINIC_ADMINISTRATION',
+  },
+  {
+    username: 'mendybaeva.e',
+    email: 'mendybaeva.e@nnmc.kz',
+    firstName: 'Эльмира Манаповна',
+    lastName: 'Мендыбаева',
+    departmentKey: 'ECONOMICS',
+  },
+  {
+    username: 'tasemenova.d',
+    email: 'tasemenova.d@nnmc.kz',
+    firstName: 'Дарига Кошкарбаевна',
+    lastName: 'Тасеменова',
+    departmentKey: 'ACCOUNTING',
+  },
+  {
+    username: 'saparova.m',
+    email: 'saparova.m@nnmc.kz',
+    firstName: 'Марина Александровна',
+    lastName: 'Сапарова',
+    departmentKey: 'ACCOUNTING',
+  },
+  {
+    username: 'zhanuzakova.a',
+    email: 'zhanuzakova.a@nnmc.kz',
+    firstName: 'Анар Едигеевна',
+    lastName: 'Жанузакова',
+    departmentKey: 'ACCOUNTING',
+  },
+];
+
 export default {
   /**
    * An asynchronous register function that runs before
@@ -36,6 +172,8 @@ export default {
 
     // Migrate: ensure SuperAdmin users + department permissions
     await migrateDepartmentPermissions(strapi);
+
+    await seedKpiProtocolUsers(strapi);
   },
 };
 
@@ -328,5 +466,249 @@ async function ensurePermission(strapi: any, roleId: number, contentType: string
     }
   } catch (err) {
     // Silently skip if the action doesn't exist (e.g., content type not yet registered)
+  }
+}
+
+function protocolDepartmentDefaults(dept: any) {
+  return {
+    key: dept.key,
+    name_ru: dept.name_ru,
+    name_kz: dept.name_kz,
+    canViewNews: true,
+    canViewDashboard: true,
+    canViewHelpdesk: true,
+    canAccessConf: true,
+    canAccessSigndoc: true,
+    ...(dept.canViewKpiTimesheet ? { canViewKpiTimesheet: true } : {}),
+  };
+}
+
+async function ensureProtocolDepartments(strapi: any) {
+  const byKey: Record<string, any> = {};
+
+  for (const dept of protocolDepartments) {
+    const existing = await strapi.entityService.findMany('api::department.department', {
+      filters: { key: dept.key },
+      limit: 1,
+    });
+    const data = protocolDepartmentDefaults(dept);
+
+    if (existing.length === 0) {
+      byKey[dept.key] = await strapi.entityService.create('api::department.department', {
+        data,
+      });
+      continue;
+    }
+
+    byKey[dept.key] = await strapi.entityService.update(
+      'api::department.department',
+      existing[0].id,
+      { data }
+    );
+  }
+
+  return byKey;
+}
+
+async function getKeycloakAdminToken(strapi: any): Promise<string | null> {
+  const keycloakUrl = process.env.KEYCLOAK_URL;
+  const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
+  const adminClientId = process.env.KEYCLOAK_ADMIN_CLIENT_ID || 'admin-cli';
+  const adminClientSecret = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET;
+
+  if (!keycloakUrl || !adminClientSecret) {
+    strapi.log.warn('[protocol-users] Keycloak admin env is missing; Strapi users will be seeded only');
+    return null;
+  }
+
+  const tokenRes = await fetch(
+    `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/token`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: adminClientId,
+        client_secret: adminClientSecret,
+      }),
+    }
+  );
+
+  if (!tokenRes.ok) {
+    strapi.log.warn(`[protocol-users] Failed to get Keycloak admin token: HTTP ${tokenRes.status}`);
+    return null;
+  }
+
+  const json = await tokenRes.json() as any;
+  return json?.access_token || null;
+}
+
+async function findKeycloakUser(adminBase: string, token: string, user: any) {
+  const headers = { Authorization: `Bearer ${token}` };
+  const byUsername = await fetch(
+    `${adminBase}/users?username=${encodeURIComponent(user.username)}&exact=true`,
+    { headers }
+  );
+  if (byUsername.ok) {
+    const items = await byUsername.json() as any[];
+    if (Array.isArray(items) && items[0]) return items[0];
+  }
+
+  const byEmail = await fetch(
+    `${adminBase}/users?email=${encodeURIComponent(user.email)}&exact=true`,
+    { headers }
+  );
+  if (!byEmail.ok) return null;
+  const items = await byEmail.json() as any[];
+  return Array.isArray(items) ? items[0] : null;
+}
+
+async function setKeycloakPassword(adminBase: string, token: string, userId: string) {
+  await fetch(`${adminBase}/users/${userId}/reset-password`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      type: 'password',
+      value: PROTOCOL_USER_PASSWORD,
+      temporary: false,
+    }),
+  });
+}
+
+async function ensureKeycloakProtocolUser(strapi: any, token: string, user: any) {
+  const keycloakUrl = process.env.KEYCLOAK_URL;
+  const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
+  if (!keycloakUrl) return;
+
+  const adminBase = `${keycloakUrl}/admin/realms/${keycloakRealm}`;
+  const existing = await findKeycloakUser(adminBase, token, user);
+  const attributes = {
+    ...(existing?.attributes || {}),
+    nnmcProtocolSeedVersion: [PROTOCOL_USER_SEED_VERSION],
+  };
+  const payload = {
+    username: user.username,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    enabled: true,
+    emailVerified: true,
+    attributes,
+  };
+
+  if (existing?.id) {
+    const shouldResetPassword =
+      process.env.NNMC_PROTOCOL_USER_RESET_PASSWORDS === 'true' ||
+      !Array.isArray(existing?.attributes?.nnmcProtocolSeedVersion) ||
+      !existing.attributes.nnmcProtocolSeedVersion.includes(PROTOCOL_USER_SEED_VERSION);
+
+    const updateRes = await fetch(`${adminBase}/users/${existing.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!updateRes.ok) {
+      strapi.log.warn(`[protocol-users] Keycloak update failed for ${user.email}: HTTP ${updateRes.status}`);
+      return;
+    }
+    if (shouldResetPassword) {
+      await setKeycloakPassword(adminBase, token, existing.id);
+    }
+    return;
+  }
+
+  const createRes = await fetch(`${adminBase}/users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      ...payload,
+      credentials: [{
+        type: 'password',
+        value: PROTOCOL_USER_PASSWORD,
+        temporary: false,
+      }],
+    }),
+  });
+
+  if (!createRes.ok && createRes.status !== 409) {
+    const text = await createRes.text().catch(() => '');
+    strapi.log.warn(`[protocol-users] Keycloak create failed for ${user.email}: HTTP ${createRes.status} ${text}`);
+  }
+}
+
+async function seedKpiProtocolUsers(strapi: any) {
+  try {
+    const departmentsByKey = await ensureProtocolDepartments(strapi);
+    const roles = await strapi.entityService.findMany('plugin::users-permissions.role');
+    const memberRole = roles.find((r: any) => r.type === 'member');
+    const authenticatedRole = roles.find((r: any) => r.type === 'authenticated');
+    const roleId = memberRole?.id || authenticatedRole?.id;
+    if (!roleId) {
+      strapi.log.warn('[protocol-users] No member/authenticated role found');
+      return;
+    }
+
+    const keycloakToken = await getKeycloakAdminToken(strapi).catch((error: any) => {
+      strapi.log.warn(`[protocol-users] Keycloak token error: ${error?.message || error}`);
+      return null;
+    });
+
+    let created = 0;
+    let updated = 0;
+
+    for (const item of radiologyProtocolUsers) {
+      const department = departmentsByKey[item.departmentKey];
+      const existing = await strapi.entityService.findMany('plugin::users-permissions.user', {
+        filters: { $or: [{ email: item.email }, { username: item.username }] },
+        limit: 1,
+      });
+
+      const userData = {
+        username: item.username,
+        email: item.email,
+        firstName: item.firstName,
+        lastName: item.lastName,
+        department: department?.id || null,
+        role: roleId,
+        provider: 'keycloak',
+        confirmed: true,
+        blocked: false,
+        isSuperAdmin: false,
+      };
+
+      if (existing.length === 0) {
+        await strapi.entityService.create('plugin::users-permissions.user', {
+          data: {
+            ...userData,
+            password: PROTOCOL_USER_PASSWORD,
+          },
+        });
+        created += 1;
+      } else {
+        await strapi.entityService.update('plugin::users-permissions.user', existing[0].id, {
+          data: userData,
+        });
+        updated += 1;
+      }
+
+      if (keycloakToken) {
+        await ensureKeycloakProtocolUser(strapi, keycloakToken, item).catch((error: any) => {
+          strapi.log.warn(`[protocol-users] Keycloak sync failed for ${item.email}: ${error?.message || error}`);
+        });
+      }
+    }
+
+    strapi.log.info(`[protocol-users] PM users seeded: +${created} created, ${updated} updated`);
+  } catch (error: any) {
+    strapi.log.warn(`[protocol-users] Seed failed: ${error?.message || error}`);
   }
 }

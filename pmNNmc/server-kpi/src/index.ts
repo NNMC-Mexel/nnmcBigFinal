@@ -1,5 +1,84 @@
 // import type { Core } from '@strapi/strapi';
 
+const RADIOLOGY_PROTOCOL_TEMPLATE = {
+  departmentKey: 'RADIOLOGY',
+  departmentName: 'Лучевая (ВМП)',
+  meetingTitle: 'Протокол ОЦМК по KPI отдела лучевой диагностики',
+  place: 'ННМЦ',
+  agendaText: 'Рассмотрение результатов KPI отдела лучевой диагностики.',
+  footerText: '',
+  secretaryName: '',
+  coordinatorRole: '',
+  commissionMembers: [
+    {
+      role: 'Лучевая диагностика',
+      name: 'Оразбекова Жанар Оримбековна',
+      email: 'orazbekova.z@nnmc.kz',
+      order: 1,
+    },
+    {
+      role: 'Отдел управления персоналом',
+      name: 'Елеусизова Ляззат Сарановна',
+      email: 'eleusizova.l@nnmc.kz',
+      order: 2,
+    },
+    {
+      role: 'Лучевая диагностика',
+      name: 'Михайлов Азат Игоревич',
+      email: 'mikhailov.a@nnmc.kz',
+      order: 3,
+    },
+    {
+      role: 'Экономика',
+      name: 'Айтымбетова Гульмира Меирбековна',
+      email: 'aitymbetova.g@nnmc.kz',
+      order: 4,
+    },
+    {
+      role: 'Отдел управления персоналом',
+      name: 'Кенжебаева Шайзат Тукеновна',
+      email: 'kenzhebaeva.s@nnmc.kz',
+      order: 5,
+    },
+    {
+      role: 'Клинико-фармакологический отдел',
+      name: 'Кушенова Сауле Жолдасбековна',
+      email: 'kushenova.s@nnmc.kz',
+      order: 6,
+    },
+    {
+      role: 'Служба поддержки пациента и внутренней экспертизы',
+      name: 'Куржукова Асель Куанышевна',
+      email: 'kurzhukova.a@nnmc.kz',
+      order: 7,
+    },
+    {
+      role: 'Служба поддержки пациента и внутренней экспертизы',
+      name: 'Ачкасов Владислав Борисович',
+      email: 'achkasov.v@nnmc.kz',
+      order: 8,
+    },
+    {
+      role: 'Администрация',
+      name: 'Жумагулов Алмат Бахчанович',
+      email: 'zhumagulov.a@nnmc.kz',
+      order: 9,
+    },
+    {
+      role: 'Экономика',
+      name: 'Мендыбаева Эльмира Манаповна',
+      email: 'mendybaeva.e@nnmc.kz',
+      order: 10,
+    },
+    {
+      role: 'Бухгалтерия',
+      name: 'Тасеменова Дарига Кошкарбаевна',
+      email: 'tasemenova.d@nnmc.kz',
+      order: 11,
+    },
+  ],
+};
+
 async function syncUsersFromPm(strapi: any) {
   const pmUrl = process.env.SERVER_PM_URL;
   const token = process.env.INTERNAL_SYNC_TOKEN;
@@ -178,6 +257,35 @@ async function ensureAuthenticatedPermissions(strapi: any) {
   }
 }
 
+async function seedRadiologyProtocolTemplate(strapi: any) {
+  try {
+    const existing = await strapi.entityService.findMany(
+      'api::department-template.department-template',
+      {
+        filters: { departmentKey: RADIOLOGY_PROTOCOL_TEMPLATE.departmentKey },
+        limit: 1,
+      }
+    );
+
+    if (!Array.isArray(existing) || existing.length === 0) {
+      await strapi.entityService.create('api::department-template.department-template', {
+        data: RADIOLOGY_PROTOCOL_TEMPLATE,
+      });
+      strapi.log.info('[department-template] Seeded RADIOLOGY KPI protocol template');
+      return;
+    }
+
+    await strapi.entityService.update(
+      'api::department-template.department-template',
+      existing[0].id,
+      { data: RADIOLOGY_PROTOCOL_TEMPLATE }
+    );
+    strapi.log.info('[department-template] Updated RADIOLOGY KPI protocol template');
+  } catch (error: any) {
+    strapi.log.warn(`[department-template] RADIOLOGY seed failed: ${error?.message || error}`);
+  }
+}
+
 export default {
   /**
    * An asynchronous register function that runs before
@@ -198,5 +306,6 @@ export default {
     await lockPublicRole(strapi);
     await ensureAuthenticatedPermissions(strapi);
     await syncUsersFromPm(strapi);
+    await seedRadiologyProtocolTemplate(strapi);
   },
 };

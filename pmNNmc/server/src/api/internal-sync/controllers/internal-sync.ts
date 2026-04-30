@@ -46,7 +46,7 @@ export default {
       email: u.email,
       firstName: u.firstName,
       lastName: u.lastName,
-      fullName: [u.firstName, u.lastName].filter(Boolean).join(' '),
+      fullName: [u.lastName, u.firstName].filter(Boolean).join(' '),
       isSuperAdmin: Boolean(u.isSuperAdmin),
       isKpiResponsible: Boolean(u.isKpiResponsible),
       department: u.department
