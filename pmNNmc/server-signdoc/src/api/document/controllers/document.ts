@@ -19,6 +19,31 @@ function signerEmail(signer: any): string {
     return normalizeEmail(signer?.email || signer?.userEmail);
 }
 
+function normalizeSignerStatus(status: any): string {
+    const value = String(status || "").trim();
+    if (["pending", "signed", "rejected"].includes(value)) return value;
+    return "pending";
+}
+
+function normalizeSigners(signers: any): any[] {
+    if (!Array.isArray(signers)) return [];
+    return signers.map((signer: any, index: number) => {
+        const rawUserId = signer?.userId;
+        const numericUserId =
+            rawUserId === null || rawUserId === undefined || rawUserId === ""
+                ? null
+                : Number(rawUserId);
+        return {
+            ...signer,
+            userId: Number.isFinite(numericUserId) ? numericUserId : rawUserId,
+            userEmail: normalizeEmail(signer?.userEmail || signer?.email),
+            email: normalizeEmail(signer?.email || signer?.userEmail),
+            order: Number(signer?.order || index + 1),
+            status: normalizeSignerStatus(signer?.status),
+        };
+    });
+}
+
 function routeId(document: any): string | number {
     return document?.id || document?.documentId;
 }
@@ -567,6 +592,9 @@ export default factories.createCoreController(
         async create(ctx) {
             const body = ctx.request.body;
             const data = (body as any)?.data || {};
+            if (Array.isArray(data.signers)) {
+                data.signers = normalizeSigners(data.signers);
+            }
 
             const currentFileId = await toFileId(strapi, data.currentFile);
             const originalFileId = await toFileId(strapi, data.originalFile);
@@ -618,6 +646,9 @@ export default factories.createCoreController(
             }
 
             const data = (ctx.request.body as any)?.data || {};
+            if (Array.isArray(data.signers)) {
+                data.signers = normalizeSigners(data.signers);
+            }
             const hasCurrentFile = Object.prototype.hasOwnProperty.call(data, "currentFile");
             const hasOriginalFile = Object.prototype.hasOwnProperty.call(data, "originalFile");
             const currentFileId = hasCurrentFile ? await toFileId(strapi, data.currentFile) : null;

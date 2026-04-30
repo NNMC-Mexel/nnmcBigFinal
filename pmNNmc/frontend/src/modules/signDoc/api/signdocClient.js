@@ -124,11 +124,12 @@ export async function getPendingDocuments() {
 
 export function isMyTurnToSign(doc, userId) {
   const signers = doc?.signers || [];
+  const signerStatus = (signer) => signer?.status || "pending";
   const mySignerIndex = signers.findIndex((s) => Number(s.userId) === Number(userId));
   if (mySignerIndex === -1) return false;
-  if (signers[mySignerIndex].status !== "pending") return false;
+  if (signerStatus(signers[mySignerIndex]) !== "pending") return false;
   if (!doc.signatureSequential) return true;
-  return signers.slice(0, mySignerIndex).every((s) => s.status === "signed");
+  return signers.slice(0, mySignerIndex).every((s) => signerStatus(s) === "signed");
 }
 
 export async function getActionablePendingDocuments() {

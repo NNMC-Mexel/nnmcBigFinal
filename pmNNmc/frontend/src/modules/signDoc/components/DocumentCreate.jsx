@@ -136,6 +136,7 @@ export default function DocumentCreate() {
                     userEmail: u.email,
                     role: p.role || "Подписант",
                     order: p.order,
+                    status: "pending",
                     department: u.department?.name || u.department?.name_ru || u.departmentName || "",
                 };
             })
@@ -452,6 +453,12 @@ export default function DocumentCreate() {
                             uploadedCmsFile?.name || cmsFileNameGenerated;
                     }
 
+                    const normalizedSigners = selectedSigners.map((signer, index) => ({
+                        ...signer,
+                        order: Number(signer.order || index + 1),
+                        status: signer.status || "pending",
+                    }));
+
                     const documentData = {
                         title: signedFile.title,
                         originalFile: uploadedFile.id,
@@ -460,7 +467,7 @@ export default function DocumentCreate() {
                         creator: currentUser.id,
                         documentType: documentTypeId || null,
                         subdivision: subdivisionId || null,
-                        signers: selectedSigners,
+                        signers: normalizedSigners,
                         signatureSequential: sequential,
                         signatureType: signatureType,
                         metadata: signedFile.metadata || null,

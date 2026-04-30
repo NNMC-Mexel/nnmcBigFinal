@@ -41,6 +41,27 @@ const API_BASE = VITE_SIGNDOC_API_BASE
     ? VITE_SIGNDOC_API_BASE.replace(/\/api$/, "")
     : `${window.location.protocol}//${window.location.hostname}:12015`;
 
+const BLOCKED_SIGN_STATUSES = ["completed", "cancelled", "revision", "revoked"];
+
+function sameId(left, right) {
+    if (left == null || right == null) return false;
+    return String(left ?? "") === String(right ?? "");
+}
+
+function getSignerStatus(signer) {
+    const status = String(signer?.status || "").trim();
+    return status || "pending";
+}
+
+function normalizeSignersForUi(signers) {
+    if (!Array.isArray(signers)) return [];
+    return signers.map((signer, index) => ({
+        ...signer,
+        order: signer?.order ?? index + 1,
+        status: getSignerStatus(signer),
+    }));
+}
+
 export default function DocumentView() {
     const toast = useToast();
     const { id } = useParams();
@@ -82,14 +103,28 @@ export default function DocumentView() {
     };
 
     useEffect(() => {
-        loadDocument();
-    }, [id]);
+        let cancelled = false;
 
-    useEffect(() => {
-        apiMe()
-            .then((user) => setCurrentUser(user))
-            .catch(() => {});
-    }, []);
+        const load = async () => {
+            let activeUser = getCurrentUser();
+            try {
+                activeUser = await apiMe();
+                if (!cancelled) setCurrentUser(activeUser);
+            } catch (err) {
+                console.warn("SignDoc user refresh failed:", err);
+            }
+
+            if (!cancelled) {
+                await loadDocument(activeUser);
+            }
+        };
+
+        load();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [id]);
 
     useEffect(() => {
         if (!documentData) return;
@@ -106,8 +141,10 @@ export default function DocumentView() {
         };
     }, [documentData]);
 
-    const loadDocument = async () => {
+    const loadDocument = async (activeUser = currentUser) => {
         setLoading(true);
+        setCanSign(false);
+        setMySignerInfo(null);
         try {
             // Ищем документ и в своих, и в назначенных на подпись
             const [myDocs, pendingDocs] = await Promise.all([
@@ -133,25 +170,30 @@ export default function DocumentView() {
                 return;
             }
 
-            setDocumentData(doc);
+            const normalizedDoc = {
+                ...doc,
+                signers: normalizeSignersForUi(doc.signers),
+            };
+            setDocumentData(normalizedDoc);
 
-            const signers = doc.signers || [];
-            const mySigner = signers.find((s) => s.userId === currentUser.id);
+            const user = activeUser || currentUser || getCurrentUser();
+            const signers = normalizedDoc.signers || [];
+            const mySigner = signers.find((s) => sameId(s.userId, user?.id));
 
             if (mySigner) {
                 setMySignerInfo(mySigner);
 
                 if (
-                    mySigner.status === "pending" &&
-                    !["completed", "cancelled", "revision", "revoked"].includes(doc.status)
+                    getSignerStatus(mySigner) === "pending" &&
+                    !BLOCKED_SIGN_STATUSES.includes(normalizedDoc.status)
                 ) {
-                    if (doc.signatureSequential) {
+                    if (normalizedDoc.signatureSequential) {
                         const myIndex = signers.findIndex(
-                            (s) => s.userId === currentUser.id,
+                            (s) => sameId(s.userId, user?.id),
                         );
                         const allPreviousSigned = signers
                             .slice(0, myIndex)
-                            .every((s) => s.status === "signed");
+                            .every((s) => getSignerStatus(s) === "signed");
 
                         setCanSign(allPreviousSigned);
                     } else {
@@ -189,8 +231,8 @@ export default function DocumentView() {
                 cmsFileName = uploadedCmsFile?.name || cmsFileNameGenerated;
             }
 
-            const updatedSigners = documentData.signers.map((s) => {
-                if (s.userId === currentUser.id) {
+            const updatedSigners = normalizeSignersForUi(documentData.signers).map((s) => {
+                if (sameId(s.userId, currentUser?.id)) {
                     return {
                         ...s,
                         status: "signed",
@@ -222,7 +264,7 @@ export default function DocumentView() {
             ];
 
             const allSigned = updatedSigners.every(
-                (s) => s.status === "signed",
+                (s) => getSignerStatus(s) === "signed",
             );
             const newStatus = allSigned ? "completed" : "in_progress";
 
@@ -359,7 +401,8 @@ export default function DocumentView() {
         }
     };
 
-    const isCreator = documentData?.creator?.id === currentUser.id;
+    const creatorId = documentData?.creator?.id ?? documentData?.creator;
+    const isCreator = sameId(creatorId, currentUser?.id);
 
     const getLastRevisionEntry = () => {
         const history = documentData?.signatureHistory || [];
@@ -377,8 +420,8 @@ export default function DocumentView() {
     const handleReject = async () => {
         setActionLoading(true);
         try {
-            const updatedSigners = documentData.signers.map((s) => {
-                if (s.userId === currentUser.id) {
+            const updatedSigners = normalizeSignersForUi(documentData.signers).map((s) => {
+                if (sameId(s.userId, currentUser?.id)) {
                     return { ...s, status: "rejected" };
                 }
                 return s;
@@ -405,7 +448,7 @@ export default function DocumentView() {
             toast.success("Документ отклонён");
             setShowRejectModal(false);
             setRejectComment("");
-            loadDocument();
+            loadDocument(currentUser);
         } catch (error) {
             console.error("Ошибка отклонения:", error);
             toast.error("Ошибка при отклонении документа");
@@ -422,7 +465,7 @@ export default function DocumentView() {
             toast.success("Документ отозван на пересчёт");
             setShowRecallModal(false);
             setRecallComment("");
-            loadDocument();
+            loadDocument(currentUser);
         } catch (error) {
             console.error("Ошибка отзыва:", error);
             toast.error("Ошибка при отзыве документа");
@@ -452,16 +495,14 @@ export default function DocumentView() {
             const creatorEmail =
                 documentData?.creator?.email || currentUser.email;
 
-            const resetSigners = (documentData.signers || []).map((s) => ({
+            const resetSigners = normalizeSignersForUi(documentData.signers).map((s) => ({
                 ...s,
                 status: "pending",
                 signedAt: null,
                 role: null,
             }));
 
-            const hasCreator = resetSigners.some(
-                (s) => s.userId === creatorId
-            );
+            const hasCreator = resetSigners.some((s) => sameId(s.userId, creatorId));
             const nextSigners = hasCreator
                 ? resetSigners
                 : [
@@ -501,7 +542,7 @@ export default function DocumentView() {
 
             toast.success("Документ отправлен заново");
             setResendFile(null);
-            loadDocument();
+            loadDocument(currentUser);
         } catch (error) {
             console.error("Ошибка отправки:", error);
             toast.error("Ошибка при повторной отправке");
@@ -562,7 +603,8 @@ export default function DocumentView() {
     };
 
     const getSequentialSignerStage = (signer, index) => {
-        if (signer.status === "signed") {
+        const status = getSignerStatus(signer);
+        if (status === "signed") {
             return {
                 status: "signed",
                 label: "Подписано",
@@ -572,7 +614,7 @@ export default function DocumentView() {
                 icon: <CheckCircle className='w-4 h-4' />,
             };
         }
-        if (signer.status === "rejected") {
+        if (status === "rejected") {
             return {
                 status: "rejected",
                 label: "Отклонил",
@@ -581,7 +623,7 @@ export default function DocumentView() {
             };
         }
         const signers = sortedSigners;
-        const firstPendingIndex = signers.findIndex((s) => s.status === "pending");
+        const firstPendingIndex = signers.findIndex((s) => getSignerStatus(s) === "pending");
         const isCurrent = firstPendingIndex === index;
         return {
             status: isCurrent ? "current" : "queued",
@@ -613,10 +655,10 @@ export default function DocumentView() {
         canSeeAccountantExcel &&
         (isKpiDocument || documentData.metadata?.accountantExcel);
     const sortedSigners = documentData.signatureSequential
-        ? [...(documentData.signers || [])].sort(
+        ? normalizeSignersForUi(documentData.signers).sort(
               (a, b) => (a.order ?? 9999) - (b.order ?? 9999)
           )
-        : documentData.signers || [];
+        : normalizeSignersForUi(documentData.signers);
 
     return (
         <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8'>
@@ -824,8 +866,8 @@ export default function DocumentView() {
                     )}
 
                     {mySignerInfo &&
-                        mySignerInfo.status === "pending" &&
-                        !["completed", "cancelled", "revision", "revoked"].includes(documentData.status) && (
+                        getSignerStatus(mySignerInfo) === "pending" &&
+                        !BLOCKED_SIGN_STATUSES.includes(documentData.status) && (
                         <div className='mb-6'>
                             {canSign ? (
                                 <div className='flex gap-3'>
@@ -875,23 +917,24 @@ export default function DocumentView() {
                         </h2>
                         <div className='space-y-3'>
                             {sortedSigners?.map((signer, index) => {
+                                const signerStatus = getSignerStatus(signer);
                                 const stage = documentData.signatureSequential
                                     ? getSequentialSignerStage(signer, index)
                                     : {
-                                          status: signer.status,
+                                          status: signerStatus,
                                           label:
-                                              signer.status === "signed"
+                                              signerStatus === "signed"
                                                   ? "Подписан"
-                                                  : signer.status === "rejected"
+                                                  : signerStatus === "rejected"
                                                   ? "Отклонил"
                                                   : "Ожидает",
                                           description: signer.signedAt
                                               ? new Date(signer.signedAt).toLocaleString("ru-RU")
                                               : "",
                                           icon:
-                                              signer.status === "signed" ? (
+                                              signerStatus === "signed" ? (
                                                   <CheckCircle className='w-4 h-4' />
-                                              ) : signer.status === "rejected" ? (
+                                              ) : signerStatus === "rejected" ? (
                                                   <XCircle className='w-4 h-4' />
                                               ) : (
                                                   <Clock className='w-4 h-4' />
