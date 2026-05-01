@@ -52,6 +52,7 @@ export interface User {
   email: string;
   firstName?: string;
   lastName?: string;
+  position?: string;
   role?: UserRole;
   department?: Department;
   isSuperAdmin?: boolean;

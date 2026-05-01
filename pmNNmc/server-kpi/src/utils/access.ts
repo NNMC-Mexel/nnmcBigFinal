@@ -4,6 +4,7 @@ declare const strapi: any;
 
 type UserAccess = {
   isAdmin: boolean;
+  isSuperAdmin?: boolean;
   roleName: string;
   allowedDepartments: string[];
   userId?: number;
@@ -39,9 +40,15 @@ function isAdminLogin(user: any): boolean {
   );
 }
 
-function hasGlobalDepartmentAccess(departmentKey: string): boolean {
+function hasGlobalDepartmentAccess(departmentKey: string, departmentName = ''): boolean {
   const normalized = String(departmentKey || '').trim().toUpperCase();
-  return normalized === 'ACCOUNTING' || normalized === 'DIGITALIZATION';
+  const name = String(departmentName || '').trim().toLowerCase();
+  return (
+    normalized === 'DIGITALIZATION' ||
+    normalized === 'ECONOMICS' ||
+    name.includes('цифров') ||
+    name.includes('эконом')
+  );
 }
 
 export async function getUserAccess(ctx: Context): Promise<UserAccess> {
@@ -105,13 +112,14 @@ export async function getUserAccess(ctx: Context): Promise<UserAccess> {
     isSuperAdmin ||
     isAdminRole(roleName) ||
     isAdminLogin(user) ||
-    hasGlobalDepartmentAccess(departmentKey);
+    hasGlobalDepartmentAccess(departmentKey, departmentName);
   if (!isAdminAccess && !isKpiResponsible) {
     normalized = [];
   }
 
   return {
     isAdmin: isAdminAccess,
+    isSuperAdmin,
     roleName,
     allowedDepartments: normalized,
     userId: user.id,

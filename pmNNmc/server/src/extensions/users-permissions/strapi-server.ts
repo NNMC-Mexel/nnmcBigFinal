@@ -1,3 +1,150 @@
+function safeUser(user: any) {
+  if (!user) return user;
+  const {
+    password,
+    resetPasswordToken,
+    confirmationToken,
+    ...rest
+  } = user;
+  return rest;
+}
+
+async function getKeycloakAdminToken(strapi: any): Promise<string | null> {
+  const keycloakUrl = process.env.KEYCLOAK_URL;
+  const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
+  const adminClientId = process.env.KEYCLOAK_ADMIN_CLIENT_ID || 'admin-cli';
+  const adminClientSecret = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET;
+  if (!keycloakUrl || !adminClientSecret) return null;
+
+  const res = await fetch(`${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: adminClientId,
+      client_secret: adminClientSecret,
+    }),
+  });
+  if (!res.ok) {
+    strapi.log.warn(`[keycloak-profile] admin token failed: HTTP ${res.status}`);
+    return null;
+  }
+  const data = await res.json() as any;
+  return data?.access_token || null;
+}
+
+async function findKeycloakUser(strapi: any, token: string, user: any): Promise<any | null> {
+  const keycloakUrl = process.env.KEYCLOAK_URL;
+  const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
+  if (!keycloakUrl) return null;
+  const adminBase = `${keycloakUrl}/admin/realms/${keycloakRealm}`;
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const username = String(user?.username || '').trim();
+  if (username) {
+    const byUsername = await fetch(`${adminBase}/users?username=${encodeURIComponent(username)}&exact=true`, { headers });
+    if (byUsername.ok) {
+      const items = await byUsername.json() as any[];
+      if (Array.isArray(items) && items[0]) return items[0];
+    }
+  }
+
+  const email = String(user?.email || '').trim();
+  if (!email) return null;
+  const byEmail = await fetch(`${adminBase}/users?email=${encodeURIComponent(email)}&exact=true`, { headers });
+  if (!byEmail.ok) return null;
+  const items = await byEmail.json() as any[];
+  return Array.isArray(items) ? items[0] : null;
+}
+
+async function updateKeycloakProfile(strapi: any, user: any, patch: any) {
+  const token = await getKeycloakAdminToken(strapi);
+  if (!token) return;
+  const keycloakUser = await findKeycloakUser(strapi, token, user);
+  if (!keycloakUser?.id) return;
+  const keycloakUrl = process.env.KEYCLOAK_URL;
+  const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
+  const adminBase = `${keycloakUrl}/admin/realms/${keycloakRealm}`;
+  await fetch(`${adminBase}/users/${keycloakUser.id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      ...keycloakUser,
+      firstName: patch.firstName ?? keycloakUser.firstName,
+      lastName: patch.lastName ?? keycloakUser.lastName,
+      attributes: {
+        ...(keycloakUser.attributes || {}),
+        ...(patch.position !== undefined ? { position: [String(patch.position || '')] } : {}),
+      },
+    }),
+  }).catch((e: any) => strapi.log.warn(`[keycloak-profile] update failed: ${e?.message || e}`));
+}
+
+async function setKeycloakPassword(strapi: any, user: any, password: string): Promise<boolean> {
+  const token = await getKeycloakAdminToken(strapi);
+  if (!token) return false;
+  const keycloakUser = await findKeycloakUser(strapi, token, user);
+  if (!keycloakUser?.id) return false;
+  const keycloakUrl = process.env.KEYCLOAK_URL;
+  const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
+  const adminBase = `${keycloakUrl}/admin/realms/${keycloakRealm}`;
+  const res = await fetch(`${adminBase}/users/${keycloakUser.id}/reset-password`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      type: 'password',
+      value: password,
+      temporary: false,
+    }),
+  });
+  if (!res.ok) {
+    strapi.log.warn(`[keycloak-profile] password update failed: HTTP ${res.status}`);
+    return false;
+  }
+  return true;
+}
+
+async function verifyKeycloakPassword(strapi: any, user: any, password: string): Promise<boolean | null> {
+  const keycloakUrl = process.env.KEYCLOAK_URL;
+  const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
+  const clientId = process.env.KEYCLOAK_CLIENT_ID;
+  if (!keycloakUrl || !clientId) return null;
+
+  const params: any = {
+    grant_type: 'password',
+    client_id: clientId,
+    username: user?.email || user?.username,
+    password,
+  };
+  if (process.env.KEYCLOAK_CLIENT_SECRET) {
+    params.client_secret = process.env.KEYCLOAK_CLIENT_SECRET;
+  }
+
+  try {
+    const res = await fetch(`${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(params),
+    });
+    if (res.ok) return true;
+    if (res.status === 400 || res.status === 401) {
+      const errorBody = await res.json().catch(() => ({})) as any;
+      if (errorBody?.error === 'invalid_grant') return false;
+      return null;
+    }
+    return null;
+  } catch (e: any) {
+    strapi.log.warn(`[keycloak-profile] password verification failed: ${e?.message || e}`);
+    return null;
+  }
+}
+
 export default (plugin) => {
   // Override bootstrap to patch Keycloak grant URLs to use HTTP instead of
   // grant's hardcoded https:// scheme (needed for internal HTTP-only deployments)
@@ -56,6 +203,54 @@ export default (plugin) => {
 
     return {
       ...original,
+      async changePassword(ctx) {
+        const requestUser = ctx.state.user;
+        if (!requestUser?.id) return ctx.unauthorized('Необходима авторизация');
+
+        const body = ctx.request.body || {};
+        const currentPassword = String(body.currentPassword || '');
+        const password = String(body.password || '');
+        const passwordConfirmation = String(body.passwordConfirmation || '');
+        if (!currentPassword || !password || !passwordConfirmation) {
+          return ctx.badRequest('Заполните текущий пароль и новый пароль');
+        }
+        if (password !== passwordConfirmation) {
+          return ctx.badRequest('Новые пароли не совпадают');
+        }
+        if (password.length < 6) {
+          return ctx.badRequest('Пароль должен быть минимум 6 символов');
+        }
+
+        const fullUser = await strapi.entityService.findOne(
+          'plugin::users-permissions.user',
+          requestUser.id,
+          { populate: ['role', 'department'] }
+        );
+
+        if ((fullUser as any)?.provider === 'keycloak') {
+          const verified = await verifyKeycloakPassword(strapi, fullUser, currentPassword);
+          if (verified === false) return ctx.badRequest('Текущий пароль указан неверно');
+
+          if (verified === true) {
+            const keycloakUpdated = await setKeycloakPassword(strapi, fullUser, password);
+            if (!keycloakUpdated) {
+              return ctx.badRequest('Не удалось изменить пароль в Keycloak');
+            }
+            await strapi.entityService.update('plugin::users-permissions.user', requestUser.id, {
+              data: { password },
+            });
+            ctx.body = { ok: true };
+            return;
+          }
+        }
+
+        await original.changePassword(ctx);
+
+        if ((fullUser as any)?.provider === 'keycloak') {
+          await setKeycloakPassword(strapi, fullUser, password);
+        }
+      },
+
       async callback(ctx) {
         // Pre-link: if a local user exists with same email, update provider to keycloak
         if (ctx.params?.provider === 'keycloak') {
@@ -131,6 +326,56 @@ export default (plugin) => {
 
     return {
       ...original,
+      async update(ctx) {
+        const requestUser = ctx.state.user;
+        if (!requestUser?.id) return ctx.unauthorized('Необходима авторизация');
+
+        const targetId = Number(ctx.params?.id);
+        if (!targetId) return ctx.badRequest('id обязателен');
+
+        const fullUser = await strapi.entityService.findOne(
+          'plugin::users-permissions.user',
+          requestUser.id,
+          { fields: ['id', 'isSuperAdmin'] } as any
+        );
+        const isSelf = Number(requestUser.id) === targetId;
+        const isSuperAdmin = Boolean((fullUser as any)?.isSuperAdmin);
+        if (!isSelf && !isSuperAdmin) {
+          return ctx.forbidden('Можно редактировать только свой профиль');
+        }
+
+        const body = ctx.request.body || {};
+        const patch: Record<string, any> = {};
+        for (const field of ['firstName', 'lastName', 'position']) {
+          if (Object.prototype.hasOwnProperty.call(body, field)) {
+            patch[field] = String(body[field] || '').trim();
+          }
+        }
+        if (Object.keys(patch).length === 0) {
+          return ctx.badRequest('Нет данных для обновления');
+        }
+
+        const before = await strapi.entityService.findOne(
+          'plugin::users-permissions.user',
+          targetId,
+          { fields: ['id', 'username', 'email', 'provider', 'firstName', 'lastName', 'position'] } as any
+        );
+        const updated = await strapi.entityService.update(
+          'plugin::users-permissions.user',
+          targetId,
+          {
+            data: patch,
+            populate: ['role', 'department'],
+          }
+        );
+
+        if ((before as any)?.provider === 'keycloak') {
+          await updateKeycloakProfile(strapi, before, patch);
+        }
+
+        ctx.body = safeUser(updated);
+      },
+
       async me(ctx) {
         await original.me(ctx);
 

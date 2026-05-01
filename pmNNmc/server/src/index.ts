@@ -288,7 +288,9 @@ async function setupPermissions(strapi: any) {
     await ensurePermission(strapi, role.id, 'plugin::users-permissions.user', 'me');
     await ensurePermission(strapi, role.id, 'plugin::users-permissions.user', 'find');
     await ensurePermission(strapi, role.id, 'plugin::users-permissions.user', 'findOne');
+    await ensurePermission(strapi, role.id, 'plugin::users-permissions.user', 'update');
     await ensurePermission(strapi, role.id, 'plugin::users-permissions.auth', 'callback');
+    await ensurePermission(strapi, role.id, 'plugin::users-permissions.auth', 'changePassword');
   }
 
   console.log('  ✅ Permissions configured');

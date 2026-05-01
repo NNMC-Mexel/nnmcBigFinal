@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { User, Mail, Building2, Shield, Camera, Lock, Save, Eye, EyeOff } from 'lucide-react';
+import { User, Mail, Building2, Shield, Camera, Lock, Save, Eye, EyeOff, Briefcase } from 'lucide-react';
 import { useAuthStore, useUserRole } from '../../store/authStore';
 import client from '../../api/client';
 import Card from '../../components/ui/Card';
@@ -30,6 +30,7 @@ export default function ProfilePage() {
   const [profileData, setProfileData] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
+    position: user?.position || '',
   });
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
 
@@ -72,6 +73,7 @@ export default function ProfilePage() {
       await client.put(`/users/${user?.id}`, {
         firstName: profileData.firstName,
         lastName: profileData.lastName,
+        position: profileData.position,
       });
       await checkAuth();
       setIsEditingProfile(false);
@@ -140,6 +142,12 @@ export default function ProfilePage() {
                     placeholder="Фамилия"
                   />
                 </div>
+                <Input
+                  label="Должность"
+                  value={profileData.position}
+                  onChange={(e) => setProfileData({ ...profileData, position: e.target.value })}
+                  placeholder="Например: врач-рентгенолог"
+                />
                 <div className="flex gap-2">
                   <Button type="submit" size="sm" loading={isUpdatingProfile}>
                     Сохранить
@@ -158,6 +166,7 @@ export default function ProfilePage() {
                       setProfileData({
                         firstName: user?.firstName || '',
                         lastName: user?.lastName || '',
+                        position: user?.position || '',
                       });
                       setIsEditingProfile(true);
                     }}
@@ -167,6 +176,12 @@ export default function ProfilePage() {
                   </button>
                 </div>
                 <p className="text-slate-500 mb-3">@{user?.username}</p>
+                {user?.position && (
+                  <p className="text-slate-600 mb-3 flex items-center gap-2">
+                    <Briefcase className="w-4 h-4" />
+                    {user.position}
+                  </p>
+                )}
               </>
             )}
 
@@ -215,6 +230,15 @@ export default function ProfilePage() {
             <div>
               <p className="text-sm text-slate-500">Отдел</p>
               <p className="font-medium text-slate-800">{getDepartmentName()}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+              <Briefcase className="w-5 h-5 text-slate-500" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Должность</p>
+              <p className="font-medium text-slate-800">{user?.position || 'Не указана'}</p>
             </div>
           </div>
         </div>

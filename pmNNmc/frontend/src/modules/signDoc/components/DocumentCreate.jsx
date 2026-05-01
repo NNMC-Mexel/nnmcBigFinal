@@ -308,7 +308,9 @@ export default function DocumentCreate() {
     const handleAddSigner = (user) => {
         if (selectedSigners.find((s) => s.userId === user.id)) {
             setSelectedSigners(
-                selectedSigners.filter((s) => s.userId !== user.id)
+                selectedSigners
+                    .filter((s) => s.userId !== user.id)
+                    .map((s, index) => ({ ...s, order: index + 1 }))
             );
         } else {
             setSelectedSigners([
@@ -323,6 +325,21 @@ export default function DocumentCreate() {
                 },
             ]);
         }
+    };
+
+    const handleRemoveSigner = (userId) => {
+        setSelectedSigners(
+            selectedSigners
+                .filter((signer) => signer.userId !== userId)
+                .map((signer, index) => ({ ...signer, order: index + 1 }))
+        );
+    };
+
+    const handleSignerChange = (index, field, value) => {
+        const newSigners = selectedSigners.map((signer, signerIndex) =>
+            signerIndex === index ? { ...signer, [field]: value } : signer
+        );
+        setSelectedSigners(newSigners);
     };
 
     const moveSignerUp = (index) => {
@@ -1171,6 +1188,7 @@ export default function DocumentCreate() {
                                                         {sequential && (
                                                             <div className='flex gap-1'>
                                                                 <button
+                                                                    type='button'
                                                                     onClick={() =>
                                                                         moveSignerUp(
                                                                             index
@@ -1184,6 +1202,7 @@ export default function DocumentCreate() {
                                                                     ↑
                                                                 </button>
                                                                 <button
+                                                                    type='button'
                                                                     onClick={() =>
                                                                         moveSignerDown(
                                                                             index
@@ -1199,6 +1218,43 @@ export default function DocumentCreate() {
                                                                 </button>
                                                             </div>
                                                         )}
+                                                    </div>
+                                                    <div className='mt-3 grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-end'>
+                                                        <label className='block'>
+                                                            <span className='text-xs font-medium text-gray-500'>
+                                                                ФИО в документе
+                                                            </span>
+                                                            <input
+                                                                type='text'
+                                                                value={signer.userName || ""}
+                                                                onChange={(e) =>
+                                                                    handleSignerChange(index, "userName", e.target.value)
+                                                                }
+                                                                className='mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
+                                                            />
+                                                        </label>
+                                                        <label className='block'>
+                                                            <span className='text-xs font-medium text-gray-500'>
+                                                                Роль / должность
+                                                            </span>
+                                                            <input
+                                                                type='text'
+                                                                value={signer.role || ""}
+                                                                onChange={(e) =>
+                                                                    handleSignerChange(index, "role", e.target.value)
+                                                                }
+                                                                placeholder='Главный экономист'
+                                                                className='mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
+                                                            />
+                                                        </label>
+                                                        <button
+                                                            type='button'
+                                                            onClick={() => handleRemoveSigner(signer.userId)}
+                                                            className='h-10 px-3 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg flex items-center justify-center gap-2 transition-colors'
+                                                            title='Удалить подписанта'>
+                                                            <X className='w-4 h-4' />
+                                                            <span className='text-sm'>Удалить</span>
+                                                        </button>
                                                     </div>
                                                 </div>
                                             )

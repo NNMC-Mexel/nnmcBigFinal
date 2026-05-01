@@ -4,8 +4,31 @@ import { getUserAccess } from '../../../utils/access';
 const UID = 'api::calculation-archive.calculation-archive' as any;
 
 function canAccessDepartment(access: any, department: string): boolean {
-  if (access.isAdmin) return true;
-  return (access.allowedDepartments || []).includes(String(department || '').trim());
+  if (canViewAllArchives(access)) return true;
+  return ownArchiveDepartments(access).includes(String(department || '').trim());
+}
+
+function canViewAllArchives(access: any): boolean {
+  const key = String(access?.departmentKey || '').trim().toUpperCase();
+  const name = String(access?.departmentName || '').trim().toLowerCase();
+  return (
+    access?.isSuperAdmin === true ||
+    key === 'DIGITALIZATION' ||
+    key === 'ECONOMICS' ||
+    name.includes('цифров') ||
+    name.includes('эконом')
+  );
+}
+
+function ownArchiveDepartments(access: any): string[] {
+  const values = [
+    ...(Array.isArray(access?.allowedDepartments) ? access.allowedDepartments : []),
+    access?.departmentName,
+    access?.departmentKey,
+  ]
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  return Array.from(new Set(values));
 }
 
 function applyDepartmentFilter(ctx: any, allowedDepartments: string[]) {
@@ -54,8 +77,8 @@ function snapshotArchive(item: any) {
 export default factories.createCoreController(UID, ({ strapi }) => ({
   async find(ctx) {
     const access = await getUserAccess(ctx);
-    if (!access.isAdmin) {
-      const allowedDepartments = access.allowedDepartments || [];
+    if (!canViewAllArchives(access)) {
+      const allowedDepartments = ownArchiveDepartments(access);
       if (allowedDepartments.length === 0) {
         ctx.body = { data: [], meta: { pagination: { page: 1, pageSize: 0, pageCount: 0, total: 0 } } };
         return;
