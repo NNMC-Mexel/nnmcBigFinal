@@ -9,6 +9,11 @@ function safeUser(user: any) {
   return rest;
 }
 
+type KeycloakPasswordUpdateResult = {
+  ok: boolean;
+  message?: string;
+};
+
 async function getKeycloakAdminToken(strapi: any): Promise<string | null> {
   const keycloakUrl = process.env.KEYCLOAK_URL;
   const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
@@ -26,7 +31,10 @@ async function getKeycloakAdminToken(strapi: any): Promise<string | null> {
     }),
   });
   if (!res.ok) {
-    strapi.log.warn(`[keycloak-profile] admin token failed: HTTP ${res.status}`);
+    const text = await res.text().catch(() => '');
+    strapi.log.warn(
+      `[keycloak-profile] admin token failed: HTTP ${res.status}${text ? ` ${text.slice(0, 300)}` : ''}`
+    );
     return null;
   }
   const data = await res.json() as any;
@@ -83,31 +91,47 @@ async function updateKeycloakProfile(strapi: any, user: any, patch: any) {
   }).catch((e: any) => strapi.log.warn(`[keycloak-profile] update failed: ${e?.message || e}`));
 }
 
-async function setKeycloakPassword(strapi: any, user: any, password: string): Promise<boolean> {
+async function setKeycloakPassword(strapi: any, user: any, password: string): Promise<KeycloakPasswordUpdateResult> {
   const token = await getKeycloakAdminToken(strapi);
-  if (!token) return false;
+  if (!token) return { ok: false, message: 'Keycloak admin token is not configured' };
+
   const keycloakUser = await findKeycloakUser(strapi, token, user);
-  if (!keycloakUser?.id) return false;
+  if (!keycloakUser?.id) {
+    strapi.log.warn(`[keycloak-profile] password update failed: user not found (${user?.email || user?.username || user?.id})`);
+    return { ok: false, message: 'Keycloak user not found' };
+  }
+
   const keycloakUrl = process.env.KEYCLOAK_URL;
   const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
   const adminBase = `${keycloakUrl}/admin/realms/${keycloakRealm}`;
-  const res = await fetch(`${adminBase}/users/${keycloakUser.id}/reset-password`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      type: 'password',
-      value: password,
-      temporary: false,
-    }),
-  });
-  if (!res.ok) {
-    strapi.log.warn(`[keycloak-profile] password update failed: HTTP ${res.status}`);
-    return false;
+
+  try {
+    const res = await fetch(`${adminBase}/users/${keycloakUser.id}/reset-password`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        type: 'password',
+        value: password,
+        temporary: false,
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      strapi.log.warn(
+        `[keycloak-profile] password update failed for ${user?.email || user?.username || user?.id}: HTTP ${res.status}${text ? ` ${text.slice(0, 300)}` : ''}`
+      );
+      return { ok: false, message: `Keycloak password update failed (HTTP ${res.status})` };
+    }
+
+    return { ok: true };
+  } catch (e: any) {
+    strapi.log.warn(`[keycloak-profile] password update failed: ${e?.message || e}`);
+    return { ok: false, message: 'Keycloak password update failed' };
   }
-  return true;
 }
 
 async function verifyKeycloakPassword(strapi: any, user: any, password: string): Promise<boolean | null> {
@@ -231,24 +255,32 @@ export default (plugin) => {
           const verified = await verifyKeycloakPassword(strapi, fullUser, currentPassword);
           if (verified === false) return ctx.badRequest('Текущий пароль указан неверно');
 
-          if (verified === true) {
-            const keycloakUpdated = await setKeycloakPassword(strapi, fullUser, password);
-            if (!keycloakUpdated) {
-              return ctx.badRequest('Не удалось изменить пароль в Keycloak');
+          const userService = strapi.plugin('users-permissions').service('user');
+
+          if (verified !== true) {
+            const localUser = await strapi.db
+              .query('plugin::users-permissions.user')
+              .findOne({ where: { id: requestUser.id } });
+            const validLocalPassword = localUser?.password
+              ? await userService.validatePassword(currentPassword, localUser.password)
+              : false;
+
+            if (!validLocalPassword) {
+              return ctx.badRequest('Текущий пароль указан неверно');
             }
-            await strapi.entityService.update('plugin::users-permissions.user', requestUser.id, {
-              data: { password },
-            });
-            ctx.body = { ok: true };
-            return;
           }
+
+          const keycloakUpdated = await setKeycloakPassword(strapi, fullUser, password);
+          if (!keycloakUpdated.ok) {
+            return ctx.badRequest(`Не удалось изменить пароль в Keycloak: ${keycloakUpdated.message}`);
+          }
+
+          await userService.edit(requestUser.id, { password });
+          ctx.body = { ok: true };
+          return;
         }
 
         await original.changePassword(ctx);
-
-        if ((fullUser as any)?.provider === 'keycloak') {
-          await setKeycloakPassword(strapi, fullUser, password);
-        }
       },
 
       async callback(ctx) {
