@@ -335,13 +335,6 @@ export default function DocumentCreate() {
         );
     };
 
-    const handleSignerChange = (index, field, value) => {
-        const newSigners = selectedSigners.map((signer, signerIndex) =>
-            signerIndex === index ? { ...signer, [field]: value } : signer
-        );
-        setSelectedSigners(newSigners);
-    };
-
     const moveSignerUp = (index) => {
         if (index === 0) return;
         const newSigners = [...selectedSigners];
@@ -1219,34 +1212,7 @@ export default function DocumentCreate() {
                                                             </div>
                                                         )}
                                                     </div>
-                                                    <div className='mt-3 grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 items-end'>
-                                                        <label className='block'>
-                                                            <span className='text-xs font-medium text-gray-500'>
-                                                                ФИО в документе
-                                                            </span>
-                                                            <input
-                                                                type='text'
-                                                                value={signer.userName || ""}
-                                                                onChange={(e) =>
-                                                                    handleSignerChange(index, "userName", e.target.value)
-                                                                }
-                                                                className='mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
-                                                            />
-                                                        </label>
-                                                        <label className='block'>
-                                                            <span className='text-xs font-medium text-gray-500'>
-                                                                Роль / должность
-                                                            </span>
-                                                            <input
-                                                                type='text'
-                                                                value={signer.role || ""}
-                                                                onChange={(e) =>
-                                                                    handleSignerChange(index, "role", e.target.value)
-                                                                }
-                                                                placeholder='Главный экономист'
-                                                                className='mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
-                                                            />
-                                                        </label>
+                                                    <div className='mt-3 flex justify-end'>
                                                         <button
                                                             type='button'
                                                             onClick={() => handleRemoveSigner(signer.userId)}
