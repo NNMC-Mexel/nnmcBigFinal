@@ -74,6 +74,12 @@
     "position": {
       "type": "string"
     },
+    "avatarUrl": {
+      "type": "string"
+    },
+    "avatarFileId": {
+      "type": "integer"
+    },
     "department": {
       "type": "relation",
       "relation": "manyToOne",

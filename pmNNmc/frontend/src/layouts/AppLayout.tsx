@@ -18,11 +18,14 @@ import {
     CalendarRange,
     BookOpen,
     FileSignature,
+    Building2,
+    Briefcase,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuthStore, useUserRole } from "../store/authStore";
 import LanguageSwitcher from "../components/ui/LanguageSwitcher";
 import NotificationsBell from "../components/NotificationsBell";
+import { getMediaUrl } from "../utils/media";
 
 export default function AppLayout() {
     const { t } = useTranslation();
@@ -30,8 +33,6 @@ export default function AppLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const { user } = useAuthStore();
     const {
-        role,
-        canEdit,
         isSuperAdmin,
         canViewDashboard,
         canViewBoard,
@@ -186,6 +187,10 @@ export default function AppLayout() {
         }
         return user?.username || user?.email || "";
     };
+
+    const avatarUrl = getMediaUrl(user?.avatarUrl);
+    const departmentName = user?.department?.name_ru || user?.department?.name_kz || user?.department?.key || "";
+    const position = user?.position || "";
 
     return (
         <div className='min-h-screen bg-gradient-to-br from-teal-50 via-blue-50 to-indigo-50 flex'>
@@ -394,19 +399,29 @@ export default function AppLayout() {
                                 setSidebarOpen(false);
                             }}
                             className='w-full mb-3 p-2 -mx-2 rounded-lg hover:bg-slate-50 transition-colors text-left flex items-center gap-3'>
-                            <div className='w-9 h-9 rounded-full bg-gradient-to-br from-primary-500 to-medical-500 flex items-center justify-center text-white font-bold text-sm'>
-                                {getFullName().charAt(0).toUpperCase() || "U"}
+                            <div className='w-11 h-11 rounded-full bg-gradient-to-br from-primary-500 to-medical-500 flex items-center justify-center text-white font-bold text-sm overflow-hidden border border-slate-200 shrink-0'>
+                                {avatarUrl ? (
+                                    <img src={avatarUrl} alt={getFullName()} className='w-full h-full object-cover' />
+                                ) : (
+                                    getFullName().charAt(0).toUpperCase() || "U"
+                                )}
                             </div>
                             <div className='flex-1 min-w-0'>
                                 <p className='font-medium text-slate-800 truncate'>
                                     {getFullName()}
                                 </p>
-                                <p className='text-xs text-slate-500 flex items-center gap-1'>
-                                    <span
-                                        className={`w-2 h-2 rounded-full ${canEdit ? "bg-primary-500" : "bg-slate-400"}`}
-                                    />
-                                    {t(`role.${role}`)}
-                                </p>
+                                {departmentName && (
+                                    <p className='text-xs text-slate-500 flex items-center gap-1 truncate'>
+                                        <Building2 className='w-3 h-3 shrink-0' />
+                                        <span className='truncate'>{departmentName}</span>
+                                    </p>
+                                )}
+                                {position && (
+                                    <p className='text-xs text-slate-500 flex items-center gap-1 truncate'>
+                                        <Briefcase className='w-3 h-3 shrink-0' />
+                                        <span className='truncate'>{position}</span>
+                                    </p>
+                                )}
                             </div>
                             <User className='w-4 h-4 text-slate-400' />
                         </button>

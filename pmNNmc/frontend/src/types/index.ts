@@ -53,6 +53,8 @@ export interface User {
   firstName?: string;
   lastName?: string;
   position?: string;
+  avatarUrl?: string;
+  avatarFileId?: number | null;
   role?: UserRole;
   department?: Department;
   isSuperAdmin?: boolean;

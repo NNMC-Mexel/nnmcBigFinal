@@ -1,17 +1,22 @@
-import { useState, FormEvent } from 'react';
+import { useRef, useState, FormEvent, ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { User, Mail, Building2, Shield, Camera, Lock, Save, Eye, EyeOff, Briefcase } from 'lucide-react';
+import { User, Mail, Building2, Shield, Camera, Lock, Save, Eye, EyeOff, Briefcase, Trash2 } from 'lucide-react';
 import { useAuthStore, useUserRole } from '../../store/authStore';
 import client from '../../api/client';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Badge from '../../components/ui/Badge';
+import { getMediaUrl } from '../../utils/media';
 
 export default function ProfilePage() {
-  const { t, i18n } = useTranslation();
+  const { i18n } = useTranslation();
   const { user, checkAuth } = useAuthStore();
   const { role, userDepartment } = useUserRole();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const avatarUrl = getMediaUrl(user?.avatarUrl);
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
 
   const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [passwordData, setPasswordData] = useState({
@@ -84,6 +89,56 @@ export default function ProfilePage() {
     }
   };
 
+  const handleAvatarChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+
+    setAvatarError('');
+    if (!file.type.startsWith('image/')) {
+      setAvatarError('Можно загрузить только изображение');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError('Фото должно быть не больше 5 МБ');
+      e.target.value = '';
+      return;
+    }
+
+    setIsUpdatingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('files', file);
+      const uploadRes = await client.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const uploaded = Array.isArray(uploadRes.data) ? uploadRes.data[0] : uploadRes.data;
+      if (!uploaded?.id) throw new Error('Upload failed');
+
+      await client.put(`/users/${user.id}`, { avatarFileId: uploaded.id });
+      await checkAuth();
+    } catch (error: any) {
+      setAvatarError(error.response?.data?.error?.message || 'Не удалось загрузить фото');
+    } finally {
+      setIsUpdatingAvatar(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    if (!user?.id) return;
+    setAvatarError('');
+    setIsUpdatingAvatar(true);
+    try {
+      await client.put(`/users/${user.id}`, { avatarFileId: null });
+      await checkAuth();
+    } catch (error: any) {
+      setAvatarError(error.response?.data?.error?.message || 'Не удалось удалить фото');
+    } finally {
+      setIsUpdatingAvatar(false);
+    }
+  };
+
   const getDepartmentName = () => {
     if (!userDepartment) return 'Не назначен';
     return i18n.language === 'kz' ? userDepartment.name_kz : userDepartment.name_ru;
@@ -116,12 +171,45 @@ export default function ProfilePage() {
         <div className="flex items-start gap-6">
           {/* Avatar */}
           <div className="relative">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary-500 to-medical-500 flex items-center justify-center text-white text-3xl font-bold">
-              {getFullName().charAt(0).toUpperCase() || 'U'}
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary-500 to-medical-500 flex items-center justify-center text-white text-3xl font-bold overflow-hidden border border-slate-200">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={getFullName()} className="w-full h-full object-cover" />
+              ) : (
+                getFullName().charAt(0).toUpperCase() || 'U'
+              )}
             </div>
-            <button className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-slate-500 hover:text-primary-600 transition-colors border border-slate-200">
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarChange}
+            />
+            <button
+              type="button"
+              disabled={isUpdatingAvatar}
+              onClick={() => avatarInputRef.current?.click()}
+              className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-slate-500 hover:text-primary-600 transition-colors border border-slate-200 disabled:opacity-60"
+              title="Загрузить фото"
+            >
               <Camera className="w-4 h-4" />
             </button>
+            {avatarUrl && (
+              <button
+                type="button"
+                disabled={isUpdatingAvatar}
+                onClick={handleAvatarRemove}
+                className="absolute top-0 right-0 w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-slate-500 hover:text-red-600 transition-colors border border-slate-200 disabled:opacity-60"
+                title="Удалить фото"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            {avatarError && (
+              <p className="absolute left-0 top-full mt-2 w-40 text-xs text-red-600">
+                {avatarError}
+              </p>
+            )}
           </div>
 
           {/* Info */}

@@ -383,6 +383,28 @@ export default (plugin) => {
             patch[field] = String(body[field] || '').trim();
           }
         }
+        if (Object.prototype.hasOwnProperty.call(body, 'avatarFileId')) {
+          const rawAvatarFileId = body.avatarFileId;
+          if (rawAvatarFileId === null || rawAvatarFileId === '' || rawAvatarFileId === false) {
+            patch.avatarFileId = null;
+            patch.avatarUrl = '';
+          } else {
+            const avatarFileId = Number(rawAvatarFileId);
+            if (!Number.isInteger(avatarFileId) || avatarFileId <= 0) {
+              return ctx.badRequest('Некорректный файл фото');
+            }
+
+            const avatarFile = await strapi.db
+              .query('plugin::upload.file')
+              .findOne({ where: { id: avatarFileId } });
+            if (!avatarFile?.id || !String(avatarFile.mime || '').startsWith('image/')) {
+              return ctx.badRequest('Можно загрузить только изображение');
+            }
+
+            patch.avatarFileId = avatarFileId;
+            patch.avatarUrl = avatarFile.url || '';
+          }
+        }
         if (Object.keys(patch).length === 0) {
           return ctx.badRequest('Нет данных для обновления');
         }
@@ -390,7 +412,7 @@ export default (plugin) => {
         const before = await strapi.entityService.findOne(
           'plugin::users-permissions.user',
           targetId,
-          { fields: ['id', 'username', 'email', 'provider', 'firstName', 'lastName', 'position'] } as any
+          { fields: ['id', 'username', 'email', 'provider', 'firstName', 'lastName', 'position', 'avatarUrl', 'avatarFileId'] } as any
         );
         const updated = await strapi.entityService.update(
           'plugin::users-permissions.user',
