@@ -25,12 +25,8 @@
       <div class="card">
 
         <div class="card-header">
-          <div class="card-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-              <polyline points="10 17 15 12 10 7"/>
-              <line x1="15" y1="12" x2="3" y2="12"/>
-            </svg>
+          <div class="card-logo-wrap">
+            <img src="${url.resourcesPath}/img/logo.png" alt="ННМЦ" class="card-logo" />
           </div>
           <h2 class="card-title">Вход в систему</h2>
           <p class="card-sub">АО "ННМЦ" — корпоративная система</p>
@@ -79,19 +75,25 @@
             </#if>
           </div>
 
-          <div class="row-between">
-            <#if realm.rememberMe>
+          <#if realm.rememberMe>
+            <div class="row-between">
               <label class="checkbox-label">
                 <input type="checkbox" name="rememberMe" <#if login.rememberMe??>checked</#if>>
                 Запомнить меня
               </label>
-            </#if>
-            <#if realm.resetPasswordAllowed>
-              <a href="${url.loginResetCredentialsUrl}" class="link-small">Забыли пароль?</a>
-            </#if>
-          </div>
+            </div>
+          </#if>
 
           <button type="submit" class="btn-submit">Войти</button>
+
+          <div class="auth-actions">
+            <#if realm.resetPasswordAllowed>
+              <a href="${url.loginResetCredentialsUrl}" class="auth-link auth-link-secondary">Забыли пароль?</a>
+            </#if>
+            <#if realm.registrationAllowed>
+              <a href="${url.registrationUrl}" class="auth-link auth-link-primary">Зарегистрироваться</a>
+            </#if>
+          </div>
 
         </form>
 
