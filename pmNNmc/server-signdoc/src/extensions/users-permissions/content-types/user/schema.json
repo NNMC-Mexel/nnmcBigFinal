@@ -68,6 +68,9 @@
     "fullName": {
       "type": "string"
     },
+    "position": {
+      "type": "string"
+    },
     "department": {
       "type": "relation",
       "relation": "manyToOne",

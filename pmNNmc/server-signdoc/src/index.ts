@@ -146,6 +146,7 @@ async function syncUsersFromPm(strapi: any) {
       if (!email) continue;
       const username = String(pmUser?.username || email).trim();
       const fullName = String(pmUser?.fullName || '').trim();
+      const position = String(pmUser?.position || '').trim();
       const deptName = String(pmUser?.department?.name_ru || '').trim();
       const deptKey = String(pmUser?.department?.key || '').trim();
       const isKpiResponsible = Boolean(pmUser?.isKpiResponsible);
@@ -175,6 +176,7 @@ async function syncUsersFromPm(strapi: any) {
             username,
             email,
             fullName,
+            position,
             department: departmentId,
             isKpiResponsible,
             isSuperAdmin,
@@ -190,6 +192,7 @@ async function syncUsersFromPm(strapi: any) {
         const patch: Record<string, any> = {};
         const existingDepartmentId = Number(existing?.department?.id || existing?.department || 0) || null;
         if (fullName && fullName !== existing.fullName) patch.fullName = fullName;
+        if (position !== String(existing.position || '')) patch.position = position;
         if ((departmentId || null) !== existingDepartmentId) patch.department = departmentId;
         if (isKpiResponsible !== existing.isKpiResponsible) patch.isKpiResponsible = isKpiResponsible;
         if (isSuperAdmin !== existing.isSuperAdmin) patch.isSuperAdmin = isSuperAdmin;

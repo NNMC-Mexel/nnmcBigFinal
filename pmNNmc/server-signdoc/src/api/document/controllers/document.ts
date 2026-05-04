@@ -447,6 +447,7 @@ async function appendAccountingAssignees(strapi: any, document: any, accountingU
             username: String(pmUser?.username || email).trim(),
             email,
             fullName: String(pmUser?.fullName || "").trim(),
+            position: String(pmUser?.position || "").trim(),
             department: departmentId,
             isKpiResponsible: Boolean(pmUser?.isKpiResponsible),
             isSuperAdmin: Boolean(pmUser?.isSuperAdmin),
@@ -468,6 +469,7 @@ async function appendAccountingAssignees(strapi: any, document: any, accountingU
             const patch: Record<string, any> = {
                 username: userPatch.username,
                 fullName: userPatch.fullName,
+                position: userPatch.position,
                 isKpiResponsible: userPatch.isKpiResponsible,
                 isSuperAdmin: userPatch.isSuperAdmin,
             };

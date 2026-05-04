@@ -138,6 +138,8 @@ export default function DocumentCreate() {
                     order: p.order,
                     status: "pending",
                     department: u.department?.name || u.department?.name_ru || u.departmentName || "",
+                    departmentName: u.departmentName || u.department?.name || u.department?.name_ru || "",
+                    position: p.position || u.position || "",
                 };
             })
             .filter(Boolean)
@@ -182,6 +184,7 @@ export default function DocumentCreate() {
                         ...u,
                         departmentId: deptId,
                         departmentName: deptName,
+                        position: String(u?.position || "").trim(),
                     };
                 });
             setUsers(normalized);
@@ -322,6 +325,9 @@ export default function DocumentCreate() {
                     order: selectedSigners.length + 1,
                     role: "",
                     status: "pending",
+                    department: user.departmentName || "",
+                    departmentName: user.departmentName || "",
+                    position: user.position || "",
                 },
             ]);
         }
@@ -1177,6 +1183,14 @@ export default function DocumentCreate() {
                                                                     signer.userEmail
                                                                 }
                                                             </p>
+                                                            <div className='mt-2 flex flex-wrap gap-2 text-xs'>
+                                                                <span className='px-2 py-1 rounded-md bg-slate-100 text-slate-600'>
+                                                                    {signer.departmentName || signer.department || "Отдел не указан"}
+                                                                </span>
+                                                                <span className='px-2 py-1 rounded-md bg-indigo-50 text-indigo-700'>
+                                                                    {signer.position || "должность не указана"}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                         {sequential && (
                                                             <div className='flex gap-1'>
