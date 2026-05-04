@@ -12,6 +12,7 @@ function canViewAllArchives(access: any): boolean {
   const key = String(access?.departmentKey || '').trim().toUpperCase();
   const name = String(access?.departmentName || '').trim().toLowerCase();
   return (
+    access?.isAdmin === true ||
     access?.isSuperAdmin === true ||
     key === 'DIGITALIZATION' ||
     key === 'ECONOMICS' ||
@@ -31,8 +32,32 @@ function ownArchiveDepartments(access: any): string[] {
   return Array.from(new Set(values));
 }
 
-function applyDepartmentFilter(ctx: any, allowedDepartments: string[]) {
-  const accessFilter = { department: { $in: allowedDepartments } };
+function normalizeEmail(value: any): string {
+  return String(value || '').trim().toLowerCase();
+}
+
+function archiveOwnerIdentifiers(access: any, user: any): string[] {
+  const values = [user?.email, user?.username, access?.userId]
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  return Array.from(new Set(values));
+}
+
+function archiveOwnerFilter(access: any, user: any) {
+  const orFilters: any[] = [];
+  const userId = Number(access?.userId || user?.id);
+  if (Number.isFinite(userId) && userId > 0) {
+    orFilters.push({ creator: { id: { $eq: userId } } });
+  }
+  const identifiers = archiveOwnerIdentifiers(access, user);
+  if (identifiers.length > 0) {
+    orFilters.push({ creatorEmail: { $in: identifiers.map(normalizeEmail) } });
+    orFilters.push({ calculatedBy: { $in: identifiers } });
+  }
+  return orFilters.length > 0 ? { $or: orFilters } : { id: { $eq: -1 } };
+}
+
+function applyAccessFilter(ctx: any, accessFilter: any) {
   ctx.query.filters = ctx.query.filters
     ? { $and: [ctx.query.filters, accessFilter] }
     : accessFilter;
@@ -41,9 +66,23 @@ function applyDepartmentFilter(ctx: any, allowedDepartments: string[]) {
 async function findArchive(strapi: any, id: any) {
   const rawId = String(id || '');
   if (/^\d+$/.test(rawId)) {
-    return await strapi.entityService.findOne(UID, Number(rawId));
+    return await strapi.entityService.findOne(UID, Number(rawId), { populate: ['creator'] });
   }
-  return await strapi.documents(UID).findOne({ documentId: rawId });
+  return await strapi.documents(UID).findOne({ documentId: rawId, populate: ['creator'] });
+}
+
+function canAccessArchive(access: any, user: any, archive: any): boolean {
+  if (canViewAllArchives(access)) return true;
+  const userId = Number(access?.userId || user?.id);
+  const creatorId = Number(archive?.creator?.id || archive?.creator);
+  if (Number.isFinite(userId) && userId > 0 && creatorId === userId) return true;
+
+  const identifiers = archiveOwnerIdentifiers(access, user);
+  const normalizedIdentifiers = identifiers.map(normalizeEmail);
+  return (
+    normalizedIdentifiers.includes(normalizeEmail(archive?.creatorEmail)) ||
+    identifiers.includes(String(archive?.calculatedBy || '').trim())
+  );
 }
 
 function pushAuditEvent(strapi: any, payload: any) {
@@ -69,6 +108,8 @@ function snapshotArchive(item: any) {
     month: item.month,
     department: item.department,
     calculatedBy: item.calculatedBy,
+    creator: item.creator?.id || item.creator || null,
+    creatorEmail: item.creatorEmail || null,
     employeeCount: item.employeeCount,
     edited: item.edited,
   };
@@ -78,12 +119,7 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
   async find(ctx) {
     const access = await getUserAccess(ctx);
     if (!canViewAllArchives(access)) {
-      const allowedDepartments = ownArchiveDepartments(access);
-      if (allowedDepartments.length === 0) {
-        ctx.body = { data: [], meta: { pagination: { page: 1, pageSize: 0, pageCount: 0, total: 0 } } };
-        return;
-      }
-      applyDepartmentFilter(ctx, allowedDepartments);
+      applyAccessFilter(ctx, archiveOwnerFilter(access, ctx.state.user));
     }
     return await super.find(ctx);
   },
@@ -92,10 +128,10 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     const access = await getUserAccess(ctx);
     const archive = await findArchive(strapi, ctx.params.id);
     if (!archive) return ctx.notFound('Расчёт не найден');
-    if (!canAccessDepartment(access, archive.department)) {
-      return ctx.forbidden('Нет доступа к этому отделу');
+    if (!canAccessArchive(access, ctx.state.user, archive)) {
+      return ctx.forbidden('Нет доступа к этому расчёту');
     }
-    return await super.findOne(ctx);
+    ctx.body = { data: archive };
   },
 
   async create(ctx) {
@@ -103,6 +139,11 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     const data = ctx.request.body?.data || {};
     if (!canAccessDepartment(access, data.department)) {
       return ctx.forbidden('Нет доступа к этому отделу');
+    }
+    data.creator = ctx.state.user?.id;
+    data.creatorEmail = normalizeEmail(ctx.state.user?.email);
+    if (!data.calculatedBy) {
+      data.calculatedBy = ctx.state.user?.email || ctx.state.user?.username || String(ctx.state.user?.id || '');
     }
     const result: any = await super.create(ctx);
     const created = result?.data || result;
@@ -120,8 +161,8 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     const access = await getUserAccess(ctx);
     const before = await findArchive(strapi, ctx.params.id);
     if (!before) return ctx.notFound('Расчёт не найден');
-    if (!canAccessDepartment(access, before.department)) {
-      return ctx.forbidden('Нет доступа к этому отделу');
+    if (!canAccessArchive(access, ctx.state.user, before)) {
+      return ctx.forbidden('Нет доступа к этому расчёту');
     }
     const nextDepartment = ctx.request.body?.data?.department;
     if (nextDepartment && !canAccessDepartment(access, nextDepartment)) {
@@ -144,8 +185,8 @@ export default factories.createCoreController(UID, ({ strapi }) => ({
     const access = await getUserAccess(ctx);
     const before = await findArchive(strapi, ctx.params.id);
     if (!before) return ctx.notFound('Расчёт не найден');
-    if (!canAccessDepartment(access, before.department)) {
-      return ctx.forbidden('Нет доступа к этому отделу');
+    if (!canAccessArchive(access, ctx.state.user, before)) {
+      return ctx.forbidden('Нет доступа к этому расчёту');
     }
     const result = await super.delete(ctx);
     pushAuditEvent(strapi, {

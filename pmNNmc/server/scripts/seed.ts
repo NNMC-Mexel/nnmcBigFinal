@@ -392,15 +392,13 @@ const seedData = async () => {
   console.log('📋 Creating ticket categories...');
   const ticketCategories = [
     // IT categories - с ответственными по умолчанию
-    { name_ru: 'Поломка компьютера', name_kz: 'Компьютер бұзылуы', slug: 'computer-breakdown', serviceGroupSlug: 'it-support', order: 1, defaultAssigneeKeys: ['ZHANDOS', 'ERNAR'] },
+    { name_ru: 'Поломка компьютера', name_kz: 'Компьютер бұзылуы', slug: 'computer-breakdown', serviceGroupSlug: 'it-support', order: 1, defaultAssigneeKeys: ['ERNAR', 'ZHANDOS'] },
     { name_ru: '1С - техподдержка', name_kz: '1С - техникалық қолдау', slug: '1c-support', serviceGroupSlug: 'it-support', order: 2, defaultAssigneeKey: 'SAID' },
-    { name_ru: 'Принтер / МФУ', name_kz: 'Принтер / МФУ', slug: 'printer', serviceGroupSlug: 'it-support', order: 3, defaultAssigneeKey: 'ERNAR' },
-    { name_ru: 'Интернет / Локальная сеть', name_kz: 'Интернет / Жергілікті желі', slug: 'network', serviceGroupSlug: 'it-support', order: 4, defaultAssigneeKey: 'ERNAR' },
+    { name_ru: 'Принтер / МФУ', name_kz: 'Принтер / МФУ', slug: 'printer', serviceGroupSlug: 'it-support', order: 3, defaultAssigneeKeys: ['ERNAR', 'ZHANDOS'] },
+    { name_ru: 'Интернет / Локальная сеть', name_kz: 'Интернет / Жергілікті желі', slug: 'network', serviceGroupSlug: 'it-support', order: 4, defaultAssigneeKeys: ['ERNAR', 'ZHANDOS'] },
     { name_ru: 'СКУД - выдача карт / потеря', name_kz: 'СКУД - карта беру / жоғалту', slug: 'access-control', serviceGroupSlug: 'it-support', order: 5, defaultAssigneeKey: 'KUAT' },
     { name_ru: 'СКУД - поломка', name_kz: 'СКУД - бұзылу', slug: 'access-control-repair', serviceGroupSlug: 'it-support', order: 6, defaultAssigneeKey: 'KUAT' },
-    { name_ru: 'Телефония', name_kz: 'Телефония', slug: 'telephony', serviceGroupSlug: 'it-support', order: 7, defaultAssigneeKey: 'ERNAR' },
-    { name_ru: 'Видеонаблюдение', name_kz: 'Бейнебақылау', slug: 'cctv', serviceGroupSlug: 'it-support', order: 8, defaultAssigneeKey: 'KUAT' },
-    { name_ru: 'Электронная почта / Outlook', name_kz: 'Электрондық пошта / Outlook', slug: 'email', serviceGroupSlug: 'it-support', order: 9, defaultAssigneeKey: 'ERNAR' },
+    { name_ru: 'Электронная почта / Outlook', name_kz: 'Электрондық пошта / Outlook', slug: 'email', serviceGroupSlug: 'it-support', order: 7, defaultAssigneeKeys: ['ERNAR', 'ZHANDOS'] },
     { name_ru: 'Damumed - техподдержка', name_kz: 'Damumed - техникалық қолдау', slug: 'damumed', serviceGroupSlug: 'it-support', order: 10, defaultAssigneeKey: 'BAKHODYR' },
     { name_ru: 'ЛИС - техподдержка', name_kz: 'ЛИС - техникалық қолдау', slug: 'lis', serviceGroupSlug: 'it-support', order: 11, defaultAssigneeKey: 'BAKHODYR' },
     { name_ru: 'МЗРК - порталы', name_kz: 'МЗРК - порталдар', slug: 'mzrk', serviceGroupSlug: 'it-support', order: 12, defaultAssigneeKey: 'BAKHODYR' },
@@ -409,9 +407,8 @@ const seedData = async () => {
     { name_ru: 'SimBase - сброс пароля', name_kz: 'SimBase - құпия сөзді қалпына келтіру', slug: 'simbase-password', serviceGroupSlug: 'it-support', order: 15, defaultAssigneeKey: 'KUAT' },
     { name_ru: 'Документолог - техподдержка', name_kz: 'Документолог - техникалық қолдау', slug: 'documentolog', serviceGroupSlug: 'it-support', order: 16, defaultAssigneeKey: 'KUAT' },
     { name_ru: 'Доменная учетная запись', name_kz: 'Домендік есептік жазба', slug: 'domain-account', serviceGroupSlug: 'it-support', order: 17, defaultAssigneeKey: 'RUSTAM' },
-    { name_ru: 'Zoom / Word / Excel', name_kz: 'Zoom / Word / Excel', slug: 'office-software', serviceGroupSlug: 'it-support', order: 18, defaultAssigneeKey: 'ERNAR' },
-    { name_ru: 'Заправка картриджа', name_kz: 'Картридж толтыру', slug: 'cartridge', serviceGroupSlug: 'it-support', order: 19, defaultAssigneeKey: 'ERNAR' },
-    { name_ru: 'Другое IT', name_kz: 'Басқа IT', slug: 'it-other', serviceGroupSlug: 'it-support', order: 20, defaultAssigneeKey: 'ZHANDOS' },
+    { name_ru: 'Zoom / Word / Excel', name_kz: 'Zoom / Word / Excel', slug: 'office-software', serviceGroupSlug: 'it-support', order: 18, defaultAssigneeKeys: ['ERNAR', 'ZHANDOS'] },
+    { name_ru: 'Заправка картриджа', name_kz: 'Картридж толтыру', slug: 'cartridge', serviceGroupSlug: 'it-support', order: 19, defaultAssigneeKeys: ['ERNAR', 'ZHANDOS'] },
     // Medical Equipment categories
     { name_ru: 'Диагностическое оборудование', name_kz: 'Диагностикалық жабдық', slug: 'diagnostic-equipment', serviceGroupSlug: 'medical-equipment', order: 1 },
     { name_ru: 'Лабораторное оборудование', name_kz: 'Зертханалық жабдық', slug: 'lab-equipment', serviceGroupSlug: 'medical-equipment', order: 2 },

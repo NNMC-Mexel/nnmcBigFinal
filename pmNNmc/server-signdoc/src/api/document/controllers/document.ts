@@ -44,6 +44,49 @@ function normalizeSigners(signers: any): any[] {
     });
 }
 
+function relationId(value: any): number | null {
+    if (value === null || value === undefined || value === "") return null;
+    if (typeof value === "number") return Number.isFinite(value) ? value : null;
+    if (typeof value === "string") {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+    if (typeof value?.id === "number") return value.id;
+    return null;
+}
+
+function filterCreatorFromAssignedUsers(value: any, creatorId: number | null) {
+    if (!creatorId || value === undefined || value === null) return value;
+    const isNotCreator = (item: any) => relationId(item) !== creatorId;
+
+    if (Array.isArray(value)) return value.filter(isNotCreator);
+    if (Array.isArray(value?.set)) {
+        return { ...value, set: value.set.filter(isNotCreator) };
+    }
+    if (Array.isArray(value?.connect)) {
+        return { ...value, connect: value.connect.filter(isNotCreator) };
+    }
+    return relationId(value) === creatorId ? [] : value;
+}
+
+function removeCreatorFromSigningQueue(data: any, requestUser: any) {
+    const creatorId =
+        relationId(data?.creator) ||
+        relationId(data?.creator?.connect?.[0]) ||
+        relationId(data?.creator?.set?.[0]) ||
+        relationId(requestUser?.id);
+    if (!creatorId) return;
+
+    if (Array.isArray(data.signers)) {
+        data.signers = normalizeSigners(data.signers).filter(
+            (signer: any) => relationId(signer?.userId) !== creatorId
+        );
+    }
+    if (Object.prototype.hasOwnProperty.call(data, "assigned_users")) {
+        data.assigned_users = filterCreatorFromAssignedUsers(data.assigned_users, creatorId);
+    }
+}
+
 function routeId(document: any): string | number {
     return document?.id || document?.documentId;
 }
@@ -592,11 +635,13 @@ export default factories.createCoreController(
         },
 
         async create(ctx) {
+            const requestUser = ctx.state.user;
             const body = ctx.request.body;
             const data = (body as any)?.data || {};
             if (Array.isArray(data.signers)) {
                 data.signers = normalizeSigners(data.signers);
             }
+            removeCreatorFromSigningQueue(data, requestUser);
 
             const currentFileId = await toFileId(strapi, data.currentFile);
             const originalFileId = await toFileId(strapi, data.originalFile);
@@ -651,6 +696,7 @@ export default factories.createCoreController(
             if (Array.isArray(data.signers)) {
                 data.signers = normalizeSigners(data.signers);
             }
+            removeCreatorFromSigningQueue(data, requestUser);
             const hasCurrentFile = Object.prototype.hasOwnProperty.call(data, "currentFile");
             const hasOriginalFile = Object.prototype.hasOwnProperty.call(data, "originalFile");
             const currentFileId = hasCurrentFile ? await toFileId(strapi, data.currentFile) : null;

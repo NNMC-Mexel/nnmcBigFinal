@@ -8,13 +8,15 @@ import {
   Loader2,
   ChevronDown,
 } from 'lucide-react';
-import { publicTicketsApi } from '../../api/tickets';
-import type { ServiceGroup, TicketCategory } from '../../types';
+import { ticketsApi } from '../../api/tickets';
+import type { ServiceGroup } from '../../types';
 import LanguageSwitcher from '../../components/ui/LanguageSwitcher';
+import { useAuthStore } from '../../store/authStore';
 
 export default function PublicTicketPage() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language === 'kz' ? 'kz' : 'ru';
+  const currentUser = useAuthStore((state) => state.user);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -37,7 +39,7 @@ export default function PublicTicketPage() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const data = await publicTicketsApi.getCategories();
+        const data = await ticketsApi.getCategories();
         setServiceGroups(data);
       } catch {
         setError(t('helpdesk.loadError', 'Не удалось загрузить категории'));
@@ -47,6 +49,24 @@ export default function PublicTicketPage() {
     };
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    setForm((prev) => ({
+      ...prev,
+      requesterName:
+        prev.requesterName ||
+        `${currentUser.lastName || ''} ${currentUser.firstName || ''}`.trim() ||
+        currentUser.username ||
+        currentUser.email ||
+        '',
+      requesterDepartment:
+        prev.requesterDepartment ||
+        currentUser.department?.name_ru ||
+        currentUser.department?.name_kz ||
+        '',
+    }));
+  }, [currentUser]);
 
   const selectedGroup = serviceGroups.find((sg) => sg.id === selectedGroupId);
   const selectedCategory = selectedGroup?.categories?.find((c) => c.id === selectedCategoryId);
@@ -64,7 +84,7 @@ export default function PublicTicketPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const result = await publicTicketsApi.submit({
+      const result = await ticketsApi.submit({
         requesterName: form.requesterName.trim(),
         requesterPhone: form.requesterPhone.trim() || undefined,
         requesterDepartment: form.requesterDepartment.trim(),

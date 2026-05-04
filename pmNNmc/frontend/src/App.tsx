@@ -268,6 +268,12 @@ function App() {
           }
         />
         <Route
+          path="helpdesk/submit"
+          element={
+            <FeatureRoute allow={canViewHelpdesk}>{withSuspense(<PublicTicketPage />)}</FeatureRoute>
+          }
+        />
+        <Route
           path="kpi-it"
           element={
             <FeatureRoute allow={canViewKpiIt}>{withSuspense(<KpiItPage forcedDepartmentKey="IT" title="KPI IT" />)}</FeatureRoute>
@@ -301,7 +307,6 @@ function App() {
 
       {/* Public pages (no auth required) */}
       <Route path="/survey/:token" element={withSuspense(<PublicSurveyPage />)} />
-      <Route path="/helpdesk/submit" element={withSuspense(<PublicTicketPage />)} />
 
       {/* Redirect root — if not authenticated, ProtectedRoute will redirect to Keycloak */}
       <Route path="/" element={<ProtectedRoute><DefaultAppRedirect /></ProtectedRoute>} />

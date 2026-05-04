@@ -516,6 +516,11 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     }
   };
 
+  useEffect(() => {
+    if (!cacheLoaded || activeTab !== "archive") return;
+    loadArchive();
+  }, [cacheLoaded, activeTab]);
+
   const restoreFromArchive = async (item) => {
     try {
       const docId = item.documentId || item.id;

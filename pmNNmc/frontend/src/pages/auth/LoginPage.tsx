@@ -170,18 +170,11 @@ export default function LoginPage() {
             <p className="text-center text-sm text-slate-500 mb-6">
               Создайте заявку через систему <span className="font-medium text-primary-600">HelpDesk</span> или позвоните по внутреннему номеру.
             </p>
-            <a
-              href="/helpdesk/submit"
-              target="_blank"
-              className="block w-full py-2.5 bg-primary-500 text-white text-center rounded-lg hover:bg-primary-600 transition-colors font-medium text-sm"
-            >
-              Открыть HelpDesk
-            </a>
             <button
               onClick={() => setShowForgotModal(false)}
-              className="block w-full py-2 text-slate-500 text-center text-sm mt-2 hover:text-slate-700"
+              className="block w-full py-2.5 bg-primary-500 text-white text-center rounded-lg hover:bg-primary-600 transition-colors font-medium text-sm"
             >
-              Закрыть
+              Понятно
             </button>
           </div>
         </div>

@@ -169,6 +169,7 @@ export default {
     }
 
     await normalizeTicketCategoryDefaultAssignees(strapi);
+    await syncItTicketCategories(strapi);
 
     // Always ensure permissions are set correctly
     await setupPermissions(strapi);
@@ -195,11 +196,8 @@ async function setupPermissions(strapi: any) {
   const leadRole = roles.find((r: any) => r.type === 'lead');
   const memberRole = roles.find((r: any) => r.type === 'member');
 
-  // Public role: minimum required for anonymous helpdesk ticket submission
-  // and Keycloak/auth callbacks. NO access to user data, projects, KPI, etc.
-  const publicPermissions: Record<string, string[]> = {
-    'api::ticket.ticket': ['publicSubmit', 'publicCategories'],
-  };
+  // Public role: only Keycloak/auth callbacks. Helpdesk submission requires login.
+  const publicPermissions: Record<string, string[]> = {};
   const publicAuthActions = [
     'plugin::users-permissions.auth.callback',
     'plugin::users-permissions.auth.connect',
@@ -220,7 +218,7 @@ async function setupPermissions(strapi: any) {
     // Analytics
     'api::analytics.analytics': ['summary'],
     // Helpdesk content types
-    'api::ticket.ticket': ['find', 'findOne', 'findFiltered', 'create', 'update', 'delete', 'reassign', 'assignableUsers', 'publicCategories'],
+    'api::ticket.ticket': ['find', 'findOne', 'findFiltered', 'create', 'update', 'delete', 'reassign', 'assignableUsers', 'submit', 'categories', 'publicSubmit', 'publicCategories'],
     'api::service-group.service-group': ['find', 'findOne'],
     'api::ticket-category.ticket-category': ['find', 'findOne'],
     // News
@@ -331,6 +329,101 @@ async function normalizeTicketCategoryDefaultAssignees(strapi: any) {
     }
   } catch (err) {
     console.error('Failed to normalize ticket category assignees:', err);
+  }
+}
+
+const IT_TICKET_CATEGORIES = [
+  { name_ru: 'Поломка компьютера', name_kz: 'Компьютер бұзылуы', slug: 'computer-breakdown', order: 1, users: ['ernar', 'zhandos'] },
+  { name_ru: '1С - техподдержка', name_kz: '1С - техникалық қолдау', slug: '1c-support', order: 2, users: ['said'] },
+  { name_ru: 'Принтер / МФУ', name_kz: 'Принтер / МФУ', slug: 'printer', order: 3, users: ['ernar', 'zhandos'] },
+  { name_ru: 'Интернет / Локальная сеть', name_kz: 'Интернет / Жергілікті желі', slug: 'network', order: 4, users: ['ernar', 'zhandos'] },
+  { name_ru: 'СКУД - выдача карт / потеря', name_kz: 'СКУД - карта беру / жоғалту', slug: 'access-control', order: 5, users: ['kuat'] },
+  { name_ru: 'СКУД - поломка', name_kz: 'СКУД - бұзылу', slug: 'access-control-repair', order: 6, users: ['kuat'] },
+  { name_ru: 'Электронная почта / Outlook', name_kz: 'Электрондық пошта / Outlook', slug: 'email', order: 7, users: ['ernar', 'zhandos'] },
+  { name_ru: 'Damumed - техподдержка', name_kz: 'Damumed - техникалық қолдау', slug: 'damumed', order: 8, users: ['bakhodyr'] },
+  { name_ru: 'ЛИС - техподдержка', name_kz: 'ЛИС - техникалық қолдау', slug: 'lis', order: 9, users: ['bakhodyr'] },
+  { name_ru: 'МЗРК - порталы', name_kz: 'МЗРК - порталдар', slug: 'mzrk', order: 10, users: ['bakhodyr'] },
+  { name_ru: 'SimBase - техподдержка', name_kz: 'SimBase - техникалық қолдау', slug: 'simbase', order: 11, users: ['kuat'] },
+  { name_ru: 'SimBase - создание аккаунта', name_kz: 'SimBase - аккаунт құру', slug: 'simbase-account', order: 12, users: ['kuat'] },
+  { name_ru: 'SimBase - сброс пароля', name_kz: 'SimBase - құпия сөзді қалпына келтіру', slug: 'simbase-password', order: 13, users: ['kuat'] },
+  { name_ru: 'Документолог - техподдержка', name_kz: 'Документолог - техникалық қолдау', slug: 'documentolog', order: 14, users: ['kuat'] },
+  { name_ru: 'Доменная учетная запись', name_kz: 'Домендік есептік жазба', slug: 'domain-account', order: 15, users: ['rustam'] },
+  { name_ru: 'Zoom / Word / Excel', name_kz: 'Zoom / Word / Excel', slug: 'office-software', order: 16, users: ['ernar', 'zhandos'] },
+  { name_ru: 'Заправка картриджа', name_kz: 'Картридж толтыру', slug: 'cartridge', order: 17, users: ['ernar', 'zhandos'] },
+];
+
+async function findUsersByUsernames(strapi: any, usernames: string[]) {
+  if (usernames.length === 0) return [];
+  const aliases = usernames.flatMap((username) => [
+    username,
+    `${username}@nnmc.kz`,
+  ]);
+  return (await strapi.entityService.findMany('plugin::users-permissions.user', {
+    filters: {
+      $or: [
+        { username: { $in: usernames } },
+        { email: { $in: aliases } },
+      ],
+    } as any,
+    pagination: { pageSize: 100 },
+  })) as any[];
+}
+
+async function syncItTicketCategories(strapi: any) {
+  try {
+    const groups = (await strapi.entityService.findMany('api::service-group.service-group', {
+      filters: { slug: 'it-support' } as any,
+      limit: 1,
+    })) as any[];
+    const itGroup = groups?.[0];
+    if (!itGroup?.id) return;
+
+    const allowedSlugs = new Set(IT_TICKET_CATEGORIES.map((item) => item.slug));
+    const existingCategories = (await strapi.entityService.findMany('api::ticket-category.ticket-category', {
+      filters: { serviceGroup: { id: itGroup.id } } as any,
+      pagination: { pageSize: 1000 },
+    })) as any[];
+
+    for (const category of existingCategories || []) {
+      if (allowedSlugs.has(category.slug)) continue;
+      try {
+        await strapi.entityService.update('api::ticket-category.ticket-category', category.id, {
+          data: { serviceGroup: null } as any,
+        });
+      } catch (error: any) {
+        strapi.log.warn(`[tickets] Could not hide legacy IT category ${category.slug}: ${error?.message || error}`);
+      }
+    }
+
+    for (const item of IT_TICKET_CATEGORIES) {
+      const users = await findUsersByUsernames(strapi, item.users);
+      const assigneeIds = users.map((user: any) => user.id).filter(Boolean);
+      const data: any = {
+        name_ru: item.name_ru,
+        name_kz: item.name_kz,
+        slug: item.slug,
+        order: item.order,
+        serviceGroup: itGroup.id,
+        defaultAssignee: {
+          set: assigneeIds.map((id: number) => ({ id })),
+        },
+      };
+
+      const existing = (await strapi.entityService.findMany('api::ticket-category.ticket-category', {
+        filters: { slug: item.slug } as any,
+        limit: 1,
+      })) as any[];
+
+      if (existing?.[0]?.id) {
+        await strapi.entityService.update('api::ticket-category.ticket-category', existing[0].id, { data });
+      } else {
+        await strapi.entityService.create('api::ticket-category.ticket-category', { data });
+      }
+    }
+
+    strapi.log.info('[tickets] IT categories and default assignees synced');
+  } catch (error: any) {
+    strapi.log.warn(`[tickets] IT categories sync failed: ${error?.message || error}`);
   }
 }
 

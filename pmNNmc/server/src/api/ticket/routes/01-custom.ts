@@ -10,11 +10,26 @@ export default {
     },
     {
       method: 'POST',
+      path: '/tickets/submit',
+      handler: 'ticket.submit',
+      config: {
+        policies: [{ name: 'global::feature-access', config: { feature: 'helpdesk' } }],
+      },
+    },
+    {
+      method: 'GET',
+      path: '/tickets/categories',
+      handler: 'ticket.categories',
+      config: {
+        policies: [{ name: 'global::feature-access', config: { feature: 'helpdesk' } }],
+      },
+    },
+    {
+      method: 'POST',
       path: '/tickets/public/submit',
       handler: 'ticket.publicSubmit',
       config: {
-        auth: false,
-        policies: [],
+        policies: [{ name: 'global::feature-access', config: { feature: 'helpdesk' } }],
       },
     },
     {
@@ -22,8 +37,7 @@ export default {
       path: '/tickets/public/categories',
       handler: 'ticket.publicCategories',
       config: {
-        auth: false,
-        policies: [],
+        policies: [{ name: 'global::feature-access', config: { feature: 'helpdesk' } }],
       },
     },
     {

@@ -127,6 +127,7 @@ export default function DocumentCreate() {
                 const email = String(p.email || "").toLowerCase();
                 const u = users.find((x) => String(x.email || "").toLowerCase() === email);
                 if (!u) return null;
+                if (Number(u.id) === Number(currentUser?.id)) return null;
                 return {
                     userId: u.id,
                     documentId: u.documentId || null,
@@ -309,6 +310,10 @@ export default function DocumentCreate() {
     };
 
     const handleAddSigner = (user) => {
+        if (Number(user.id) === Number(currentUser?.id)) {
+            toast.warning("Нельзя добавить себя в список подписантов. Используйте кнопку «Подписываю только Я».");
+            return;
+        }
         if (selectedSigners.find((s) => s.userId === user.id)) {
             setSelectedSigners(
                 selectedSigners
@@ -431,8 +436,9 @@ export default function DocumentCreate() {
         }
     };
 
-    const handleSubmit = async () => {
-        if (selectedSigners.length === 0) {
+    const handleSubmit = async (options = {}) => {
+        const selfOnly = options?.selfOnly === true;
+        if (!selfOnly && selectedSigners.length === 0) {
             toast.warning("Выберите хотя бы одного подписанта");
             return;
         }
@@ -469,24 +475,32 @@ export default function DocumentCreate() {
                             uploadedCmsFile?.name || cmsFileNameGenerated;
                     }
 
-                    const normalizedSigners = selectedSigners.map((signer, index) => ({
-                        ...signer,
-                        order: Number(signer.order || index + 1),
-                        status: signer.status || "pending",
-                    }));
+                    const normalizedSigners = selfOnly
+                        ? []
+                        : selectedSigners.map((signer, index) => ({
+                              ...signer,
+                              order: Number(signer.order || index + 1),
+                              status: signer.status || "pending",
+                          }));
 
                     const documentData = {
                         title: signedFile.title,
                         originalFile: uploadedFile.id,
                         currentFile: uploadedFile.id,
-                        status: "in_progress",
+                        status: selfOnly ? "completed" : "in_progress",
                         creator: currentUser.id,
                         documentType: documentTypeId || null,
                         subdivision: subdivisionId || null,
                         signers: normalizedSigners,
-                        signatureSequential: sequential,
+                        signatureSequential: selfOnly ? false : sequential,
                         signatureType: signatureType,
-                        metadata: signedFile.metadata || null,
+                        metadata: selfOnly
+                            ? {
+                                  ...(signedFile.metadata || {}),
+                                  selfSigned: true,
+                                  completedAt: new Date().toISOString(),
+                              }
+                            : signedFile.metadata || null,
                         signatureHistory: [
                             {
                                 userId: currentUser.id,
@@ -518,7 +532,7 @@ export default function DocumentCreate() {
             }
 
             if (errorCount === 0) {
-                toast.success(`Успешно создано документов: ${successCount}`);
+                toast.success(selfOnly ? `Документ создан и подписан: ${successCount}` : `Успешно создано документов: ${successCount}`);
             } else {
                 toast.warning(
                     `Создано: ${successCount}, ошибок: ${errorCount}`
@@ -1255,6 +1269,17 @@ export default function DocumentCreate() {
                                 }}
                                 className='flex-1 py-3 px-6 rounded-lg font-semibold bg-gray-200 hover:bg-gray-300 text-gray-700'>
                                 Назад
+                            </button>
+                            <button
+                                onClick={() => handleSubmit({ selfOnly: true })}
+                                disabled={loading}
+                                className={`flex-1 py-3 px-6 rounded-lg font-semibold flex items-center justify-center gap-2 ${
+                                    loading
+                                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                        : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                }`}>
+                                <CheckCircle className='w-5 h-5' />
+                                Подписываю только Я
                             </button>
                             <button
                                 onClick={handleSubmit}

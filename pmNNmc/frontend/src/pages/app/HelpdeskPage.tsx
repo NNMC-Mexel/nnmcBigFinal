@@ -154,15 +154,13 @@ export default function HelpdeskPage() {
           >
             <RefreshCw className="w-5 h-5" />
           </button>
-          <a
-            href="/helpdesk/submit"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => navigate('/app/helpdesk/submit')}
             className="flex items-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 transition-colors"
           >
             <ExternalLink className="w-4 h-4" />
             {t('helpdesk.publicForm', 'Форма подачи')}
-          </a>
+          </button>
         </div>
       </div>
 

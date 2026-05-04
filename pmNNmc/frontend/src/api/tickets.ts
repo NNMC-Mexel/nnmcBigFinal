@@ -1,12 +1,5 @@
 import client from './client';
-import axios from 'axios';
 import type { Ticket, ServiceGroup, AssignableUser } from '../types';
-
-const DEFAULT_API_URL =
-  typeof window !== 'undefined'
-    ? `${window.location.protocol}//${window.location.hostname}:1337`
-    : 'http://127.0.0.1:1337';
-const API_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 
 export interface TicketFilters {
   status?: string;
@@ -74,24 +67,21 @@ export const ticketsApi = {
     const response = await client.get('/tickets/assignable-users');
     return response.data.data || [];
   },
-};
 
-// Public API (no auth)
-export const publicTicketsApi = {
   getCategories: async (): Promise<ServiceGroup[]> => {
-    const res = await axios.get(`${API_URL}/api/tickets/public/categories`);
-    return res.data.data || [];
+    const response = await client.get('/tickets/categories');
+    return response.data.data || [];
   },
 
   submit: async (data: {
-    requesterName: string;
+    requesterName?: string;
     requesterPhone?: string;
-    requesterDepartment: string;
+    requesterDepartment?: string;
     comment: string;
     categoryId?: number;
     serviceGroupId: number;
-  }): Promise<{ ticketNumber: string; id: number }> => {
-    const res = await axios.post(`${API_URL}/api/tickets/public/submit`, data);
-    return res.data.data;
+  }): Promise<{ ticketNumber: string; id: number; documentId?: string }> => {
+    const response = await client.post('/tickets/submit', data);
+    return response.data.data;
   },
 };
