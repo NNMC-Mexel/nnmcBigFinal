@@ -363,11 +363,47 @@ function getRequestField(ctx: Context, key: string): any {
   return undefined;
 }
 
-function normalizeDepartment(value: any): string {
+const DEPARTMENT_ALIASES: Record<string, string> = {
+  RADIOLOGY: 'RADIOLOGY',
+  RADIOLOGYSMP: 'RADIOLOGY',
+  RADIOLOGYVMP: 'RADIOLOGY',
+  'ЛУЧЕВАЯ': 'RADIOLOGY',
+  'ЛУЧЕВАЯДИАГНОСТИКА': 'RADIOLOGY',
+  'ЛУЧЕВАЯСМП': 'RADIOLOGY',
+  'ЛУЧЕВАЯВМП': 'RADIOLOGY',
+  'ОТДЕЛЛУЧЕВОЙДИАГНОСТИКИ': 'RADIOLOGY',
+  'ОТДЕЛЛУЧЕВАЯДИАГНОСТИКА': 'RADIOLOGY',
+};
+
+function compactDepartment(value: any): string {
   return String(value || '')
     .trim()
     .toUpperCase()
-    .replace(/[\s\-–—_]+/g, '');
+    .replace(/[‐‑‒–—−]/g, '-')
+    .replace(/[\s\-_]+/g, '');
+}
+
+function normalizeDepartment(value: any): string {
+  const key = compactDepartment(value);
+  return DEPARTMENT_ALIASES[key] || key;
+}
+
+function expandDepartmentFilterValues(departments: string[]): string[] {
+  const values = new Set<string>();
+  for (const department of departments || []) {
+    const raw = String(department || '').trim();
+    if (!raw) continue;
+    values.add(raw);
+
+    if (normalizeDepartment(raw) === 'RADIOLOGY') {
+      values.add('RADIOLOGY');
+      values.add('Лучевая');
+      values.add('Лучевая СМП');
+      values.add('Лучевая ВМП');
+      values.add('Лучевая диагностика');
+    }
+  }
+  return Array.from(values);
 }
 
 function isNumericValue(value: any): boolean {
@@ -539,7 +575,7 @@ async function calcCore(ctx: Context) {
 
   const kpiFilters: any = {};
   if (!access.isAdmin && allowedDepartments.length > 0) {
-    kpiFilters.department = { $in: allowedDepartments };
+    kpiFilters.department = { $in: expandDepartmentFilterValues(allowedDepartments) };
   }
 
   const kpiQuery: any = {
@@ -1168,7 +1204,7 @@ export default {
 
       const kpiFilters: any = {};
       if (!access.isAdmin && allowedDepartments.length > 0) {
-        kpiFilters.department = { $in: allowedDepartments };
+        kpiFilters.department = { $in: expandDepartmentFilterValues(allowedDepartments) };
       }
       const kpiQuery: any = {
         fields: ['id', 'fio', 'kpiSum', 'scheduleType', 'department', 'categoryCode'],
@@ -1267,4 +1303,3 @@ export default {
     }
   },
 };
-

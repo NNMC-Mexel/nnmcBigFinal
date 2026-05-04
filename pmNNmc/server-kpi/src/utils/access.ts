@@ -22,6 +22,13 @@ function normalizeDepartments(input: any): string[] {
     .filter((d) => d.length > 0);
 }
 
+function pushUnique(list: string[], value: any) {
+  const item = String(value || '').trim();
+  if (item && !list.includes(item)) {
+    list.push(item);
+  }
+}
+
 function isAdminRole(roleName: string): boolean {
   const lowered = String(roleName || '').toLowerCase();
   if (!lowered) return false;
@@ -104,18 +111,16 @@ export async function getUserAccess(ctx: Context): Promise<UserAccess> {
     }
   }
 
-  let normalized = allowedDepartments || [];
-  if (isKpiResponsible && departmentKey && !normalized.includes(departmentKey)) {
-    normalized.push(departmentKey);
+  let normalized = [...(allowedDepartments || [])];
+  if (isKpiResponsible) {
+    pushUnique(normalized, departmentKey);
+    pushUnique(normalized, departmentName);
   }
   const isAdminAccess =
     isSuperAdmin ||
     isAdminRole(roleName) ||
     isAdminLogin(user) ||
     hasGlobalDepartmentAccess(departmentKey, departmentName);
-  if (!isAdminAccess && !isKpiResponsible) {
-    normalized = [];
-  }
 
   return {
     isAdmin: isAdminAccess,
