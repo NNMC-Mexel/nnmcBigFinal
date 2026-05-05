@@ -87,6 +87,19 @@ function removeCreatorFromSigningQueue(data: any, requestUser: any) {
     }
 }
 
+function signerUserIds(signers: any): number[] {
+    if (!Array.isArray(signers)) return [];
+    const ids = signers
+        .map((signer: any) => relationId(signer?.userId))
+        .filter((id: any): id is number => Number.isFinite(id));
+    return Array.from(new Set(ids));
+}
+
+function syncAssignedUsersFromSigners(data: any) {
+    if (!Array.isArray(data?.signers)) return;
+    data.assigned_users = signerUserIds(data.signers);
+}
+
 function routeId(document: any): string | number {
     return document?.id || document?.documentId;
 }
@@ -452,12 +465,25 @@ function allSignersSigned(document: any): boolean {
 }
 
 function notifyNextSequentialSigner(strapi: any, before: any, after: any) {
+    if (before?.status === "revision" && ["pending", "in_progress"].includes(after?.status)) {
+        return;
+    }
     if (!after?.signatureSequential || !hasNewSignature(before, after)) return;
     if (allSignersSigned(after)) return;
     const nextSigner = sortedSigners(after?.signers || []).find(
         (s: any) => s?.status === "pending"
     );
     if (nextSigner) notifySigner(strapi, after, nextSigner);
+}
+
+function notifyResentSigners(strapi: any, before: any, after: any) {
+    if (before?.status !== "revision") return;
+    if (!["pending", "in_progress"].includes(after?.status)) return;
+    const pending = sortedSigners(after?.signers || []).filter(
+        (s: any) => s?.status === "pending"
+    );
+    const targets = after?.signatureSequential ? pending.slice(0, 1) : pending;
+    targets.forEach((signer: any) => notifySigner(strapi, after, signer));
 }
 
 async function appendAccountingAssignees(strapi: any, document: any, accountingUsers: any[]) {
@@ -711,6 +737,7 @@ export default factories.createCoreController(
                 data.signers = normalizeSigners(data.signers);
             }
             removeCreatorFromSigningQueue(data, requestUser);
+            syncAssignedUsersFromSigners(data);
 
             const currentFileId = await toFileId(strapi, data.currentFile);
             const originalFileId = await toFileId(strapi, data.originalFile);
@@ -765,7 +792,18 @@ export default factories.createCoreController(
             if (Array.isArray(data.signers)) {
                 data.signers = normalizeSigners(data.signers);
             }
-            removeCreatorFromSigningQueue(data, requestUser);
+            removeCreatorFromSigningQueue(data, {
+                id: relationId(before.creator),
+            });
+            syncAssignedUsersFromSigners(data);
+            if (
+                before.status === "revision" &&
+                data.status === "completed" &&
+                Array.isArray(data.signers) &&
+                data.signers.length === 0
+            ) {
+                return ctx.badRequest("Исправленный документ нельзя завершить без подписантов");
+            }
             const hasCurrentFile = Object.prototype.hasOwnProperty.call(data, "currentFile");
             const hasOriginalFile = Object.prototype.hasOwnProperty.call(data, "originalFile");
             const currentFileId = hasCurrentFile ? await toFileId(strapi, data.currentFile) : null;
@@ -786,6 +824,7 @@ export default factories.createCoreController(
             ]);
 
             try {
+                notifyResentSigners(strapi, before, after);
                 notifyNextSequentialSigner(strapi, before, after);
                 await handleCompletedDocument(strapi, before, after);
                 pushAuditEvent(strapi, {

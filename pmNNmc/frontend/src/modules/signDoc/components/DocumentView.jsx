@@ -9,6 +9,8 @@ import {
     getDocumentFileUrl,
     presignDocumentFile,
     downloadAccountantExcel,
+    getAllUsers,
+    getDepartments,
     getUser as getCurrentUser,
     apiMe,
 } from "../api/signdocClient";
@@ -29,6 +31,8 @@ import {
     AlertTriangle,
     PauseCircle,
     FileSignature,
+    UserPlus,
+    X,
 } from "lucide-react";
 import DocumentSignatureApp from "./DocumentSignatureApp";
 import ConfirmModal from "./ConfirmModal";
@@ -63,6 +67,102 @@ function normalizeSignersForUi(signers) {
     }));
 }
 
+function normalizeUserForSigner(user) {
+    const dept = user?.department;
+    const deptId =
+        dept?.id ||
+        dept?.documentId ||
+        dept?.data?.id ||
+        dept?.data?.documentId ||
+        null;
+    const deptName =
+        dept?.name ||
+        dept?.name_ru ||
+        dept?.name_kz ||
+        dept?.data?.name ||
+        dept?.data?.name_ru ||
+        dept?.data?.name_kz ||
+        dept?.attributes?.name ||
+        dept?.attributes?.name_ru ||
+        dept?.attributes?.name_kz ||
+        user?.departmentName ||
+        "";
+
+    return {
+        ...user,
+        departmentId: deptId,
+        departmentName: deptName,
+        position: String(user?.position || "").trim(),
+    };
+}
+
+function normalizeDepartmentForSelect(dept) {
+    if (dept?.attributes) {
+        return {
+            id: dept.id || dept.attributes.documentId,
+            name:
+                dept.attributes.name ||
+                dept.attributes.name_ru ||
+                dept.attributes.name_kz,
+        };
+    }
+    return {
+        id: dept.id || dept.documentId,
+        name: dept.name || dept.name_ru || dept.name_kz,
+    };
+}
+
+function buildResendSignerDraft(documentData, users, creatorId) {
+    const usersById = new Map(
+        (Array.isArray(users) ? users : []).map((user) => [String(user.id), user])
+    );
+    const candidates = [];
+    const addCandidate = (source) => {
+        const userId = source?.userId;
+        if (userId == null || sameId(userId, creatorId)) return;
+        if (candidates.some((item) => sameId(item.userId, userId))) return;
+        candidates.push(source);
+    };
+
+    normalizeSignersForUi(documentData?.signers).forEach(addCandidate);
+    (documentData?.signatureHistory || []).forEach((entry) => {
+        if (!entry?.userId || sameId(entry.userId, creatorId)) return;
+        addCandidate({
+            userId: entry.userId,
+            userName: entry.userName,
+            userEmail: entry.userEmail || entry.email,
+            role: entry.role,
+        });
+    });
+
+    return candidates.map((signer, index) => {
+        const user = usersById.get(String(signer.userId));
+        const name =
+            user?.fullName ||
+            user?.username ||
+            signer.userName ||
+            signer.fullName ||
+            signer.email ||
+            signer.userEmail ||
+            `Пользователь ${signer.userId}`;
+        const email = user?.email || signer.userEmail || signer.email || "";
+        return {
+            ...signer,
+            userId: signer.userId,
+            userName: name,
+            userEmail: email,
+            email,
+            order: index + 1,
+            role: "",
+            status: "pending",
+            signedAt: null,
+            department: user?.departmentName || signer.departmentName || signer.department || "",
+            departmentName: user?.departmentName || signer.departmentName || signer.department || "",
+            position: user?.position || signer.position || "",
+        };
+    });
+}
+
 export default function DocumentView() {
     const toast = useToast();
     const { id } = useParams();
@@ -86,8 +186,17 @@ export default function DocumentView() {
     const [previewMode, setPreviewMode] = useState("current");
     const [originalPreviewUrl, setOriginalPreviewUrl] = useState(null);
     const [originalLoading, setOriginalLoading] = useState(false);
+    const [resendUsers, setResendUsers] = useState([]);
+    const [resendDepartments, setResendDepartments] = useState([]);
+    const [resendDepartmentFilter, setResendDepartmentFilter] = useState("all");
+    const [resendSignerSearchQuery, setResendSignerSearchQuery] = useState("");
+    const [resendSigners, setResendSigners] = useState([]);
+    const [resendSequential, setResendSequential] = useState(true);
+    const [resendSignersDirty, setResendSignersDirty] = useState(false);
 
     const [currentUser, setCurrentUser] = useState(getCurrentUser());
+    const creatorId = documentData?.creator?.id ?? documentData?.creator;
+    const isCreator = sameId(creatorId, currentUser?.id);
 
     // Extracts the MinIO object key from a full MinIO URL (removes endpoint+bucket prefix)
     const extractMinioKey = (url) => {
@@ -152,6 +261,70 @@ export default function DocumentView() {
         setOriginalPreviewUrl(null);
         setPreviewMode("current");
     }, [documentData?.originalFile?.id]);
+
+    useEffect(() => {
+        setResendSignersDirty(false);
+    }, [documentData?.documentId, documentData?.status]);
+
+    useEffect(() => {
+        if (!isCreator || documentData?.status !== "revision") return;
+        let cancelled = false;
+
+        const loadResendDictionaries = async () => {
+            try {
+                const [allUsers, allDepartments] = await Promise.all([
+                    getAllUsers(),
+                    getDepartments(),
+                ]);
+                if (cancelled) return;
+
+                const normalizedUsers = (Array.isArray(allUsers) ? allUsers : [])
+                    .filter((user) => !sameId(user?.id, currentUser?.id))
+                    .map(normalizeUserForSigner);
+                const normalizedDepartments = (Array.isArray(allDepartments) ? allDepartments : [])
+                    .map(normalizeDepartmentForSelect)
+                    .filter((dept) => dept.id && dept.name)
+                    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "ru"));
+
+                setResendUsers(normalizedUsers);
+                setResendDepartments(normalizedDepartments);
+            } catch (error) {
+                console.error("Resend signer dictionaries load error:", error);
+                toast.error("Не удалось загрузить список подписантов");
+            }
+        };
+
+        loadResendDictionaries();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isCreator, documentData?.status, currentUser?.id]);
+
+    useEffect(() => {
+        if (!documentData || documentData.status !== "revision") {
+            setResendSigners([]);
+            setResendFile(null);
+            setResendOriginalUpload(null);
+            setResendFileUrl(null);
+            setShowResendSignature(false);
+            return;
+        }
+
+        setResendSequential(Boolean(documentData.signatureSequential));
+        if (!resendSignersDirty) {
+            setResendSigners(buildResendSignerDraft(documentData, resendUsers, creatorId));
+        }
+    }, [
+        documentData?.documentId,
+        documentData?.status,
+        documentData?.signers,
+        documentData?.signatureHistory,
+        documentData?.signatureSequential,
+        resendUsers,
+        creatorId,
+        resendSignersDirty,
+    ]);
 
     const hasOriginalDifferent = Boolean(
         documentData?.originalFile?.id &&
@@ -440,15 +613,13 @@ export default function DocumentView() {
         }
     };
 
-    const creatorId = documentData?.creator?.id ?? documentData?.creator;
-    const isCreator = sameId(creatorId, currentUser?.id);
-
     const getLastRevisionEntry = () => {
         const history = documentData?.signatureHistory || [];
         for (let i = history.length - 1; i >= 0; i--) {
             if (
                 history[i].type === "rejection" ||
-                history[i].type === "recall"
+                history[i].type === "recall" ||
+                history[i].type === "revoked"
             ) {
                 return history[i];
             }
@@ -513,9 +684,75 @@ export default function DocumentView() {
         }
     };
 
+    const handleAddResendSigner = (user) => {
+        if (sameId(user.id, currentUser?.id)) {
+            toast.warning("Нельзя добавить себя в список подписантов");
+            return;
+        }
+
+        setResendSignersDirty(true);
+        setResendSigners((prev) => {
+            if (prev.some((signer) => sameId(signer.userId, user.id))) {
+                return prev
+                    .filter((signer) => !sameId(signer.userId, user.id))
+                    .map((signer, index) => ({ ...signer, order: index + 1 }));
+            }
+
+            return [
+                ...prev,
+                {
+                    userId: user.id,
+                    userName: user.fullName || user.username || user.email,
+                    userEmail: user.email,
+                    email: user.email,
+                    order: prev.length + 1,
+                    role: "",
+                    status: "pending",
+                    signedAt: null,
+                    department: user.departmentName || "",
+                    departmentName: user.departmentName || "",
+                    position: user.position || "",
+                },
+            ];
+        });
+    };
+
+    const handleRemoveResendSigner = (userId) => {
+        setResendSignersDirty(true);
+        setResendSigners((prev) =>
+            prev
+                .filter((signer) => !sameId(signer.userId, userId))
+                .map((signer, index) => ({ ...signer, order: index + 1 })),
+        );
+    };
+
+    const moveResendSignerUp = (index) => {
+        if (index === 0) return;
+        setResendSignersDirty(true);
+        setResendSigners((prev) => {
+            const next = [...prev];
+            [next[index - 1], next[index]] = [next[index], next[index - 1]];
+            return next.map((signer, idx) => ({ ...signer, order: idx + 1 }));
+        });
+    };
+
+    const moveResendSignerDown = (index) => {
+        setResendSignersDirty(true);
+        setResendSigners((prev) => {
+            if (index >= prev.length - 1) return prev;
+            const next = [...prev];
+            [next[index], next[index + 1]] = [next[index + 1], next[index]];
+            return next.map((signer, idx) => ({ ...signer, order: idx + 1 }));
+        });
+    };
+
     const handleResend = async () => {
         if (!resendFile) {
             toast.warning("Загрузите исправленный файл");
+            return;
+        }
+        if (resendSigners.length === 0) {
+            toast.warning("Выберите хотя бы одного подписанта для повторной отправки");
             return;
         }
         setActionLoading(true);
@@ -557,20 +794,16 @@ export default function DocumentView() {
                 cmsFileName = uploadedCmsFile?.name || cmsFileNameGenerated;
             }
 
-            const creatorId =
-                documentData?.creator?.id ||
-                documentData?.creator ||
-                currentUser.id;
-
-            const nextSigners = normalizeSignersForUi(documentData.signers)
+            const nextSigners = normalizeSignersForUi(resendSigners)
                 .filter((s) => !sameId(s.userId, creatorId))
                 .map((s, index) => ({
                     ...s,
                     order: index + 1,
                     status: "pending",
                     signedAt: null,
-                    role: null,
+                    role: "",
                 }));
+            const signerNames = nextSigners.map((s) => s.userName).filter(Boolean).join(", ");
 
             const now = new Date().toISOString();
             const updatedHistory = [
@@ -581,6 +814,9 @@ export default function DocumentView() {
                     userName:
                         currentUser.fullName || currentUser.username,
                     date: now,
+                    comment: signerNames
+                        ? `Документ исправлен и отправлен заново. Подписанты: ${signerNames}`
+                        : "Документ исправлен и отправлен заново.",
                 },
                 {
                     userId: currentUser.id,
@@ -598,10 +834,11 @@ export default function DocumentView() {
             ];
 
             await updateDocument(documentData.documentId, {
-                status: nextSigners.length === 0 ? "completed" : "in_progress",
+                status: "in_progress",
                 originalFile: resendOriginalUpload.id,
                 currentFile: uploadedSigned.id,
                 signers: nextSigners,
+                signatureSequential: resendSequential,
                 signatureHistory: updatedHistory,
             });
 
@@ -611,6 +848,7 @@ export default function DocumentView() {
             setResendFileUrl(null);
             setResendOriginalUpload(null);
             setResendFile(null);
+            setResendSignersDirty(false);
             loadDocument(currentUser);
         } catch (error) {
             console.error("Ошибка отправки:", error);
@@ -741,6 +979,22 @@ export default function DocumentView() {
               (a, b) => (a.order ?? 9999) - (b.order ?? 9999)
           )
         : normalizeSignersForUi(documentData.signers);
+    const filteredResendUsers = resendUsers.filter((user) => {
+        if (resendDepartmentFilter !== "all") {
+            if (String(user.departmentId) !== String(resendDepartmentFilter)) {
+                return false;
+            }
+        }
+
+        const query = resendSignerSearchQuery.trim().toLowerCase();
+        if (!query) return true;
+
+        return (
+            String(user.fullName || "").toLowerCase().includes(query) ||
+            String(user.username || "").toLowerCase().includes(query) ||
+            String(user.email || "").toLowerCase().includes(query)
+        );
+    });
 
     return (
         <div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-8'>
@@ -909,6 +1163,158 @@ export default function DocumentView() {
                             </div>
                             {isCreator && (
                                 <div className='mt-4 pt-4 border-t border-amber-200'>
+                                    <div className='mb-5'>
+                                        <div className='flex items-center justify-between gap-3 mb-3 flex-wrap'>
+                                            <div>
+                                                <p className='text-sm font-semibold text-gray-800'>
+                                                    Повторная отправка на подпись
+                                                </p>
+                                                <p className='text-xs text-gray-600'>
+                                                    Прежние подписанты уже выбраны. При необходимости измените список и порядок.
+                                                </p>
+                                            </div>
+                                            <label className='flex items-center gap-2 text-sm text-gray-700'>
+                                                <input
+                                                    type='checkbox'
+                                                    checked={resendSequential}
+                                                    onChange={(e) =>
+                                                        setResendSequential(e.target.checked)
+                                                    }
+                                                    className='w-4 h-4 text-indigo-600 rounded'
+                                                />
+                                                Последовательно
+                                            </label>
+                                        </div>
+
+                                        <div className='grid grid-cols-1 lg:grid-cols-2 gap-4'>
+                                            <div className='bg-white border border-amber-100 rounded-lg p-3'>
+                                                <div className='space-y-2 mb-3'>
+                                                    <input
+                                                        type='text'
+                                                        value={resendSignerSearchQuery}
+                                                        onChange={(e) =>
+                                                            setResendSignerSearchQuery(e.target.value)
+                                                        }
+                                                        placeholder='Поиск по ФИО, логину или email'
+                                                        className='w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500'
+                                                    />
+                                                    <select
+                                                        value={resendDepartmentFilter}
+                                                        onChange={(e) =>
+                                                            setResendDepartmentFilter(e.target.value)
+                                                        }
+                                                        className='w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500'>
+                                                        <option value='all'>Все отделы</option>
+                                                        {resendDepartments.map((dept) => (
+                                                            <option key={dept.id} value={dept.id}>
+                                                                {dept.name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className='space-y-2 max-h-64 overflow-y-auto'>
+                                                    {filteredResendUsers.length === 0 ? (
+                                                        <div className='p-3 text-sm text-gray-500 border border-gray-200 rounded-lg'>
+                                                            Пользователи не найдены
+                                                        </div>
+                                                    ) : (
+                                                        filteredResendUsers.map((user) => {
+                                                            const selected = resendSigners.some((signer) =>
+                                                                sameId(signer.userId, user.id)
+                                                            );
+                                                            return (
+                                                                <button
+                                                                    key={user.id}
+                                                                    type='button'
+                                                                    onClick={() => handleAddResendSigner(user)}
+                                                                    className={`w-full text-left p-3 border rounded-lg transition-colors ${
+                                                                        selected
+                                                                            ? "border-amber-500 bg-amber-50"
+                                                                            : "border-gray-200 hover:border-amber-300"
+                                                                    }`}>
+                                                                    <p className='font-medium text-gray-800'>
+                                                                        {user.fullName || user.username || user.email}
+                                                                    </p>
+                                                                    <p className='text-sm text-gray-600'>{user.email}</p>
+                                                                    <p className='text-xs text-gray-500 mt-1'>
+                                                                        {user.departmentName || "Отдел не указан"} · {user.position || "должность не указана"}
+                                                                    </p>
+                                                                </button>
+                                                            );
+                                                        })
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className='bg-white border border-amber-100 rounded-lg p-3'>
+                                                <h3 className='text-sm font-semibold text-gray-800 mb-3'>
+                                                    Подписанты ({resendSigners.length})
+                                                </h3>
+                                                {resendSigners.length === 0 ? (
+                                                    <div className='text-center py-10 text-gray-500 border border-dashed border-gray-200 rounded-lg'>
+                                                        <UserPlus className='w-10 h-10 mx-auto mb-2' />
+                                                        <p className='text-sm'>Выберите подписантов</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className='space-y-2 max-h-64 overflow-y-auto'>
+                                                        {resendSigners.map((signer, index) => (
+                                                            <div
+                                                                key={signer.userId}
+                                                                className='p-3 border border-gray-200 rounded-lg'>
+                                                                <div className='flex items-start justify-between gap-3'>
+                                                                    <div className='min-w-0'>
+                                                                        <p className='font-medium text-gray-800'>
+                                                                            {resendSequential ? `${index + 1}. ` : ""}
+                                                                            {signer.userName}
+                                                                        </p>
+                                                                        <p className='text-sm text-gray-600 truncate'>
+                                                                            {signer.userEmail}
+                                                                        </p>
+                                                                        <div className='mt-2 flex flex-wrap gap-2 text-xs'>
+                                                                            <span className='px-2 py-1 rounded-md bg-slate-100 text-slate-600'>
+                                                                                {signer.departmentName || signer.department || "Отдел не указан"}
+                                                                            </span>
+                                                                            <span className='px-2 py-1 rounded-md bg-indigo-50 text-indigo-700'>
+                                                                                {signer.position || "должность не указана"}
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className='flex items-center gap-1'>
+                                                                        {resendSequential && (
+                                                                            <>
+                                                                                <button
+                                                                                    type='button'
+                                                                                    onClick={() => moveResendSignerUp(index)}
+                                                                                    disabled={index === 0}
+                                                                                    className='p-1 text-gray-500 hover:text-amber-600 disabled:opacity-30'>
+                                                                                    ↑
+                                                                                </button>
+                                                                                <button
+                                                                                    type='button'
+                                                                                    onClick={() => moveResendSignerDown(index)}
+                                                                                    disabled={index === resendSigners.length - 1}
+                                                                                    className='p-1 text-gray-500 hover:text-amber-600 disabled:opacity-30'>
+                                                                                    ↓
+                                                                                </button>
+                                                                            </>
+                                                                        )}
+                                                                        <button
+                                                                            type='button'
+                                                                            onClick={() => handleRemoveResendSigner(signer.userId)}
+                                                                            className='p-1 text-red-500 hover:bg-red-50 rounded'
+                                                                            title='Удалить подписанта'>
+                                                                            <X className='w-4 h-4' />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <p className='text-sm font-medium text-gray-700 mb-2'>
                                         Загрузите исправленный файл и
                                         отправьте заново
@@ -938,7 +1344,8 @@ export default function DocumentView() {
                                             onClick={handleResend}
                                             disabled={
                                                 !resendFile ||
-                                                actionLoading
+                                                actionLoading ||
+                                                resendSigners.length === 0
                                             }
                                             className='px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2'>
                                             {actionLoading ? (
@@ -1091,7 +1498,8 @@ export default function DocumentView() {
                                     const isRejection =
                                         sig.type === "rejection";
                                     const isRecall =
-                                        sig.type === "recall";
+                                        sig.type === "recall" ||
+                                        sig.type === "revoked";
                                     const isResend =
                                         sig.type === "resend";
                                     const isAction =
