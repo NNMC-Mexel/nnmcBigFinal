@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Bell, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { notificationsApi, type Notification } from '../api/notifications';
+import { subscribeToNotificationRealtime } from '../api/notificationRealtime';
 
-const POLL_INTERVAL_MS = 30_000;
+const FALLBACK_POLL_INTERVAL_MS = 120_000;
 
 export default function NotificationsBell() {
   const [open, setOpen] = useState(false);
@@ -12,6 +13,7 @@ export default function NotificationsBell() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const ref = useRef<HTMLDivElement>(null);
+  const openRef = useRef(open);
 
   const refreshCount = async () => {
     try {
@@ -35,9 +37,26 @@ export default function NotificationsBell() {
   };
 
   useEffect(() => {
+    openRef.current = open;
+  }, [open]);
+
+  useEffect(() => {
     refreshCount();
-    const t = setInterval(refreshCount, POLL_INTERVAL_MS);
-    return () => clearInterval(t);
+    const unsubscribe = subscribeToNotificationRealtime((payload) => {
+      if (typeof payload.unreadCount === 'number') {
+        setCount(payload.unreadCount);
+      } else {
+        refreshCount();
+      }
+      if (openRef.current) {
+        refreshList();
+      }
+    });
+    const t = setInterval(refreshCount, FALLBACK_POLL_INTERVAL_MS);
+    return () => {
+      unsubscribe();
+      clearInterval(t);
+    };
   }, []);
 
   useEffect(() => {

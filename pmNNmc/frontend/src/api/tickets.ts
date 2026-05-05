@@ -48,6 +48,7 @@ export const ticketsApi = {
         'populate[0]': 'category',
         'populate[1]': 'serviceGroup',
         'populate[2]': 'assignee',
+        'populate[3]': 'attachments',
       },
     });
     return response.data.data;
@@ -80,8 +81,20 @@ export const ticketsApi = {
     comment: string;
     categoryId?: number;
     serviceGroupId: number;
+    attachments?: number[];
   }): Promise<{ ticketNumber: string; id: number; documentId?: string }> => {
     const response = await client.post('/tickets/submit', data);
     return response.data.data;
+  },
+
+  uploadAttachments: async (files: File[]): Promise<number[]> => {
+    if (files.length === 0) return [];
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    const response = await client.post('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    const uploaded = Array.isArray(response.data) ? response.data : [response.data];
+    return uploaded.map((file: any) => Number(file.id)).filter(Boolean);
   },
 };

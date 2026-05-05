@@ -69,6 +69,15 @@ export interface UserRole {
   description?: string;
 }
 
+export interface MediaFile {
+  id: number;
+  name: string;
+  url: string;
+  mime?: string;
+  size?: number;
+  ext?: string;
+}
+
 export interface AssignableUser {
   id: number;
   username: string;
@@ -212,6 +221,7 @@ export interface Ticket {
   category?: TicketCategory;
   serviceGroup?: ServiceGroup;
   assignee?: User[];
+  attachments?: MediaFile[];
   createdAt?: string;
   updatedAt?: string;
 }

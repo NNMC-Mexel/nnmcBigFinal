@@ -1,4 +1,8 @@
 import type { Context } from 'koa';
+import {
+  publishNotificationCreated,
+  publishNotificationState,
+} from '../../../utils/notification-realtime';
 
 declare const strapi: any;
 
@@ -72,6 +76,7 @@ export default {
     await strapi.entityService.update('api::notification.notification', id, {
       data: { isRead: true },
     });
+    await publishNotificationState(strapi, user.id);
 
     ctx.body = { ok: true };
   },
@@ -85,8 +90,48 @@ export default {
       where: { recipient: user.id, isRead: false },
       data: { isRead: true },
     });
+    await publishNotificationState(strapi, user.id);
 
     ctx.body = { ok: true };
+  },
+
+  // POST /api/notifications/read-by-link
+  async markReadByLink(ctx: Context) {
+    const user = (ctx.state as any).user;
+    if (!user) return ctx.unauthorized('Необходима авторизация');
+
+    const rawLink = String((ctx.request.body as any)?.link || '').trim();
+    if (!rawLink || !rawLink.startsWith('/app/')) {
+      return (ctx.body = { ok: true, updated: 0 });
+    }
+
+    const normalizedLink = rawLink.replace(/\/+$/, '');
+    const unreadItems = await strapi.entityService.findMany('api::notification.notification', {
+      filters: { recipient: user.id, isRead: false },
+      fields: ['id', 'link'],
+      pagination: { pageSize: 200 },
+    });
+    const ids = (unreadItems || [])
+      .filter((item: any) => {
+        const link = String(item.link || '').replace(/\/+$/, '');
+        return link === normalizedLink || link.startsWith(`${normalizedLink}/`);
+      })
+      .map((item: any) => item.id)
+      .filter(Boolean);
+
+    if (ids.length > 0) {
+      await strapi.db.query('api::notification.notification').updateMany({
+        where: { id: { $in: ids }, recipient: user.id, isRead: false },
+        data: { isRead: true },
+      });
+    }
+
+    const updated = ids.length;
+    if (updated > 0) {
+      await publishNotificationState(strapi, user.id);
+    }
+
+    ctx.body = { ok: true, updated };
   },
 
   // POST /api/internal-notifications
@@ -127,6 +172,7 @@ export default {
         metadata: body.metadata || null,
       },
     });
+    await publishNotificationCreated(strapi, user.id, created);
 
     ctx.body = { id: created.id };
   },

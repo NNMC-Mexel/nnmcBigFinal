@@ -37,8 +37,20 @@ function getSlotBooking(slot, bookings) {
   });
 }
 
-export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuccess, currentUser }) {
+export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuccess, currentUser, profileUser }) {
   const user = currentUser || null;
+  const profile = profileUser || user || {};
+  const profileName =
+    `${profile.lastName || ''} ${profile.firstName || ''}`.trim() ||
+    profile.fullName ||
+    profile.username ||
+    profile.email ||
+    '';
+  const profileDepartment =
+    profile.department?.name_ru ||
+    profile.department?.name_kz ||
+    profile.department?.key ||
+    '';
   const [roomId, setRoomId] = useState(initialData?.roomId || rooms[0]?.id || '');
   const [date, setDate] = useState(initialData?.date || format(new Date(), 'yyyy-MM-dd'));
   const [startSlot, setStartSlot] = useState(
@@ -47,8 +59,8 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
   const [endSlot, setEndSlot] = useState(
     initialData?.hour ? `${String(initialData.hour + 1).padStart(2, '00')}:00` : null
   );
-  const [bookerName, setBookerName] = useState(user?.username || '');
-  const [department, setDepartment] = useState('');
+  const [bookerName, setBookerName] = useState(profileName);
+  const [department, setDepartment] = useState(profileDepartment);
   const [topic, setTopic] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -70,6 +82,11 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
   useEffect(() => {
     fetchBookings();
   }, [fetchBookings]);
+
+  useEffect(() => {
+    setBookerName(profileName);
+    setDepartment(profileDepartment);
+  }, [profileName, profileDepartment]);
 
   useEffect(() => {
     setStartSlot(null);
@@ -151,8 +168,8 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
         date,
         startTime: startSlot,
         endTime: endSlot,
-        bookerName,
-        department,
+        bookerName: profileName || bookerName,
+        department: profileDepartment || department,
         topic,
         userId: user?.id || null,
         isRecurring,
@@ -189,9 +206,9 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
                 className={`flex-1 py-3 px-4 rounded-xl border-2 text-sm font-medium transition-all ${
                   roomId === room.id
                     ? idx === 0
-                      ? 'border-room-1 bg-room-1/5 text-room-1'
-                      : 'border-room-2 bg-room-2/5 text-room-2'
-                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                      ? 'border-cyan-700 bg-cyan-600 text-white shadow-sm'
+                      : 'border-emerald-700 bg-emerald-600 text-white shadow-sm'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-cyan-500 hover:bg-cyan-50 hover:text-cyan-800'
                 }`}
               >
                 {room.name}
@@ -318,12 +335,12 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
                             ? 'bg-violet-100 text-violet-400 cursor-not-allowed line-through'
                             : 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
                           : state === 'start'
-                          ? 'bg-primary text-white shadow-sm ring-2 ring-primary/30'
+                          ? 'bg-cyan-600 text-white shadow-sm ring-2 ring-cyan-200'
                           : state === 'end'
-                          ? 'bg-primary text-white shadow-sm ring-2 ring-primary/30'
+                          ? 'bg-cyan-600 text-white shadow-sm ring-2 ring-cyan-200'
                           : state === 'selected'
-                          ? 'bg-primary/80 text-white'
-                          : 'bg-white border border-gray-200 text-gray-700 hover:border-primary hover:text-primary hover:bg-primary/5'
+                          ? 'bg-cyan-500 text-white'
+                          : 'bg-white border border-gray-300 text-gray-700 hover:border-cyan-500 hover:text-cyan-800 hover:bg-cyan-50'
                       }`}
                     >
                       {slot}
@@ -338,7 +355,7 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
                   <span>Свободно</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded bg-primary" />
+                  <div className="w-3 h-3 rounded bg-cyan-600" />
                   <span>Ваш выбор</span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -365,11 +382,12 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Ваше имя</label>
           <input
             type="text"
-            value={bookerName}
+            value={profileName || bookerName || 'ФИО не указано'}
+            readOnly
             onChange={(e) => setBookerName(e.target.value)}
             required
             placeholder="Иван Иванов"
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-800 cursor-default"
           />
         </div>
 
@@ -378,11 +396,12 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Отдел</label>
           <input
             type="text"
-            value={department}
+            value={profileDepartment || department || 'Отдел не указан'}
+            readOnly
             onChange={(e) => setDepartment(e.target.value)}
             required
             placeholder="Маркетинг"
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-800 cursor-default"
           />
         </div>
 
@@ -407,7 +426,7 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
         <button
           type="submit"
           disabled={submitting || !startSlot || !endSlot}
-          className="w-full py-3 bg-primary text-white rounded-xl font-medium hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-colors disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
         >
           {submitting
             ? 'Бронирование...'

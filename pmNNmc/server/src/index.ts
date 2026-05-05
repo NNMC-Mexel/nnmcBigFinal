@@ -1,4 +1,5 @@
 import seedData from '../scripts/seed';
+import { initNotificationRealtime } from './utils/notification-realtime';
 
 const PROTOCOL_USER_PASSWORD = process.env.NNMC_PROTOCOL_USER_PASSWORD || 'Aa123123!';
 const PROTOCOL_USER_SEED_VERSION = 'radiology-kpi-protocol-2026-04-30';
@@ -170,6 +171,7 @@ export default {
 
     await normalizeTicketCategoryDefaultAssignees(strapi);
     await syncItTicketCategories(strapi);
+    initNotificationRealtime(strapi);
 
     // Always ensure permissions are set correctly
     await setupPermissions(strapi);
@@ -234,7 +236,7 @@ async function setupPermissions(strapi: any) {
       'updateDepartmentPermissions',
     ],
     // In-app notifications (own only — see controller for row-level filter)
-    'api::notification.notification': ['mine', 'unreadCount', 'markRead', 'markAllRead'],
+    'api::notification.notification': ['mine', 'unreadCount', 'markRead', 'markAllRead', 'markReadByLink'],
   };
 
   // Apply public permissions and remove anything not on the allowlist

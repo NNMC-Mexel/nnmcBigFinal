@@ -45,6 +45,12 @@
     "staffComment": {
       "type": "text"
     },
+    "attachments": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": ["images", "files"]
+    },
     "category": {
       "type": "relation",
       "relation": "manyToOne",

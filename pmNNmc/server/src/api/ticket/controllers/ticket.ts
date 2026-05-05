@@ -1,5 +1,8 @@
 import { factories } from '@strapi/strapi';
 import { getUserFlags } from '../../../utils/project-assignments';
+import { publishNotificationCreated } from '../../../utils/notification-realtime';
+
+const TICKET_UID = 'api::ticket.ticket';
 
 function extractRelationId(relation: any): number | null {
   if (!relation) return null;
@@ -44,6 +47,37 @@ function getUserDisplayName(user: any): string {
   );
 }
 
+function normalizeFileIds(input: any): number[] {
+  const raw = Array.isArray(input) ? input : input ? [input] : [];
+  return Array.from(
+    new Set(
+      raw
+        .map((value: any) => Number(value?.id || value))
+        .filter((value: number) => Number.isFinite(value) && value > 0)
+    )
+  );
+}
+
+async function attachTicketFiles(strapi: any, ticketId: number, fileIds: number[]) {
+  if (!ticketId || fileIds.length === 0) return;
+  await Promise.all(
+    fileIds.map((fileId) =>
+      strapi.db.query('plugin::upload.file').update({
+        where: { id: fileId },
+        data: {
+          related: [
+            {
+              id: ticketId,
+              __type: TICKET_UID,
+              __pivot: { field: 'attachments' },
+            },
+          ],
+        },
+      })
+    )
+  );
+}
+
 async function notifyTicketAssignees(strapi: any, ticketId: number) {
   try {
     const ticket = (await strapi.entityService.findOne('api::ticket.ticket', ticketId, {
@@ -56,7 +90,7 @@ async function notifyTicketAssignees(strapi: any, ticketId: number) {
 
     const categoryName = ticket.category?.name_ru || ticket.category?.name_kz || 'Заявка';
     const body = String(ticket.comment || '').trim();
-    await Promise.all(
+    const createdNotifications = await Promise.all(
       assigneeIds.map((recipientId) =>
         strapi.entityService.create('api::notification.notification', {
           data: {
@@ -74,6 +108,11 @@ async function notifyTicketAssignees(strapi: any, ticketId: number) {
             },
           },
         })
+      )
+    );
+    await Promise.all(
+      createdNotifications.map((notification, index) =>
+        publishNotificationCreated(strapi, Number(assigneeIds[index]), notification)
       )
     );
 
@@ -225,7 +264,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     const [tickets, total] = await Promise.all([
       strapi.entityService.findMany('api::ticket.ticket', {
         filters,
-        populate: ['category', 'serviceGroup', 'assignee'],
+        populate: ['category', 'serviceGroup', 'assignee', 'attachments'] as any,
         sort: { createdAt: 'desc' } as any,
         start: (page - 1) * pageSize,
         limit: pageSize,
@@ -374,7 +413,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
 
     const tickets = (await strapi.entityService.findMany('api::ticket.ticket', {
       filters,
-      populate: ['category', 'serviceGroup', 'assignee'],
+      populate: ['category', 'serviceGroup', 'assignee', 'attachments'] as any,
       limit: 1,
     })) as any[];
 
@@ -426,7 +465,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     }
 
     const body = ctx.request.body as any;
-    const { requesterName, requesterPhone, requesterDepartment, comment, categoryId, serviceGroupId } = body;
+    const { requesterPhone, comment, categoryId, serviceGroupId, attachments } = body;
 
     if (!comment || !serviceGroupId) {
       ctx.throw(400, 'Обязательные поля: comment, serviceGroupId');
@@ -467,11 +506,16 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       }
     }
 
+    const requesterName = getUserDisplayName(userWithDept);
+    const requesterDepartment = String(
+      userWithDept?.department?.name_ru || userWithDept?.department?.name_kz || ''
+    ).trim();
+
     const ticketData: any = {
-      requesterName: String(requesterName || getUserDisplayName(userWithDept)).trim(),
+      requesterName,
       requesterPhone: requesterPhone || null,
       requesterDepartment:
-        String(requesterDepartment || userWithDept?.department?.name_ru || userWithDept?.department?.name_kz || '').trim() ||
+        requesterDepartment ||
         'Не указан',
       comment,
       serviceGroup: serviceGroup.id,
@@ -486,6 +530,10 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     const ticket = (await strapi.entityService.create('api::ticket.ticket', {
       data: ticketData,
     })) as any;
+    const attachmentIds = normalizeFileIds(attachments);
+    if (attachmentIds.length > 0) {
+      await attachTicketFiles(strapi, ticket.id, attachmentIds);
+    }
     const ticketWithAssignees = await notifyTicketAssignees(strapi, ticket.id);
     const responseTicket = ticketWithAssignees || ticket;
 

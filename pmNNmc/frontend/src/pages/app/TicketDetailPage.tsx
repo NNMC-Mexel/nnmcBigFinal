@@ -11,11 +11,13 @@ import {
   Tag,
   Clock,
   Loader2,
+  Paperclip,
 } from 'lucide-react';
 import { useTicketStore } from '../../store/ticketStore';
 import TicketStatusBadge from '../../components/tickets/TicketStatusBadge';
 import ReassignModal from '../../components/tickets/ReassignModal';
 import Loader from '../../components/ui/Loader';
+import { getMediaUrl } from '../../utils/media';
 
 const STATUSES = ['NEW', 'IN_PROGRESS', 'DONE', 'INVALID'] as const;
 const COMPLEXITIES = ['A', 'B', 'C', 'D'] as const;
@@ -241,6 +243,28 @@ export default function TicketDetailPage() {
               {ticket.comment}
             </div>
           </div>
+
+          {ticket.attachments && ticket.attachments.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h2 className="text-lg font-semibold text-slate-800 mb-3">
+                Вложения
+              </h2>
+              <div className="space-y-2">
+                {ticket.attachments.map((file) => (
+                  <a
+                    key={file.id}
+                    href={getMediaUrl(file.url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-cyan-300 hover:bg-cyan-50"
+                  >
+                    <Paperclip className="w-4 h-4 text-cyan-600" />
+                    <span className="truncate">{file.name}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Staff Comment */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">

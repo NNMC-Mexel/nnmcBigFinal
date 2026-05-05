@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Check, CheckCheck } from 'lucide-react';
 import { notificationsApi, type Notification } from '../../api/notifications';
+import { subscribeToNotificationRealtime } from '../../api/notificationRealtime';
 
 export default function NotificationsPage() {
   const [items, setItems] = useState<Notification[]>([]);
@@ -23,6 +24,12 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     load();
+  }, [unreadOnly]);
+
+  useEffect(() => {
+    return subscribeToNotificationRealtime(() => {
+      load();
+    });
   }, [unreadOnly]);
 
   const handleItemClick = async (n: Notification) => {

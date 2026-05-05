@@ -31,4 +31,8 @@ export const notificationsApi = {
   markAllRead: async (): Promise<void> => {
     await client.post('/notifications/mark-all-read');
   },
+
+  markReadByLink: async (link: string): Promise<void> => {
+    await client.post('/notifications/read-by-link', { link });
+  },
 };

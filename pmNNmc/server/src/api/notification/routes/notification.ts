@@ -26,6 +26,12 @@ export default {
     },
     {
       method: 'POST',
+      path: '/notifications/read-by-link',
+      handler: 'notification.markReadByLink',
+      config: { policies: [], middlewares: [] },
+    },
+    {
+      method: 'POST',
       path: '/internal-notifications',
       handler: 'notification.createInternal',
       // Authorized by X-Internal-Token; bypass JWT auth.

@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
     LayoutDashboard,
@@ -21,15 +21,17 @@ import {
     Building2,
     Briefcase,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore, useUserRole } from "../store/authStore";
 import LanguageSwitcher from "../components/ui/LanguageSwitcher";
 import NotificationsBell from "../components/NotificationsBell";
 import { getMediaUrl } from "../utils/media";
+import { notificationsApi } from "../api/notifications";
 
 export default function AppLayout() {
     const { t } = useTranslation();
     const navigate = useNavigate();
+    const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const { user } = useAuthStore();
     const {
@@ -64,6 +66,14 @@ export default function AppLayout() {
             window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout`;
         }
     };
+
+    useEffect(() => {
+        if (!location.pathname.startsWith("/app/")) return;
+        void notificationsApi.markReadByLink(location.pathname).catch(() => {});
+        if (location.search) {
+            void notificationsApi.markReadByLink(`${location.pathname}${location.search}`).catch(() => {});
+        }
+    }, [location.pathname, location.search]);
 
     // No longer needed — services use department flags directly
 

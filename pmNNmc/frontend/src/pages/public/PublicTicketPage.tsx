@@ -7,6 +7,8 @@ import {
   AlertCircle,
   Loader2,
   ChevronDown,
+  Paperclip,
+  X,
 } from 'lucide-react';
 import { ticketsApi } from '../../api/tickets';
 import type { ServiceGroup } from '../../types';
@@ -28,6 +30,7 @@ export default function PublicTicketPage() {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [expandedGroup, setExpandedGroup] = useState<number | null>(null);
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
 
   const [form, setForm] = useState({
     requesterName: '',
@@ -35,6 +38,17 @@ export default function PublicTicketPage() {
     requesterDepartment: '',
     comment: '',
   });
+
+  const profileName =
+    `${currentUser?.lastName || ''} ${currentUser?.firstName || ''}`.trim() ||
+    currentUser?.username ||
+    currentUser?.email ||
+    '';
+  const profileDepartment =
+    currentUser?.department?.name_ru ||
+    currentUser?.department?.name_kz ||
+    currentUser?.department?.key ||
+    '';
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -54,26 +68,17 @@ export default function PublicTicketPage() {
     if (!currentUser) return;
     setForm((prev) => ({
       ...prev,
-      requesterName:
-        prev.requesterName ||
-        `${currentUser.lastName || ''} ${currentUser.firstName || ''}`.trim() ||
-        currentUser.username ||
-        currentUser.email ||
-        '',
-      requesterDepartment:
-        prev.requesterDepartment ||
-        currentUser.department?.name_ru ||
-        currentUser.department?.name_kz ||
-        '',
+      requesterName: profileName,
+      requesterDepartment: profileDepartment,
     }));
-  }, [currentUser]);
+  }, [currentUser, profileName, profileDepartment]);
 
   const selectedGroup = serviceGroups.find((sg) => sg.id === selectedGroupId);
   const selectedCategory = selectedGroup?.categories?.find((c) => c.id === selectedCategoryId);
 
   const canSubmit =
-    form.requesterName.trim() &&
-    form.requesterDepartment.trim() &&
+    profileName.trim() &&
+    profileDepartment.trim() &&
     form.comment.trim() &&
     selectedGroupId;
 
@@ -84,13 +89,13 @@ export default function PublicTicketPage() {
     setSubmitting(true);
     setError(null);
     try {
+      const attachmentIds = await ticketsApi.uploadAttachments(attachmentFiles);
       const result = await ticketsApi.submit({
-        requesterName: form.requesterName.trim(),
         requesterPhone: form.requesterPhone.trim() || undefined,
-        requesterDepartment: form.requesterDepartment.trim(),
         comment: form.comment.trim(),
         serviceGroupId: selectedGroupId,
         categoryId: selectedCategoryId || undefined,
+        attachments: attachmentIds,
       });
       setTicketNumber(result.ticketNumber);
       setSubmitted(true);
@@ -107,8 +112,23 @@ export default function PublicTicketPage() {
     setSelectedGroupId(null);
     setSelectedCategoryId(null);
     setExpandedGroup(null);
-    setForm({ requesterName: '', requesterPhone: '', requesterDepartment: '', comment: '' });
+    setAttachmentFiles([]);
+    setForm({
+      requesterName: profileName,
+      requesterPhone: '',
+      requesterDepartment: profileDepartment,
+      comment: '',
+    });
     setError(null);
+  };
+
+  const handleAttachmentChange = (files: FileList | null) => {
+    if (!files) return;
+    setAttachmentFiles((prev) => [...prev, ...Array.from(files)]);
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachmentFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const getName = (item: { name_ru: string; name_kz: string }) =>
@@ -264,11 +284,12 @@ export default function PublicTicketPage() {
               </label>
               <input
                 type="text"
-                value={form.requesterName}
+                value={profileName || 'ФИО не указано'}
+                readOnly
                 onChange={(e) => setForm({ ...form, requesterName: e.target.value })}
                 placeholder={t('helpdesk.namePlaceholder', 'Иванов Иван Иванович')}
                 required
-                className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 cursor-default"
               />
             </div>
 
@@ -278,11 +299,12 @@ export default function PublicTicketPage() {
               </label>
               <input
                 type="text"
-                value={form.requesterDepartment}
+                value={profileDepartment || 'Отдел не указан'}
+                readOnly
                 onChange={(e) => setForm({ ...form, requesterDepartment: e.target.value })}
                 placeholder={t('helpdesk.departmentPlaceholder', 'АКЦ')}
                 required
-                className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 cursor-default"
               />
             </div>
 
@@ -298,6 +320,45 @@ export default function PublicTicketPage() {
                 rows={5}
                 className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Фото или файл
+              </label>
+              <label className="flex items-center justify-center gap-2 w-full px-4 py-3 border border-dashed border-cyan-300 rounded-xl bg-cyan-50/60 text-cyan-700 cursor-pointer hover:bg-cyan-50 transition-colors">
+                <Paperclip className="w-4 h-4" />
+                <span>Добавить вложение</span>
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    handleAttachmentChange(e.target.files);
+                    e.currentTarget.value = '';
+                  }}
+                />
+              </label>
+              {attachmentFiles.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {attachmentFiles.map((file, index) => (
+                    <div
+                      key={`${file.name}-${file.size}-${index}`}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                    >
+                      <span className="truncate">{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(index)}
+                        className="p-1 text-slate-400 hover:text-red-600 rounded"
+                        aria-label="Удалить вложение"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {error && (

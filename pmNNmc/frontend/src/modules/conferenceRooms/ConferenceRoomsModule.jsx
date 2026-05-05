@@ -6,6 +6,7 @@ import BookingForm from '../../components/BookingForm/BookingForm';
 import Modal from '../../components/ui/Modal';
 import { useRooms } from '../../hooks/useRooms';
 import { confGetMe } from '../../api/confClient';
+import { useAuthStore } from '../../store/authStore';
 
 const ROOM_COLORS = ['bg-room-1', 'bg-room-2'];
 
@@ -20,6 +21,7 @@ function formatDateLabel(dateStr) {
 export default function ConferenceRoomsModule() {
   const [confUser, setConfUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const profileUser = useAuthStore((state) => state.user);
 
   useEffect(() => {
     const token = localStorage.getItem('conf_token');
@@ -58,11 +60,11 @@ export default function ConferenceRoomsModule() {
     );
   }
 
-  return <BookingDashboard confUser={confUser} />;
+  return <BookingDashboard confUser={confUser} profileUser={profileUser} />;
 }
 
 // --- Booking dashboard (shown after login) ---
-function BookingDashboard({ confUser }) {
+function BookingDashboard({ confUser, profileUser }) {
   const { rooms, loading } = useRooms();
   const [bookingModal, setBookingModal] = useState({ open: false, data: null });
   const [detailModal, setDetailModal] = useState({ open: false, booking: null });
@@ -175,7 +177,7 @@ function BookingDashboard({ confUser }) {
                     <div className="text-xs text-gray-500 mt-0.5">до {room.capacity} чел.</div>
                   )}
                 </div>
-                <div className={`text-sm font-medium ${c.text} flex items-center gap-1 shrink-0`}>
+                <div className="text-sm font-medium text-white bg-cyan-600 hover:bg-cyan-700 px-3 py-2 rounded-lg flex items-center gap-1 shrink-0 transition-colors">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
@@ -272,6 +274,7 @@ function BookingDashboard({ confUser }) {
           initialData={bookingModal.data}
           onSuccess={handleBookingSuccess}
           currentUser={confUser}
+          profileUser={profileUser}
         />
       )}
 
