@@ -1,5 +1,7 @@
 // import type { Core } from '@strapi/strapi';
 
+import { randomBytes } from 'crypto';
+
 const RADIOLOGY_DEPARTMENT = {
   key: 'RADIOLOGY',
   name: 'Лучевая',
@@ -45,6 +47,7 @@ async function ensureAuthenticatedPermissions(strapi: any) {
   const actions = [
     'api::document.document.find',
     'api::document.document.findOne',
+    'api::document.document.findMine',
     'api::document.document.create',
     'api::document.document.update',
     'api::document.document.delete',
@@ -103,6 +106,54 @@ async function seedDocumentTypes(strapi: any) {
     } catch (err) {
       console.warn(`⚠️ Failed to seed document type "${name}":`, err);
     }
+  }
+}
+
+const generateDocumentUid = () => randomBytes(5).toString('hex').toUpperCase();
+
+async function backfillDocumentUids(strapi: any) {
+  try {
+    const pageSize = 200;
+    let totalUpdated = 0;
+
+    while (true) {
+      const batch = await strapi.db.query('api::document.document').findMany({
+        where: { uid: { $null: true } },
+        select: ['id'],
+        limit: pageSize,
+      });
+
+      if (!Array.isArray(batch) || batch.length === 0) break;
+
+      for (const row of batch) {
+        let attempt = 0;
+        while (attempt < 3) {
+          try {
+            await strapi.db.query('api::document.document').update({
+              where: { id: row.id },
+              data: { uid: generateDocumentUid() },
+            });
+            totalUpdated += 1;
+            break;
+          } catch (error: any) {
+            attempt += 1;
+            if (attempt >= 3) {
+              strapi.log.warn(
+                `[document-uid] Could not assign uid for document ${row.id}: ${error?.message || error}`
+              );
+            }
+          }
+        }
+      }
+
+      if (batch.length < pageSize) break;
+    }
+
+    if (totalUpdated > 0) {
+      strapi.log.info(`[document-uid] Backfilled uid for ${totalUpdated} documents`);
+    }
+  } catch (error: any) {
+    strapi.log.warn(`[document-uid] Backfill failed: ${error?.message || error}`);
   }
 }
 
@@ -373,6 +424,7 @@ export default {
     await lockPublicRole(strapi);
     await ensureAuthenticatedPermissions(strapi);
     await seedDocumentTypes(strapi);
+    await backfillDocumentUids(strapi);
     await syncDepartmentsFromPm(strapi);
     await mergeRadiologyDepartments(strapi);
     await syncUsersFromPm(strapi);

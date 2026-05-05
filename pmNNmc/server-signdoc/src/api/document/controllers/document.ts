@@ -102,6 +102,21 @@ function mergeFilters(existing: any, accessFilter: any) {
     return { $and: [existing, accessFilter] };
 }
 
+const SAFE_DOCUMENT_POPULATE = {
+    creator: {
+        fields: ["id", "username", "fullName", "email"],
+        populate: { department: { fields: ["id", "name", "key"] } },
+    },
+    assigned_users: {
+        fields: ["id", "username", "fullName", "email"],
+        populate: { department: { fields: ["id", "name", "key"] } },
+    },
+    documentType: { fields: ["id", "name"] },
+    originalFile: { fields: ["id", "name", "hash", "ext", "mime", "size", "url"] },
+    currentFile: { fields: ["id", "name", "hash", "ext", "mime", "size", "url"] },
+    subdivision: { fields: ["id", "name"] },
+};
+
 function notifyViaPm(strapi: any, payload: NotifyPayload) {
     const pmUrl = process.env.SERVER_PM_URL;
     const token = process.env.INTERNAL_SYNC_TOKEN;
@@ -145,6 +160,7 @@ function summarizeDocument(document: any) {
     return {
         id: document?.id,
         documentId: document?.documentId,
+        uid: document?.uid || null,
         title: document?.title,
         status: document?.status,
         creator: document?.creator?.id || document?.creator || null,
@@ -618,6 +634,59 @@ export default factories.createCoreController(
                 ctx.query.filters = mergeFilters(ctx.query.filters, accessFilter);
             }
             return await super.find(ctx);
+        },
+
+        async findMine(ctx) {
+            const requestUser = ctx.state.user;
+            if (!requestUser) return ctx.unauthorized("Необходима авторизация");
+
+            const allowedRoles = ["creator", "assigned", "all"];
+            const role = String(ctx.query.role || "all");
+            if (!allowedRoles.includes(role)) {
+                return ctx.badRequest(`role must be one of: ${allowedRoles.join(", ")}`);
+            }
+
+            let filters: any;
+            if (role === "creator") {
+                filters = { creator: { id: requestUser.id } };
+            } else if (role === "assigned") {
+                filters = { assigned_users: { id: requestUser.id } };
+            } else {
+                filters = {
+                    $or: [
+                        { creator: { id: requestUser.id } },
+                        { assigned_users: { id: requestUser.id } },
+                    ],
+                };
+            }
+
+            const pageSize = 200;
+            let start = 0;
+            const all: any[] = [];
+            while (true) {
+                const batch = await strapi.documents(DOCUMENT_UID).findMany({
+                    filters,
+                    populate: SAFE_DOCUMENT_POPULATE,
+                    sort: { createdAt: "desc" } as any,
+                    start,
+                    limit: pageSize,
+                } as any);
+
+                if (!Array.isArray(batch) || batch.length === 0) break;
+                all.push(...batch);
+                if (batch.length < pageSize) break;
+                start += pageSize;
+            }
+
+            const byId = new Map();
+            for (const doc of all) {
+                byId.set(doc.documentId || doc.id, doc);
+            }
+            const sanitized = await (this as any).sanitizeOutput(Array.from(byId.values()), ctx);
+            ctx.body = {
+                data: sanitized,
+                meta: { total: Array.isArray(sanitized) ? sanitized.length : 0 },
+            };
         },
 
         async findOne(ctx) {

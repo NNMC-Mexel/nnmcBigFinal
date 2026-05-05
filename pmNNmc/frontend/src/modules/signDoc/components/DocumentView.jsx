@@ -28,6 +28,7 @@ import {
     Upload,
     AlertTriangle,
     PauseCircle,
+    FileSignature,
 } from "lucide-react";
 import DocumentSignatureApp from "./DocumentSignatureApp";
 import ConfirmModal from "./ConfirmModal";
@@ -79,6 +80,12 @@ export default function DocumentView() {
     const [resendFile, setResendFile] = useState(null);
     const [actionLoading, setActionLoading] = useState(false);
     const [signFileUrl, setSignFileUrl] = useState(null);
+    const [showResendSignature, setShowResendSignature] = useState(false);
+    const [resendFileUrl, setResendFileUrl] = useState(null);
+    const [resendOriginalUpload, setResendOriginalUpload] = useState(null);
+    const [previewMode, setPreviewMode] = useState("current");
+    const [originalPreviewUrl, setOriginalPreviewUrl] = useState(null);
+    const [originalLoading, setOriginalLoading] = useState(false);
 
     const [currentUser, setCurrentUser] = useState(getCurrentUser());
 
@@ -140,6 +147,38 @@ export default function DocumentView() {
             cancelled = true;
         };
     }, [documentData]);
+
+    useEffect(() => {
+        setOriginalPreviewUrl(null);
+        setPreviewMode("current");
+    }, [documentData?.originalFile?.id]);
+
+    const hasOriginalDifferent = Boolean(
+        documentData?.originalFile?.id &&
+            documentData?.currentFile?.id &&
+            !sameId(documentData.originalFile.id, documentData.currentFile.id)
+    );
+
+    const handleTogglePreview = async () => {
+        if (!documentData) return;
+        const nextMode = previewMode === "current" ? "original" : "current";
+
+        if (nextMode === "original" && !originalPreviewUrl) {
+            setOriginalLoading(true);
+            try {
+                const url = await getDocumentFileUrl(documentData.documentId, "original");
+                setOriginalPreviewUrl(url);
+            } catch (error) {
+                console.error("Original preview load error:", error);
+                toast.error("Не удалось загрузить оригинал документа");
+                setOriginalLoading(false);
+                return;
+            }
+            setOriginalLoading(false);
+        }
+
+        setPreviewMode(nextMode);
+    };
 
     const loadDocument = async (activeUser = currentUser) => {
         setLoading(true);
@@ -481,46 +520,59 @@ export default function DocumentView() {
         }
         setActionLoading(true);
         try {
-            const uploadedFile = await uploadFile(resendFile);
+            const uploadedOriginal = await uploadFile(resendFile);
+            const url = URL.createObjectURL(resendFile);
+            setResendOriginalUpload(uploadedOriginal);
+            setResendFileUrl(url);
+            setShowResendSignature(true);
+        } catch (error) {
+            console.error("Ошибка загрузки файла:", error);
+            toast.error("Ошибка при загрузке файла");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleResendSignatureComplete = async (
+        signedPdfBlob,
+        cmsBlob,
+        signatureData,
+    ) => {
+        setActionLoading(true);
+        try {
+            const uploadedSigned = await uploadFile(signedPdfBlob);
+
+            let cmsFileUrl = null;
+            let cmsFileName = null;
+
+            if (cmsBlob) {
+                const cmsFileNameGenerated = `${
+                    documentData.title
+                }_${currentUser.username}_resend_${Date.now()}.cms`;
+                const cmsFileObj = new File([cmsBlob], cmsFileNameGenerated, {
+                    type: "application/pkcs7-signature",
+                });
+                const uploadedCmsFile = await uploadFile(cmsFileObj);
+                cmsFileUrl = uploadedCmsFile?.url || null;
+                cmsFileName = uploadedCmsFile?.name || cmsFileNameGenerated;
+            }
 
             const creatorId =
                 documentData?.creator?.id ||
                 documentData?.creator ||
                 currentUser.id;
-            const creatorName =
-                documentData?.creator?.fullName ||
-                documentData?.creator?.username ||
-                currentUser.fullName ||
-                currentUser.username;
-            const creatorEmail =
-                documentData?.creator?.email || currentUser.email;
 
-            const resetSigners = normalizeSignersForUi(documentData.signers).map((s) => ({
-                ...s,
-                status: "pending",
-                signedAt: null,
-                role: null,
-            }));
+            const nextSigners = normalizeSignersForUi(documentData.signers)
+                .filter((s) => !sameId(s.userId, creatorId))
+                .map((s, index) => ({
+                    ...s,
+                    order: index + 1,
+                    status: "pending",
+                    signedAt: null,
+                    role: null,
+                }));
 
-            const hasCreator = resetSigners.some((s) => sameId(s.userId, creatorId));
-            const nextSigners = hasCreator
-                ? resetSigners
-                : [
-                      {
-                          userId: creatorId,
-                          userName: creatorName,
-                          userEmail: creatorEmail,
-                          order: 1,
-                          role: "Создатель",
-                          status: "pending",
-                      },
-                      ...resetSigners,
-                  ];
-
-            nextSigners.forEach((s, i) => {
-                s.order = i + 1;
-            });
-
+            const now = new Date().toISOString();
             const updatedHistory = [
                 ...(documentData.signatureHistory || []),
                 {
@@ -528,19 +580,36 @@ export default function DocumentView() {
                     userId: currentUser.id,
                     userName:
                         currentUser.fullName || currentUser.username,
-                    date: new Date().toISOString(),
+                    date: now,
+                },
+                {
+                    userId: currentUser.id,
+                    userName: currentUser.fullName || currentUser.username,
+                    role:
+                        signatureData.position ||
+                        signatureData.name ||
+                        "Создатель",
+                    signedAt: now,
+                    signatureType: signatureData.type,
+                    cmsFileUrl,
+                    cmsFileName,
+                    iin: signatureData.iin || null,
                 },
             ];
 
             await updateDocument(documentData.documentId, {
-                status: "in_progress",
-                originalFile: uploadedFile.id,
-                currentFile: uploadedFile.id,
+                status: nextSigners.length === 0 ? "completed" : "in_progress",
+                originalFile: resendOriginalUpload.id,
+                currentFile: uploadedSigned.id,
                 signers: nextSigners,
                 signatureHistory: updatedHistory,
             });
 
-            toast.success("Документ отправлен заново");
+            toast.success("Документ подписан и отправлен заново");
+            setShowResendSignature(false);
+            if (resendFileUrl) URL.revokeObjectURL(resendFileUrl);
+            setResendFileUrl(null);
+            setResendOriginalUpload(null);
             setResendFile(null);
             loadDocument(currentUser);
         } catch (error) {
@@ -586,6 +655,19 @@ export default function DocumentView() {
                 isSigningDocument={true}
                 signatureType={documentData.signatureType}
                 signatureIndex={signedCount}
+            />
+        );
+    }
+
+    if (showResendSignature && resendFileUrl) {
+        return (
+            <DocumentSignatureApp
+                documentId={documentData.id}
+                preloadedFileUrl={resendFileUrl}
+                onSignatureComplete={handleResendSignatureComplete}
+                isSigningDocument={true}
+                signatureType={documentData.signatureType}
+                signatureIndex={0}
             />
         );
     }
@@ -673,8 +755,15 @@ export default function DocumentView() {
                 <div className='bg-white rounded-2xl shadow-xl p-8'>
                     <div className='flex items-start justify-between mb-6 flex-wrap gap-4'>
                         <div>
-                            <h1 className='text-3xl font-bold text-gray-800 mb-2'>
-                                {documentData.title}
+                            <h1 className='text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3 flex-wrap'>
+                                <span>{documentData.title}</span>
+                                {documentData.uid && (
+                                    <span
+                                        className='text-sm font-mono font-normal text-gray-400 bg-gray-100 px-2 py-1 rounded'
+                                        title='Уникальный идентификатор документа'>
+                                        #{documentData.uid}
+                                    </span>
+                                )}
                             </h1>
                             <p className='text-gray-600'>
                                 Создан:{" "}
@@ -1127,13 +1216,43 @@ export default function DocumentView() {
 
                     {pdfPreviewUrl && (
                         <div className='mb-6'>
-                            <h2 className='text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2'>
-                                <Eye className='w-5 h-5 text-indigo-600' />
-                                Предпросмотр документа
-                            </h2>
+                            <div className='flex items-center justify-between mb-4 flex-wrap gap-3'>
+                                <h2 className='text-xl font-semibold text-gray-800 flex items-center gap-2'>
+                                    <Eye className='w-5 h-5 text-indigo-600' />
+                                    Предпросмотр документа
+                                    {previewMode === "original" && (
+                                        <span className='text-sm font-normal text-gray-500'>
+                                            (оригинал)
+                                        </span>
+                                    )}
+                                </h2>
+                                {hasOriginalDifferent && (
+                                    <button
+                                        onClick={handleTogglePreview}
+                                        disabled={originalLoading}
+                                        className='flex items-center gap-2 px-4 py-2 border border-indigo-300 text-indigo-700 hover:bg-indigo-50 rounded-lg text-sm font-medium transition-colors disabled:opacity-50'
+                                        title='Переключить между оригиналом и подписанной версией'>
+                                        {originalLoading ? (
+                                            <div className='animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600' />
+                                        ) : previewMode === "current" ? (
+                                            <FileText className='w-4 h-4' />
+                                        ) : (
+                                            <FileSignature className='w-4 h-4' />
+                                        )}
+                                        {previewMode === "current"
+                                            ? "Показать оригинал"
+                                            : "Показать подписанный"}
+                                    </button>
+                                )}
+                            </div>
                             <div className='mx-auto'>
                                 <iframe
-                                    src={pdfPreviewUrl}
+                                    src={
+                                        previewMode === "original" &&
+                                        originalPreviewUrl
+                                            ? originalPreviewUrl
+                                            : pdfPreviewUrl
+                                    }
                                     title='Предпросмотр PDF'
                                     className='w-full rounded-lg border border-gray-200 shadow-sm'
                                     style={{ height: 1000 }}

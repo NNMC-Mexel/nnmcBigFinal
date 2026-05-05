@@ -215,9 +215,12 @@ export default function DocumentList({ type = "my" }) {
 
         const titleQ = titleQuery.trim().toLowerCase();
         if (titleQ) {
-            result = result.filter((doc) =>
-                (doc.title || "").toLowerCase().includes(titleQ)
-            );
+            const uidQ = titleQ.replace(/^#/, "");
+            result = result.filter((doc) => {
+                const title = (doc.title || "").toLowerCase();
+                const uid = (doc.uid || "").toLowerCase();
+                return title.includes(titleQ) || uid.includes(uidQ);
+            });
         }
 
         if (dateFrom) {
@@ -717,7 +720,7 @@ export default function DocumentList({ type = "my" }) {
                                     onChange={(e) =>
                                         setTitleQuery(e.target.value)
                                     }
-                                    placeholder='Поиск по названию...'
+                                    placeholder='Название или #ID...'
                                     className='px-3 py-2 w-full border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
                                 />
                             </div>
@@ -1031,8 +1034,15 @@ export default function DocumentList({ type = "my" }) {
                                                 <FileText className='w-10 h-10 text-indigo-600 flex-shrink-0' />
 
                                                 <div className='flex-1'>
-                                                    <h3 className='text-lg font-semibold text-gray-800 mb-1'>
-                                                        {doc.title}
+                                                    <h3 className='text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2 flex-wrap'>
+                                                        <span>{doc.title}</span>
+                                                        {doc.uid && (
+                                                            <span
+                                                                className='text-xs font-mono font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded'
+                                                                title='Уникальный идентификатор документа'>
+                                                                #{doc.uid}
+                                                            </span>
+                                                        )}
                                                     </h3>
 
                                                     <div className='flex items-center gap-4 text-sm text-gray-600 mb-2'>

@@ -16,6 +16,11 @@
       "type": "string",
       "required": true
     },
+    "uid": {
+      "type": "string",
+      "unique": true,
+      "configurable": false
+    },
     "status": {
       "type": "enumeration",
       "enum": ["pending", "in_progress", "completed", "cancelled", "revision", "revoked"],

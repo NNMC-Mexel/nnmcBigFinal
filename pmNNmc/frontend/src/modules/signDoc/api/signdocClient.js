@@ -111,18 +111,15 @@ async function fetchAllPages(baseUrl) {
 }
 
 export async function getMyDocuments() {
-  const user = getUser();
-  const baseUrl = `${API_BASE}/documents?filters[$or][0][creator][id][$eq]=${user.id}&filters[$or][1][assigned_users][id][$eq]=${user.id}&populate[creator][populate]=department&populate[documentType]=true&populate[originalFile]=true&populate[currentFile]=true&populate[subdivision]=true`;
-  return fetchAllPages(baseUrl);
+  return fetchMine("all");
 }
 
 export async function getPendingDocuments() {
-  const user = getUser();
-  const baseUrl = `${API_BASE}/documents?filters[assigned_users][id][$eq]=${user.id}&populate[creator][populate]=department&populate[documentType]=true&populate[originalFile]=true&populate[currentFile]=true&populate[subdivision]=true`;
-  return fetchAllPages(baseUrl);
+  return fetchMine("assigned");
 }
 
 export function isMyTurnToSign(doc, userId) {
+  if (doc?.status !== "pending" && doc?.status !== "in_progress") return false;
   const signers = doc?.signers || [];
   const signerStatus = (signer) => signer?.status || "pending";
   const mySignerIndex = signers.findIndex((s) => Number(s.userId) === Number(userId));
@@ -130,6 +127,14 @@ export function isMyTurnToSign(doc, userId) {
   if (signerStatus(signers[mySignerIndex]) !== "pending") return false;
   if (!doc.signatureSequential) return true;
   return signers.slice(0, mySignerIndex).every((s) => signerStatus(s) === "signed");
+}
+
+async function fetchMine(role) {
+  const res = await fetch(`${API_BASE}/documents/mine?role=${role}`, {
+    headers: { ...getAuthHeader() },
+  });
+  const json = await handleResponse(res);
+  return json.data || [];
 }
 
 export async function getActionablePendingDocuments() {
