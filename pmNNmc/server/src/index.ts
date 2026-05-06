@@ -3,11 +3,28 @@ import { initNotificationRealtime } from './utils/notification-realtime';
 
 const PROTOCOL_USER_PASSWORD = process.env.NNMC_PROTOCOL_USER_PASSWORD || 'Aa123123!';
 const PROTOCOL_USER_SEED_VERSION = 'radiology-kpi-protocol-2026-04-30';
+const HELPDESK_USER_PASSWORD = process.env.NNMC_HELPDESK_USER_PASSWORD || 'Aa123123!';
+const HELPDESK_USER_SEED_VERSION = 'it-helpdesk-2026-05-06';
 const RADIOLOGY_DEPARTMENT = {
   key: 'RADIOLOGY',
   name_ru: 'Лучевая',
   name_kz: 'Сәулелік',
 };
+
+const itHelpdeskUsers = [
+  { username: 'ernar', email: 'ernar@nnmc.kz', firstName: 'Ернар', lastName: '' },
+  { username: 'zhandos', email: 'zhandos@nnmc.kz', firstName: 'Жандос', lastName: '' },
+  { username: 'said', email: 'said@nnmc.kz', firstName: 'Саид', lastName: '' },
+  { username: 'kuat', email: 'kuat@nnmc.kz', firstName: 'Куат', lastName: '' },
+  { username: 'bakhodyr', email: 'bakhodyr@nnmc.kz', firstName: 'Баходыр', lastName: '' },
+  { username: 'rustam', email: 'rustam@nnmc.kz', firstName: 'Рустам', lastName: '' },
+];
+
+const legacyItHelpdeskUsers = [
+  { username: 'admin', email: 'admin@example.com' },
+  { username: 'it.lead', email: 'it.lead@example.com' },
+  { username: 'it.member', email: 'it.member@example.com' },
+];
 
 const protocolDepartments = [
   {
@@ -170,6 +187,7 @@ export default {
     }
 
     await normalizeTicketCategoryDefaultAssignees(strapi);
+    await syncItHelpdeskUsers(strapi);
     await syncItTicketCategories(strapi);
     initNotificationRealtime(strapi);
 
@@ -570,6 +588,203 @@ async function ensurePermission(strapi: any, roleId: number, contentType: string
   }
 }
 
+async function getDepartmentByKey(strapi: any, key: string) {
+  const existing = await strapi.entityService.findMany('api::department.department', {
+    filters: { key } as any,
+    limit: 1,
+  });
+  if (existing?.[0]) return existing[0];
+
+  return await strapi.entityService.create('api::department.department', {
+    data: {
+      key,
+      name_ru: key === 'IT' ? 'Отдел IT' : key,
+      name_kz: key,
+      canViewNews: true,
+      canViewDashboard: true,
+      canViewHelpdesk: true,
+      canAccessConf: true,
+      canAccessSigndoc: true,
+      canManageTickets: key === 'IT',
+    },
+  });
+}
+
+async function ensureKeycloakHelpdeskUser(strapi: any, token: string, user: any) {
+  const keycloakUrl = process.env.KEYCLOAK_URL;
+  const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
+  if (!keycloakUrl) return;
+
+  const adminBase = `${keycloakUrl}/admin/realms/${keycloakRealm}`;
+  const existing = await findKeycloakUser(adminBase, token, user);
+  const payload = {
+    username: user.username,
+    email: user.email,
+    firstName: user.firstName || '',
+    lastName: user.lastName || '',
+    enabled: true,
+    emailVerified: true,
+    attributes: {
+      ...(existing?.attributes || {}),
+      nnmcHelpdeskSeedVersion: [HELPDESK_USER_SEED_VERSION],
+    },
+  };
+
+  if (existing?.id) {
+    const updateRes = await fetch(`${adminBase}/users/${existing.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!updateRes.ok) {
+      strapi.log.warn(`[helpdesk-users] Keycloak update failed for ${user.email}: HTTP ${updateRes.status}`);
+      return;
+    }
+    await setKeycloakPassword(adminBase, token, existing.id, HELPDESK_USER_PASSWORD);
+    return;
+  }
+
+  const createRes = await fetch(`${adminBase}/users`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      ...payload,
+      credentials: [{
+        type: 'password',
+        value: HELPDESK_USER_PASSWORD,
+        temporary: false,
+      }],
+    }),
+  });
+
+  if (!createRes.ok && createRes.status !== 409) {
+    const text = await createRes.text().catch(() => '');
+    strapi.log.warn(`[helpdesk-users] Keycloak create failed for ${user.email}: HTTP ${createRes.status} ${text}`);
+    return;
+  }
+
+  if (createRes.status === 409) {
+    const conflicted = await findKeycloakUser(adminBase, token, user);
+    if (conflicted?.id) {
+      await setKeycloakPassword(adminBase, token, conflicted.id, HELPDESK_USER_PASSWORD);
+    }
+  }
+}
+
+async function deleteKeycloakUserIfExists(strapi: any, token: string, user: any) {
+  const keycloakUrl = process.env.KEYCLOAK_URL;
+  const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
+  if (!keycloakUrl) return;
+
+  const adminBase = `${keycloakUrl}/admin/realms/${keycloakRealm}`;
+  const existing = await findKeycloakUser(adminBase, token, user);
+  if (!existing?.id) return;
+
+  const res = await fetch(`${adminBase}/users/${existing.id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok && res.status !== 404) {
+    strapi.log.warn(`[helpdesk-users] Keycloak delete failed for ${user.email}: HTTP ${res.status}`);
+  }
+}
+
+async function syncItHelpdeskUsers(strapi: any) {
+  try {
+    const itDepartment = await getDepartmentByKey(strapi, 'IT');
+    const roles = await strapi.entityService.findMany('plugin::users-permissions.role');
+    const memberRole = roles.find((r: any) => r.type === 'member');
+    const authenticatedRole = roles.find((r: any) => r.type === 'authenticated');
+    const roleId = memberRole?.id || authenticatedRole?.id;
+    if (!roleId) {
+      strapi.log.warn('[helpdesk-users] No member/authenticated role found');
+      return;
+    }
+
+    const keycloakToken = await getKeycloakAdminToken(strapi).catch((error: any) => {
+      strapi.log.warn(`[helpdesk-users] Keycloak token error: ${error?.message || error}`);
+      return null;
+    });
+
+    let created = 0;
+    let updated = 0;
+
+    for (const item of itHelpdeskUsers) {
+      const existing = await strapi.entityService.findMany('plugin::users-permissions.user', {
+        filters: { $or: [{ email: item.email }, { username: item.username }] } as any,
+        limit: 1,
+      });
+
+      const userData = {
+        username: item.username,
+        email: item.email,
+        firstName: item.firstName,
+        lastName: item.lastName,
+        password: HELPDESK_USER_PASSWORD,
+        department: itDepartment.id,
+        role: roleId,
+        provider: 'keycloak',
+        confirmed: true,
+        blocked: false,
+        isSuperAdmin: false,
+      };
+
+      if (existing.length === 0) {
+        await strapi.entityService.create('plugin::users-permissions.user', { data: userData });
+        created += 1;
+      } else {
+        await strapi.entityService.update('plugin::users-permissions.user', existing[0].id, {
+          data: userData,
+        });
+        updated += 1;
+      }
+
+      if (keycloakToken) {
+        await ensureKeycloakHelpdeskUser(strapi, keycloakToken, item).catch((error: any) => {
+          strapi.log.warn(`[helpdesk-users] Keycloak sync failed for ${item.email}: ${error?.message || error}`);
+        });
+      }
+    }
+
+    for (const legacy of legacyItHelpdeskUsers) {
+      if (keycloakToken) {
+        await deleteKeycloakUserIfExists(strapi, keycloakToken, legacy).catch((error: any) => {
+          strapi.log.warn(`[helpdesk-users] Keycloak delete failed for ${legacy.email}: ${error?.message || error}`);
+        });
+      }
+
+      const legacyUsers = await strapi.entityService.findMany('plugin::users-permissions.user', {
+        filters: { $or: [{ email: legacy.email }, { username: legacy.username }] } as any,
+        pagination: { pageSize: 10 },
+      });
+
+      for (const user of legacyUsers || []) {
+        try {
+          await strapi.entityService.delete('plugin::users-permissions.user', user.id);
+          strapi.log.info(`[helpdesk-users] Deleted legacy IT user ${legacy.username}`);
+        } catch (error: any) {
+          strapi.log.warn(
+            `[helpdesk-users] Could not delete legacy IT user ${legacy.username}; blocking instead: ${error?.message || error}`
+          );
+          await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+            data: { blocked: true, department: null } as any,
+          });
+        }
+      }
+    }
+
+    strapi.log.info(`[helpdesk-users] IT users synced: +${created} created, ${updated} updated`);
+  } catch (error: any) {
+    strapi.log.warn(`[helpdesk-users] Sync failed: ${error?.message || error}`);
+  }
+}
+
 function protocolDepartmentDefaults(dept: any) {
   return {
     key: dept.key,
@@ -746,7 +961,12 @@ async function findKeycloakUser(adminBase: string, token: string, user: any) {
   return Array.isArray(items) ? items[0] : null;
 }
 
-async function setKeycloakPassword(adminBase: string, token: string, userId: string) {
+async function setKeycloakPassword(
+  adminBase: string,
+  token: string,
+  userId: string,
+  password = PROTOCOL_USER_PASSWORD
+) {
   await fetch(`${adminBase}/users/${userId}/reset-password`, {
     method: 'PUT',
     headers: {
@@ -755,7 +975,7 @@ async function setKeycloakPassword(adminBase: string, token: string, userId: str
     },
     body: JSON.stringify({
       type: 'password',
-      value: PROTOCOL_USER_PASSWORD,
+      value: password,
       temporary: false,
     }),
   });
