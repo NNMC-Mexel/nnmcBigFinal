@@ -43,7 +43,18 @@ export default ({ env }) => {
     },
     'strapi::poweredBy',
     'strapi::query',
-    'strapi::body',
+    {
+      name: 'strapi::body',
+      config: {
+        formLimit: '256mb',
+        jsonLimit: '20mb',
+        textLimit: '20mb',
+        formidable: {
+          maxFileSize: 250 * 1024 * 1024,
+          multiples: true,
+        },
+      },
+    },
     {
       name: 'strapi::session',
       config: {

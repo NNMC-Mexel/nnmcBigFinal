@@ -128,7 +128,7 @@ export default function PublicTicketPage() {
       setTicketNumber(result.ticketNumber);
       setSubmitted(true);
     } catch (err: any) {
-      setError(err.response?.data?.error?.message || t('helpdesk.submitError', 'Не удалось отправить заявку'));
+      setError(err.response?.data?.error?.message || err.message || t('helpdesk.submitError', 'Не удалось отправить заявку'));
     } finally {
       setSubmitting(false);
     }
@@ -369,7 +369,7 @@ export default function PublicTicketPage() {
                 <input
                   type="file"
                   multiple
-                  accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
+                  accept="image/*,video/*,.jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov,.avi,.mkv,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
                   className="hidden"
                   onChange={(e) => {
                     handleAttachmentChange(e.target.files);

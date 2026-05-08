@@ -124,16 +124,11 @@ export const ticketsApi = {
       return ticketsApi.submit(data);
     }
 
-    const formData = new FormData();
-    Object.entries(data).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        formData.append(key, String(value));
-      }
+    const attachmentIds = await ticketsApi.uploadAttachments(files);
+    return ticketsApi.submit({
+      ...data,
+      attachments: attachmentIds,
     });
-    files.forEach((file) => formData.append('files', file));
-
-    const response = await client.post('/tickets/submit', formData);
-    return response.data.data;
   },
 
   uploadAttachments: async (files: File[]): Promise<number[]> => {
@@ -142,9 +137,21 @@ export const ticketsApi = {
     for (const file of files) {
       const formData = new FormData();
       formData.append('files', file);
-      const response = await client.post('/tickets/attachments/upload', formData);
-      const uploaded = Array.isArray(response.data?.data) ? response.data.data : response.data?.data ? [response.data.data] : [];
-      ids.push(...uploaded.map((item: any) => Number(item.id)).filter(Boolean));
+      const response = await client.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const uploaded = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response.data?.data)
+        ? response.data.data
+        : response.data?.data
+        ? [response.data.data]
+        : [];
+      const uploadedIds = uploaded.map((item: any) => Number(item.id)).filter(Boolean);
+      if (uploadedIds.length === 0) {
+        throw new Error(`Не удалось загрузить файл: ${file.name}`);
+      }
+      ids.push(...uploadedIds);
     }
     return ids;
   },
