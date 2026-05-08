@@ -81,6 +81,7 @@ export interface MediaFile {
 export interface AssignableUser {
   id: number;
   username: string;
+  email?: string;
   firstName?: string;
   lastName?: string;
   department?: Department | null;
@@ -214,10 +215,13 @@ export interface Ticket {
   requesterName: string;
   requesterPhone?: string;
   requesterDepartment: string;
+  requester?: User | null;
   comment: string;
   status: 'NEW' | 'IN_PROGRESS' | 'DONE' | 'INVALID';
   complexity?: 'A' | 'B' | 'C' | 'D';
   staffComment?: string;
+  completedAt?: string | null;
+  completedBy?: User | null;
   category?: TicketCategory;
   serviceGroup?: ServiceGroup;
   assignee?: User[];

@@ -99,6 +99,13 @@ export async function publishNotificationState(strapi: any, userId: number, type
   sockets.forEach((socket) => send(socket, { type, unreadCount }));
 }
 
+export async function publishToUser(strapi: any, userId: number, payload: any) {
+  const sockets = clientsByUser.get(Number(userId));
+  if (!sockets || sockets.size === 0) return;
+  const unreadCount = await getUnreadCount(strapi, Number(userId));
+  sockets.forEach((socket) => send(socket, { ...payload, unreadCount }));
+}
+
 export async function publishNotificationCreated(strapi: any, userId: number, notification: any) {
   const sockets = clientsByUser.get(Number(userId));
   if (!sockets || sockets.size === 0) return;

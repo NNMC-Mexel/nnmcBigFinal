@@ -2,6 +2,10 @@ type NotificationRealtimePayload = {
   type: string;
   unreadCount?: number;
   notification?: unknown;
+  ticketId?: number | null;
+  ticketDocumentId?: string | null;
+  ticketNumber?: string | null;
+  status?: string | null;
 };
 
 type Listener = (payload: NotificationRealtimePayload) => void;

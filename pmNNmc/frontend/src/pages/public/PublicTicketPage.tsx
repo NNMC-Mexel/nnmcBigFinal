@@ -15,6 +15,32 @@ import type { ServiceGroup } from '../../types';
 import LanguageSwitcher from '../../components/ui/LanguageSwitcher';
 import { useAuthStore } from '../../store/authStore';
 
+function formatKazakhstanPhoneInput(value: string) {
+  let digits = value.replace(/\D/g, '');
+  if (digits.startsWith('8')) digits = `7${digits.slice(1)}`;
+  if (!digits.startsWith('7')) digits = `7${digits}`;
+  digits = digits.slice(0, 11);
+  const local = digits.slice(1);
+  const p1 = local.slice(0, 3);
+  const p2 = local.slice(3, 6);
+  const p3 = local.slice(6, 8);
+  const p4 = local.slice(8, 10);
+
+  let result = '+7';
+  if (p1) result += ` (${p1}`;
+  if (p1.length === 3) result += ')';
+  if (p2) result += ` ${p2}`;
+  if (p3) result += `-${p3}`;
+  if (p4) result += `-${p4}`;
+  return result;
+}
+
+function normalizeKazakhstanPhone(value: string) {
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('7')) return `+${digits}`;
+  return null;
+}
+
 export default function PublicTicketPage() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language === 'kz' ? 'kz' : 'ru';
@@ -75,23 +101,27 @@ export default function PublicTicketPage() {
 
   const selectedGroup = serviceGroups.find((sg) => sg.id === selectedGroupId);
   const selectedCategory = selectedGroup?.categories?.find((c) => c.id === selectedCategoryId);
+  const normalizedPhone = normalizeKazakhstanPhone(form.requesterPhone);
+  const phoneError = form.requesterPhone.trim() && !normalizedPhone;
 
-  const canSubmit =
+  const canSubmit = Boolean(
     profileName.trim() &&
     profileDepartment.trim() &&
+    normalizedPhone &&
     form.comment.trim() &&
-    selectedGroupId;
+    selectedGroupId
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit || !selectedGroupId) return;
+    if (!canSubmit || !selectedGroupId || !normalizedPhone) return;
 
     setSubmitting(true);
     setError(null);
     try {
       const attachmentIds = await ticketsApi.uploadAttachments(attachmentFiles);
       const result = await ticketsApi.submit({
-        requesterPhone: form.requesterPhone.trim() || undefined,
+        requesterPhone: normalizedPhone,
         comment: form.comment.trim(),
         serviceGroupId: selectedGroupId,
         categoryId: selectedCategoryId || undefined,
@@ -272,10 +302,19 @@ export default function PublicTicketPage() {
               <input
                 type="tel"
                 value={form.requesterPhone}
-                onChange={(e) => setForm({ ...form, requesterPhone: e.target.value })}
-                placeholder="777 777 77 77"
-                className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                onChange={(e) => setForm({ ...form, requesterPhone: formatKazakhstanPhoneInput(e.target.value) })}
+                placeholder="+7 (7__) ___-__-__"
+                required
+                inputMode="tel"
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${
+                  phoneError ? 'border-red-300 bg-red-50' : 'border-slate-300'
+                }`}
               />
+              {phoneError ? (
+                <p className="mt-1 text-xs text-red-600">Введите казахстанский номер в формате +7 (7XX) XXX-XX-XX</p>
+              ) : (
+                <p className="mt-1 text-xs text-slate-400">Формат: +7 (7XX) XXX-XX-XX</p>
+              )}
             </div>
 
             <div>

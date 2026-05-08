@@ -12,12 +12,15 @@ import {
   Clock,
   Loader2,
   Paperclip,
+  CheckCircle2,
 } from 'lucide-react';
 import { useTicketStore } from '../../store/ticketStore';
+import { useAuthStore, useUserRole } from '../../store/authStore';
 import TicketStatusBadge from '../../components/tickets/TicketStatusBadge';
 import ReassignModal from '../../components/tickets/ReassignModal';
 import Loader from '../../components/ui/Loader';
 import { getMediaUrl } from '../../utils/media';
+import { subscribeToNotificationRealtime } from '../../api/notificationRealtime';
 
 const STATUSES = ['NEW', 'IN_PROGRESS', 'DONE', 'INVALID'] as const;
 const COMPLEXITIES = ['A', 'B', 'C', 'D'] as const;
@@ -27,6 +30,8 @@ export default function TicketDetailPage() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const lang = i18n.language === 'kz' ? 'kz' : 'ru';
+  const currentUser = useAuthStore((state) => state.user);
+  const { isSuperAdmin } = useUserRole();
 
   const {
     selectedTicket,
@@ -55,6 +60,15 @@ export default function TicketDetailPage() {
   }, [id]);
 
   useEffect(() => {
+    if (!id) return undefined;
+    return subscribeToNotificationRealtime((payload) => {
+      if (!payload.type?.startsWith('tickets:')) return;
+      if (payload.ticketDocumentId && payload.ticketDocumentId !== id) return;
+      fetchTicket(id);
+    });
+  }, [id, fetchTicket]);
+
+  useEffect(() => {
     if (selectedTicket) {
       setEditStatus(selectedTicket.status);
       setEditComplexity(selectedTicket.complexity || '');
@@ -63,7 +77,7 @@ export default function TicketDetailPage() {
   }, [selectedTicket]);
 
   const handleSave = async () => {
-    if (!selectedTicket) return;
+    if (!selectedTicket || !canEditTicket) return;
     setSaving(true);
     try {
       await updateTicket(selectedTicket.documentId, {
@@ -133,6 +147,15 @@ export default function TicketDetailPage() {
     assignee.firstName || assignee.lastName
       ? `${assignee.lastName || ''} ${assignee.firstName || ''}`.trim()
       : assignee.username;
+  const getUserName = (user: any) =>
+    user?.firstName || user?.lastName
+      ? `${user.lastName || ''} ${user.firstName || ''}`.trim()
+      : user?.username || user?.email || '-';
+  const isAssignedToMe = assignees.some((a) => Number(a.id) === Number(currentUser?.id));
+  const isKuat =
+    currentUser?.username?.toLowerCase() === 'kuat' ||
+    currentUser?.email?.toLowerCase() === 'kuat@nnmc.kz';
+  const canEditTicket = Boolean(isSuperAdmin || isAssignedToMe || isKuat);
 
   const hasChanges =
     editStatus !== ticket.status ||
@@ -145,7 +168,7 @@ export default function TicketDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/app/helpdesk')}
+            onClick={() => navigate(-1)}
             className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -163,6 +186,7 @@ export default function TicketDetailPage() {
           </div>
         </div>
 
+        {canEditTicket && (
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowReassign(true)}
@@ -184,6 +208,7 @@ export default function TicketDetailPage() {
             {t('common.save', 'Сохранить')}
           </button>
         </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -271,13 +296,19 @@ export default function TicketDetailPage() {
             <h2 className="text-lg font-semibold text-slate-800 mb-3">
               {t('helpdesk.staffComment', 'Комментарий специалиста')}
             </h2>
-            <textarea
-              value={editStaffComment}
-              onChange={(e) => setEditStaffComment(e.target.value)}
-              placeholder={t('helpdesk.staffCommentPlaceholder', 'Добавьте комментарий...')}
-              rows={4}
-              className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
-            />
+            {canEditTicket ? (
+              <textarea
+                value={editStaffComment}
+                onChange={(e) => setEditStaffComment(e.target.value)}
+                placeholder={t('helpdesk.staffCommentPlaceholder', 'Добавьте комментарий...')}
+                rows={4}
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
+              />
+            ) : (
+              <div className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap">
+                {ticket.staffComment || 'Комментарий пока не добавлен'}
+              </div>
+            )}
           </div>
         </div>
 
@@ -288,26 +319,42 @@ export default function TicketDetailPage() {
             <h3 className="text-sm font-semibold text-slate-800 mb-3">
               {t('helpdesk.status', 'Статус')}
             </h3>
-            <div className="space-y-2">
-              {STATUSES.map((s) => (
-                <label
-                  key={s}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                    editStatus === s ? 'bg-cyan-50 border border-cyan-200' : 'hover:bg-slate-50'
+            {canEditTicket ? (
+              <div className="space-y-2">
+                {STATUSES.filter((s) => s !== 'DONE').map((s) => (
+                  <label
+                    key={s}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                      editStatus === s ? 'bg-cyan-50 border border-cyan-200' : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="status"
+                      value={s}
+                      checked={editStatus === s}
+                      onChange={() => setEditStatus(s)}
+                      className="w-4 h-4 text-cyan-600 border-slate-300 focus:outline-none focus:ring-0 focus-visible:ring-0"
+                    />
+                    <TicketStatusBadge status={s} />
+                  </label>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setEditStatus('DONE')}
+                  className={`mt-3 w-full rounded-xl px-4 py-4 text-base font-semibold transition-colors flex items-center justify-center gap-2 ${
+                    editStatus === 'DONE'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
                   }`}
                 >
-                  <input
-                    type="radio"
-                    name="status"
-                    value={s}
-                    checked={editStatus === s}
-                    onChange={() => setEditStatus(s)}
-                    className="w-4 h-4 text-cyan-600 border-slate-300 focus:outline-none focus:ring-0 focus-visible:ring-0"
-                  />
-                  <TicketStatusBadge status={s} />
-                </label>
-              ))}
-            </div>
+                  <CheckCircle2 className="w-5 h-5" />
+                  Выполнено
+                </button>
+              </div>
+            ) : (
+              <TicketStatusBadge status={ticket.status} />
+            )}
           </div>
 
           {/* Complexity */}
@@ -319,11 +366,14 @@ export default function TicketDetailPage() {
               {COMPLEXITIES.map((c) => (
                 <button
                   key={c}
-                  onClick={() => setEditComplexity(editComplexity === c ? '' : c)}
+                  disabled={!canEditTicket}
+                  onClick={() => canEditTicket && setEditComplexity(editComplexity === c ? '' : c)}
                   className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
                     editComplexity === c
                       ? 'bg-cyan-600 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      : canEditTicket
+                      ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                   }`}
                 >
                   {c}
@@ -364,12 +414,14 @@ export default function TicketDetailPage() {
                 )}
               </div>
             </div>
-            <button
-              onClick={() => setShowReassign(true)}
-              className="mt-3 w-full py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
-            >
-              {t('helpdesk.changeAssignee', 'Сменить исполнителя')}
-            </button>
+            {canEditTicket && (
+              <button
+                onClick={() => setShowReassign(true)}
+                className="mt-3 w-full py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                {t('helpdesk.changeAssignee', 'Сменить исполнителя')}
+              </button>
+            )}
           </div>
 
           {/* Info */}
@@ -386,6 +438,18 @@ export default function TicketDetailPage() {
                 <Tag className="w-4 h-4" />
                 <span>{t('helpdesk.serviceGroup', 'Служба')}: {getServiceGroupName()}</span>
               </div>
+              {ticket.completedAt && (
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Выполнено: {formatDate(ticket.completedAt)}</span>
+                </div>
+              )}
+              {ticket.completedBy && (
+                <div className="flex items-center gap-2 text-slate-600">
+                  <UserPlus className="w-4 h-4" />
+                  <span>Закрыл: {getUserName(ticket.completedBy)}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

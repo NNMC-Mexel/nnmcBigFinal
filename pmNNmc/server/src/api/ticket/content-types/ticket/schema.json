@@ -28,6 +28,11 @@
       "type": "string",
       "required": true
     },
+    "requester": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
     "comment": {
       "type": "text",
       "required": true
@@ -44,6 +49,14 @@
     },
     "staffComment": {
       "type": "text"
+    },
+    "completedAt": {
+      "type": "datetime"
+    },
+    "completedBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
     },
     "attachments": {
       "type": "media",

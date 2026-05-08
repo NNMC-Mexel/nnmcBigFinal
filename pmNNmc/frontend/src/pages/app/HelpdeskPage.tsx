@@ -3,18 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Headphones, RefreshCw, ExternalLink } from 'lucide-react';
 import { useTicketStore } from '../../store/ticketStore';
-import { useUserRole } from '../../store/authStore';
+import { useAuthStore, useUserRole } from '../../store/authStore';
 import TicketStatusBadge from '../../components/tickets/TicketStatusBadge';
 import TicketFilters from '../../components/tickets/TicketFilters';
 import Loader from '../../components/ui/Loader';
+import { subscribeToNotificationRealtime } from '../../api/notificationRealtime';
 
 export default function HelpdeskPage() {
   const PAGE_SIZE = 10;
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const lang = i18n.language === 'kz' ? 'kz' : 'ru';
-  const { isLead, isAdmin, isSuperAdmin } = useUserRole();
-  const canFilterByAssignee = isLead || isAdmin || isSuperAdmin;
+  const currentUser = useAuthStore((state) => state.user);
+  const { isSuperAdmin } = useUserRole();
+  const isKuat =
+    currentUser?.username?.toLowerCase() === 'kuat' ||
+    currentUser?.email?.toLowerCase() === 'kuat@nnmc.kz';
+  const canFilterByAssignee = isSuperAdmin || isKuat;
 
   const { tickets, total, isLoading, error, fetchTickets, setFilters, filters, assignableUsers, fetchAssignableUsers } = useTicketStore();
 
@@ -47,6 +52,13 @@ export default function HelpdeskPage() {
       fetchAssignableUsers();
     }
   }, []);
+
+  useEffect(() => {
+    return subscribeToNotificationRealtime((payload) => {
+      if (!payload.type?.startsWith('tickets:')) return;
+      doFetch(statusFilter, searchFilter, assigneeFilter, myTicketsOnly, currentPage);
+    });
+  }, [doFetch, statusFilter, searchFilter, assigneeFilter, myTicketsOnly, currentPage]);
 
   const handleStatusChange = (status: string) => {
     setStatusFilter(status);
@@ -130,6 +142,11 @@ export default function HelpdeskPage() {
       )
       .join(', ');
   };
+
+  const getUserName = (user: any) =>
+    user?.firstName || user?.lastName
+      ? `${user.lastName || ''} ${user.firstName || ''}`.trim()
+      : user?.username || user?.email || '-';
 
   return (
     <div className="space-y-6">
@@ -219,6 +236,9 @@ export default function HelpdeskPage() {
                       {t('helpdesk.assignee', 'Исполнитель')}
                     </th>
                     <th className="text-left px-4 py-3 font-medium text-slate-600">
+                      Закрыл
+                    </th>
+                    <th className="text-left px-4 py-3 font-medium text-slate-600">
                       {t('helpdesk.createdAt', 'Дата')}
                     </th>
                   </tr>
@@ -240,6 +260,16 @@ export default function HelpdeskPage() {
                         <TicketStatusBadge status={ticket.status} />
                       </td>
                       <td className="px-4 py-3 text-slate-600">{getAssigneeName(ticket)}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {ticket.completedBy ? (
+                          <div>
+                            <div>{getUserName(ticket.completedBy)}</div>
+                            <div className="text-xs text-slate-400">{formatDate(ticket.completedAt || ticket.updatedAt)}</div>
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-slate-500 text-xs">
                         {formatDate(ticket.createdAt)}
                       </td>

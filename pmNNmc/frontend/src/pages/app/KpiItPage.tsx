@@ -184,7 +184,7 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
     const avgDoneMinutes =
       done.length > 0
         ? Math.round(
-            done.reduce((sum, t) => sum + toMinutesDiff(t.createdAt, t.updatedAt), 0) / done.length
+            done.reduce((sum, t) => sum + toMinutesDiff(t.createdAt, t.completedAt || t.updatedAt), 0) / done.length
           )
         : 0;
     return { done: done.length, inProgress, newly, invalid, avgDoneMinutes };
@@ -217,14 +217,14 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
       ['Таблица заявок'],
       ['Сотрудник', 'Номер', 'Заявитель', 'Отдел', 'Создано', 'Обновлено', 'Статус', 'Время (мин)', 'Время (формат)'],
       ...filtered.map((ticket) => {
-        const actual = toMinutesDiff(ticket.createdAt, ticket.updatedAt);
+        const actual = toMinutesDiff(ticket.createdAt, ticket.completedAt || ticket.updatedAt);
         return [
           selectedUser ? toUserName(selectedUser) : '',
           ticket.ticketNumber,
           ticket.requesterName,
           ticket.requesterDepartment,
           formatDateTime(ticket.createdAt),
-          formatDateTime(ticket.updatedAt),
+          formatDateTime(ticket.completedAt || ticket.updatedAt),
           statusRu[ticket.status] || ticket.status,
           String(actual),
           formatDuration(actual),
@@ -388,7 +388,7 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
               </thead>
               <tbody>
                 {filtered.map((ticket) => {
-                  const actual = toMinutesDiff(ticket.createdAt, ticket.updatedAt);
+                  const actual = toMinutesDiff(ticket.createdAt, ticket.completedAt || ticket.updatedAt);
                   const kpi = getKpiState(ticket.status);
 
                   return (
@@ -400,7 +400,7 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
                       <td className="px-4 py-3 text-slate-800">{selectedUser ? toUserName(selectedUser) : '-'}</td>
                       <td className="px-4 py-3 text-slate-700">{ticket.ticketNumber}</td>
                       <td className="px-4 py-3 text-slate-600">{ticket.createdAt ? new Date(ticket.createdAt).toLocaleString('ru-RU') : '-'}</td>
-                      <td className="px-4 py-3 text-slate-600">{ticket.updatedAt ? new Date(ticket.updatedAt).toLocaleString('ru-RU') : '-'}</td>
+                      <td className="px-4 py-3 text-slate-600">{ticket.completedAt || ticket.updatedAt ? new Date(ticket.completedAt || ticket.updatedAt || '').toLocaleString('ru-RU') : '-'}</td>
                       <td className="px-4 py-3">
                         <div className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
                           {formatDuration(actual)}
@@ -454,7 +454,7 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
                 </p>
                 <p className="text-sm text-slate-500 mt-4">Дата обновления</p>
                 <p className="text-lg text-slate-800">
-                  {selectedTicket.updatedAt ? new Date(selectedTicket.updatedAt).toLocaleString('ru-RU') : 'N/A'}
+                  {selectedTicket.completedAt || selectedTicket.updatedAt ? new Date(selectedTicket.completedAt || selectedTicket.updatedAt || '').toLocaleString('ru-RU') : 'N/A'}
                 </p>
               </div>
             </div>

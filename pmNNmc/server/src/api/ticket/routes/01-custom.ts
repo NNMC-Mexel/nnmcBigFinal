@@ -9,6 +9,14 @@ export default {
       },
     },
     {
+      method: 'GET',
+      path: '/tickets/my-requests',
+      handler: 'ticket.myRequests',
+      config: {
+        policies: [{ name: 'global::feature-access', config: { feature: 'helpdesk' } }],
+      },
+    },
+    {
       method: 'POST',
       path: '/tickets/submit',
       handler: 'ticket.submit',

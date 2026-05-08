@@ -20,6 +20,7 @@ import {
     FileSignature,
     Building2,
     Briefcase,
+    ClipboardList,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuthStore, useUserRole } from "../store/authStore";
@@ -49,6 +50,7 @@ export default function AppLayout() {
         canAccessSigndoc,
         canManageNews,
         canViewActivityLog,
+        departmentKey,
     } = useUserRole();
 
     const handleLogout = () => {
@@ -104,12 +106,25 @@ export default function AppLayout() {
         canViewTable ? { to: "/app/table", icon: Table, label: t("nav.table"), iconColor: "text-cyan-500", activeBg: "bg-cyan-50", activeText: "text-cyan-700" } : null,
     ].filter(Boolean) as Array<{ to: string; icon: typeof LayoutDashboard; label: string; iconColor: string; activeBg: string; activeText: string }>;
 
+    const isHelpdeskWorker =
+        isSuperAdmin || ["IT", "MEDICAL_EQUIPMENT", "ENGINEERING"].includes(departmentKey || "");
+
     const helpdeskNavItems = [
-        canViewHelpdesk
+        canViewHelpdesk && isHelpdeskWorker
             ? {
                   to: "/app/helpdesk",
                   icon: Headphones,
                   label: t("nav.helpdesk", "Заявки"),
+                  iconColor: "text-emerald-500",
+                  activeBg: "bg-emerald-50",
+                  activeText: "text-emerald-700",
+              }
+            : null,
+        canViewHelpdesk && !isHelpdeskWorker
+            ? {
+                  to: "/app/my-requests",
+                  icon: ClipboardList,
+                  label: "Мои запросы",
                   iconColor: "text-emerald-500",
                   activeBg: "bg-emerald-50",
                   activeText: "text-emerald-700",

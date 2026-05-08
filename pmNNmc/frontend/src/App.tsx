@@ -30,6 +30,7 @@ const ProfilePage = lazy(() => import('./pages/app/ProfilePage'));
 const NotificationsPage = lazy(() => import('./pages/app/NotificationsPage'));
 const AdminPanelPage = lazy(() => import('./pages/app/AdminPanelPage'));
 const HelpdeskPage = lazy(() => import('./pages/app/HelpdeskPage'));
+const MyRequestsPage = lazy(() => import('./pages/app/MyRequestsPage'));
 const TicketDetailPage = lazy(() => import('./pages/app/TicketDetailPage'));
 const KpiItPage = lazy(() => import('./pages/app/KpiItPage'));
 const KpiTimesheetPage = lazy(() => import('./pages/app/KpiTimesheetPage'));
@@ -262,15 +263,21 @@ function App() {
           }
         />
         <Route
-          path="helpdesk/:id"
+          path="my-requests"
           element={
-            <FeatureRoute allow={canViewHelpdesk}>{withSuspense(<TicketDetailPage />)}</FeatureRoute>
+            <FeatureRoute allow={canViewHelpdesk}>{withSuspense(<MyRequestsPage />)}</FeatureRoute>
           }
         />
         <Route
           path="helpdesk/submit"
           element={
             <FeatureRoute allow={canViewHelpdesk}>{withSuspense(<PublicTicketPage />)}</FeatureRoute>
+          }
+        />
+        <Route
+          path="helpdesk/:id"
+          element={
+            <FeatureRoute allow={canViewHelpdesk}>{withSuspense(<TicketDetailPage />)}</FeatureRoute>
           }
         />
         <Route

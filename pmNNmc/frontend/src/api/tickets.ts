@@ -7,6 +7,7 @@ export interface TicketFilters {
   categoryId?: number;
   assigneeId?: number;
   myTickets?: boolean;
+  submittedByMe?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -34,8 +35,29 @@ export const ticketsApi = {
     if (filters?.myTickets !== undefined) {
       params.myTickets = filters.myTickets;
     }
+    if (filters?.submittedByMe !== undefined) {
+      params.submittedByMe = filters.submittedByMe;
+    }
 
     const response = await client.get('/tickets/list', { params });
+    return {
+      data: response.data.data || [],
+      total: response.data.meta?.pagination?.total || 0,
+    };
+  },
+
+  getMyRequests: async (filters?: TicketFilters): Promise<{ data: Ticket[]; total: number }> => {
+    const params: Record<string, any> = {
+      page: filters?.page || 1,
+      pageSize: filters?.pageSize || 100,
+    };
+    if (filters?.status && filters.status !== 'ALL') {
+      params.status = filters.status;
+    }
+    if (filters?.search) {
+      params.search = filters.search;
+    }
+    const response = await client.get('/tickets/my-requests', { params });
     return {
       data: response.data.data || [],
       total: response.data.meta?.pagination?.total || 0,
@@ -89,12 +111,14 @@ export const ticketsApi = {
 
   uploadAttachments: async (files: File[]): Promise<number[]> => {
     if (files.length === 0) return [];
-    const formData = new FormData();
-    files.forEach((file) => formData.append('files', file));
-    const response = await client.post('/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    const uploaded = Array.isArray(response.data) ? response.data : [response.data];
-    return uploaded.map((file: any) => Number(file.id)).filter(Boolean);
+    const ids: number[] = [];
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append('files', file);
+      const response = await client.post('/upload', formData);
+      const uploaded = Array.isArray(response.data) ? response.data : [response.data];
+      ids.push(...uploaded.map((item: any) => Number(item.id)).filter(Boolean));
+    }
+    return ids;
   },
 };

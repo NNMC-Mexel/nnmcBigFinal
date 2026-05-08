@@ -19,6 +19,14 @@ client.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  if (config.data instanceof FormData) {
+    const headers = config.headers as any;
+    if (typeof headers?.delete === 'function') {
+      headers.delete('Content-Type');
+    } else if (headers) {
+      delete headers['Content-Type'];
+    }
+  }
   return config;
 });
 

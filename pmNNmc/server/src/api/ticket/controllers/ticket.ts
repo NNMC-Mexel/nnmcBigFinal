@@ -1,8 +1,9 @@
 import { factories } from '@strapi/strapi';
 import { getUserFlags } from '../../../utils/project-assignments';
-import { publishNotificationCreated } from '../../../utils/notification-realtime';
+import { publishNotificationCreated, publishToUser } from '../../../utils/notification-realtime';
 
 const TICKET_UID = 'api::ticket.ticket';
+const HELP_SERVICE_DEPARTMENT_KEYS = ['IT', 'MEDICAL_EQUIPMENT', 'ENGINEERING'];
 
 function extractRelationId(relation: any): number | null {
   if (!relation) return null;
@@ -47,6 +48,89 @@ function getUserDisplayName(user: any): string {
   );
 }
 
+function isKuatHelpdeskHead(user: any): boolean {
+  const username = String(user?.username || '').toLowerCase();
+  const email = String(user?.email || '').toLowerCase();
+  return username === 'kuat' || email === 'kuat@nnmc.kz';
+}
+
+function normalizeKazakhstanPhone(value: any): string | null {
+  const digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('7')) return `+${digits}`;
+  if (digits.length === 10 && digits.startsWith('7')) return `+7${digits}`;
+  return null;
+}
+
+function formatUserForClient(user: any) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    department: user.department
+      ? {
+          id: user.department.id,
+          key: user.department.key,
+          name_ru: user.department.name_ru,
+          name_kz: user.department.name_kz,
+        }
+      : null,
+  };
+}
+
+function getTicketUserIds(ticket: any): number[] {
+  return Array.from(
+    new Set([
+      ...extractRelationIds(ticket?.assignee),
+      ...extractRelationIds(ticket?.requester),
+    ])
+  );
+}
+
+async function publishTicketRealtime(strapi: any, ticket: any, type = 'tickets:updated') {
+  const userIds = getTicketUserIds(ticket);
+  await Promise.all(
+    userIds.map((userId) =>
+      publishToUser(strapi, userId, {
+        type,
+        ticketId: ticket?.id || null,
+        ticketDocumentId: ticket?.documentId || null,
+        ticketNumber: ticket?.ticketNumber || null,
+        status: ticket?.status || null,
+      })
+    )
+  );
+}
+
+function userCanManageTicket(userWithDept: any, ticket: any, isSuperAdmin: boolean): boolean {
+  if (isSuperAdmin || isKuatHelpdeskHead(userWithDept)) return true;
+  const userId = Number(userWithDept?.id);
+  const assigneeIds = extractRelationIds(ticket?.assignee);
+
+  if (assigneeIds.includes(userId)) return true;
+
+  return false;
+}
+
+function userCanViewTicket(userWithDept: any, ticket: any, isSuperAdmin: boolean): boolean {
+  if (userCanManageTicket(userWithDept, ticket, isSuperAdmin)) return true;
+  const userId = Number(userWithDept?.id);
+  const requesterIds = extractRelationIds(ticket?.requester);
+  return requesterIds.includes(userId);
+}
+
+async function getTicketByDocumentId(strapi: any, documentId: string) {
+  const tickets = (await strapi.entityService.findMany('api::ticket.ticket', {
+    filters: { documentId } as any,
+    populate: ['category', 'serviceGroup', 'serviceGroup.department', 'assignee', 'assignee.department', 'attachments', 'requester', 'completedBy'] as any,
+    limit: 1,
+  })) as any[];
+
+  return tickets?.[0] || null;
+}
+
 function normalizeFileIds(input: any): number[] {
   const raw = Array.isArray(input) ? input : input ? [input] : [];
   return Array.from(
@@ -81,7 +165,7 @@ async function attachTicketFiles(strapi: any, ticketId: number, fileIds: number[
 async function notifyTicketAssignees(strapi: any, ticketId: number) {
   try {
     const ticket = (await strapi.entityService.findOne('api::ticket.ticket', ticketId, {
-      populate: ['assignee', 'category', 'serviceGroup'],
+      populate: ['assignee', 'category', 'serviceGroup', 'requester'],
     })) as any;
     if (!ticket) return null;
 
@@ -115,6 +199,7 @@ async function notifyTicketAssignees(strapi: any, ticketId: number) {
         publishNotificationCreated(strapi, Number(assigneeIds[index]), notification)
       )
     );
+    await publishTicketRealtime(strapi, ticket, 'tickets:new');
 
     return ticket;
   } catch (error: any) {
@@ -145,8 +230,17 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
         result.push({
           id: assigneeId,
           username: assignee.username,
+          email: assignee.email,
           firstName: assignee.firstName,
           lastName: assignee.lastName,
+          department: assignee.department
+            ? {
+                id: assignee.department.id,
+                key: assignee.department.key,
+                name_ru: assignee.department.name_ru,
+                name_kz: assignee.department.name_kz,
+              }
+            : null,
         });
         continue;
       }
@@ -155,7 +249,8 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
         'plugin::users-permissions.user',
         assigneeId,
         {
-          fields: ['id', 'username', 'firstName', 'lastName'],
+          fields: ['id', 'username', 'email', 'firstName', 'lastName'],
+          populate: ['department'],
         }
       )) as any;
 
@@ -163,8 +258,17 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
         result.push({
           id: fullUser.id,
           username: fullUser.username,
+          email: fullUser.email,
           firstName: fullUser.firstName,
           lastName: fullUser.lastName,
+          department: fullUser.department
+            ? {
+                id: fullUser.department.id,
+                key: fullUser.department.key,
+                name_ru: fullUser.department.name_ru,
+                name_kz: fullUser.department.name_kz,
+              }
+            : null,
         });
       }
     }
@@ -177,6 +281,8 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     return {
       ...ticket,
       assignee: await (this as any).formatAssigneesForClient(ticket.assignee),
+      requester: formatUserForClient(ticket.requester),
+      completedBy: formatUserForClient(ticket.completedBy),
     };
   },
 
@@ -190,7 +296,9 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
 
     const query = ctx.query as any;
     const myTicketsOnly = query.myTickets === 'true' || query.myTickets === true;
+    const submittedByMe = query.submittedByMe === 'true' || query.submittedByMe === true;
     const assigneeId = query.assigneeId ? parseInt(query.assigneeId) : undefined;
+    const categoryId = query.categoryId ? parseInt(query.categoryId) : undefined;
     const status = query.status as string | undefined;
     const search = query.search as string | undefined;
     const page = parseInt(query.page) || 1;
@@ -204,23 +312,44 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
 
     const { isSuperAdmin } = getUserFlags(userWithDept);
     const dept = userWithDept?.department;
-    const canManageTickets = isSuperAdmin || dept?.canManageTickets === true;
+    const isHelpdeskHead = isKuatHelpdeskHead(userWithDept);
 
-    const filters: any = {};
+    const andFilters: any[] = [];
 
     if (status && status !== 'ALL') {
-      filters.status = status;
+      andFilters.push({ status });
     }
 
     if (search) {
-      filters.$or = [
-        { requesterName: { $containsi: search } },
-        { ticketNumber: { $containsi: search } },
-        { requesterDepartment: { $containsi: search } },
-      ];
+      andFilters.push({
+        $or: [
+          { requesterName: { $containsi: search } },
+          { ticketNumber: { $containsi: search } },
+          { requesterDepartment: { $containsi: search } },
+        ],
+      });
     }
 
-    if (!isSuperAdmin) {
+    if (categoryId) {
+      andFilters.push({ category: { id: categoryId } });
+    }
+
+    if (submittedByMe) {
+      andFilters.push({ requester: { id: user.id } });
+    } else if (isSuperAdmin || isHelpdeskHead) {
+      andFilters.push({
+        serviceGroup: {
+          department: {
+            key: { $in: HELP_SERVICE_DEPARTMENT_KEYS },
+          },
+        },
+      });
+      if (myTicketsOnly) {
+        andFilters.push({ assignee: { id: user.id } });
+      } else if (assigneeId) {
+        andFilters.push({ assignee: { id: assigneeId } });
+      }
+    } else {
       const deptKey = dept?.key;
 
       if (!deptKey) {
@@ -228,43 +357,15 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
         return;
       }
 
-      const serviceGroups = (await strapi.entityService.findMany(
-        'api::service-group.service-group',
-        {
-          filters: { department: { key: deptKey } } as any,
-          populate: ['department'],
-        }
-      )) as any[];
-
-      if (!serviceGroups || serviceGroups.length === 0) {
-        ctx.body = { data: [], meta: { pagination: { total: 0, page: 1, pageSize, pageCount: 0 } } };
-        return;
-      }
-
-      const sgIds = serviceGroups.map((sg: any) => sg.id);
-      filters.serviceGroup = { id: { $in: sgIds } };
-
-      if (!canManageTickets) {
-        filters.assignee = { id: user.id };
-      } else {
-        if (myTicketsOnly) {
-          filters.assignee = { id: user.id };
-        } else if (assigneeId) {
-          filters.assignee = { id: assigneeId };
-        }
-      }
-    } else {
-      if (myTicketsOnly) {
-        filters.assignee = { id: user.id };
-      } else if (assigneeId) {
-        filters.assignee = { id: assigneeId };
-      }
+      andFilters.push({ assignee: { id: user.id } });
     }
+
+    const filters = andFilters.length > 1 ? { $and: andFilters } : andFilters[0] || {};
 
     const [tickets, total] = await Promise.all([
       strapi.entityService.findMany('api::ticket.ticket', {
         filters,
-        populate: ['category', 'serviceGroup', 'assignee', 'attachments'] as any,
+        populate: ['category', 'serviceGroup', 'serviceGroup.department', 'assignee', 'assignee.department', 'attachments', 'requester', 'completedBy'] as any,
         sort: { createdAt: 'desc' } as any,
         start: (page - 1) * pageSize,
         limit: pageSize,
@@ -289,80 +390,16 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     };
   },
 
+  async myRequests(ctx) {
+    ctx.query = {
+      ...(ctx.query as any),
+      submittedByMe: true,
+    };
+    return await (this as any).findFiltered(ctx);
+  },
+
   async find(ctx) {
-    const user = ctx.state.user;
-    if (!user) {
-      ctx.throw(401, 'Not authenticated');
-      return;
-    }
-
-    const userWithDept = (await strapi.entityService.findOne(
-      'plugin::users-permissions.user',
-      user.id,
-      { populate: ['department'] }
-    )) as any;
-
-    const { isSuperAdmin } = getUserFlags(userWithDept);
-    const dept = userWithDept?.department;
-    const canManageTickets = isSuperAdmin || dept?.canManageTickets === true;
-
-    const myTicketsOnly = ctx.query.myTickets === 'true' || ctx.query.myTickets === true;
-    const assigneeFilter = ctx.query.assigneeId as string | undefined;
-    const queryFilters = ctx.query.filters as any || {};
-
-    delete ctx.query.myTickets;
-    delete ctx.query.assigneeId;
-
-    if (!isSuperAdmin) {
-      const deptKey = dept?.key;
-      if (!deptKey) {
-        ctx.body = { data: [], meta: { pagination: { total: 0, page: 1, pageSize: 25, pageCount: 0 } } };
-        return;
-      }
-
-      const serviceGroups = (await strapi.entityService.findMany(
-        'api::service-group.service-group',
-        { filters: { department: { key: deptKey } } as any }
-      )) as any[];
-
-      if (!serviceGroups || serviceGroups.length === 0) {
-        ctx.body = { data: [], meta: { pagination: { total: 0, page: 1, pageSize: 25, pageCount: 0 } } };
-        return;
-      }
-
-      const sgIds = serviceGroups.map((sg: any) => sg.id);
-
-      const filters: any = {
-        ...queryFilters,
-        serviceGroup: { id: { $in: sgIds } },
-      };
-
-      if (!canManageTickets) {
-        if (myTicketsOnly || !assigneeFilter) {
-          filters.assignee = { id: user.id };
-        }
-      }
-
-      if (assigneeFilter && canManageTickets) {
-        filters.assignee = { id: parseInt(assigneeFilter) };
-      }
-
-      ctx.query.filters = filters;
-    } else {
-      if (assigneeFilter) {
-        ctx.query.filters = {
-          ...queryFilters,
-          assignee: { id: parseInt(assigneeFilter) },
-        };
-      } else if (myTicketsOnly) {
-        ctx.query.filters = {
-          ...queryFilters,
-          assignee: { id: user.id },
-        };
-      }
-    }
-
-    return await super.find(ctx);
+    return await (this as any).findFiltered(ctx);
   },
 
   async findOne(ctx) {
@@ -381,44 +418,13 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     )) as any;
 
     const { isSuperAdmin } = getUserFlags(userWithDept);
-    const dept = userWithDept?.department;
-    const canManageTickets = isSuperAdmin || dept?.canManageTickets === true;
-
-    const filters: any = { documentId: id };
-
-    if (!isSuperAdmin) {
-      const deptKey = dept?.key;
-      if (!deptKey) {
-        ctx.throw(404, 'Ticket not found');
-        return;
-      }
-
-      const serviceGroups = (await strapi.entityService.findMany(
-        'api::service-group.service-group',
-        { filters: { department: { key: deptKey } } as any }
-      )) as any[];
-
-      const sgIds = (serviceGroups || []).map((sg: any) => sg.id);
-      if (sgIds.length === 0) {
-        ctx.throw(404, 'Ticket not found');
-        return;
-      }
-
-      filters.serviceGroup = { id: { $in: sgIds } };
-
-      if (!canManageTickets) {
-        filters.assignee = { id: user.id };
-      }
+    const ticket = await getTicketByDocumentId(strapi, id);
+    if (!ticket) {
+      ctx.throw(404, 'Ticket not found');
+      return;
     }
 
-    const tickets = (await strapi.entityService.findMany('api::ticket.ticket', {
-      filters,
-      populate: ['category', 'serviceGroup', 'assignee', 'attachments'] as any,
-      limit: 1,
-    })) as any[];
-
-    const ticket = tickets?.[0];
-    if (!ticket) {
+    if (!userCanViewTicket(userWithDept, ticket, isSuperAdmin)) {
       ctx.throw(404, 'Ticket not found');
       return;
     }
@@ -434,26 +440,59 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       return;
     }
 
-    const data = ctx.request.body?.data || {};
+    const userWithDept = (await strapi.entityService.findOne(
+      'plugin::users-permissions.user',
+      user.id,
+      { populate: ['department'] }
+    )) as any;
+    const { isSuperAdmin } = getUserFlags(userWithDept);
+
+    const existingTicket = await getTicketByDocumentId(strapi, ctx.params.id);
+    if (!existingTicket) {
+      ctx.throw(404, 'Ticket not found');
+      return;
+    }
+    if (!userCanManageTicket(userWithDept, existingTicket, isSuperAdmin)) {
+      ctx.throw(403, 'Forbidden');
+      return;
+    }
+
+    const input = ctx.request.body?.data || {};
+    const data: any = {};
+    if (input.status !== undefined) data.status = input.status;
+    if (input.complexity !== undefined) data.complexity = input.complexity || null;
+    if (input.staffComment !== undefined) data.staffComment = input.staffComment || null;
+
     const nextStatus = data.status;
+    const assigneeIds = extractRelationIds(existingTicket?.assignee);
 
     if (nextStatus === 'IN_PROGRESS') {
-      const existing = (await strapi.entityService.findMany('api::ticket.ticket', {
-        filters: { documentId: ctx.params.id } as any,
-        populate: ['assignee'],
-        limit: 1,
-      })) as any[];
-      const ticket = existing?.[0];
-      const assigneeIds = extractRelationIds(ticket?.assignee);
-      if (ticket?.status === 'NEW' && assigneeIds.includes(Number(user.id))) {
+      if (existingTicket?.status === 'NEW' && assigneeIds.includes(Number(user.id))) {
         data.assignee = {
           set: [{ id: Number(user.id) }],
         };
       }
     }
 
-    const result: any = await super.update(ctx);
-    const normalizedTicket = await (this as any).formatTicketForClient(result?.data || result);
+    if (nextStatus === 'DONE' && existingTicket?.status !== 'DONE') {
+      data.completedBy = Number(user.id);
+      data.completedAt = new Date().toISOString();
+      if (assigneeIds.includes(Number(user.id))) {
+        data.assignee = {
+          set: [{ id: Number(user.id) }],
+        };
+      }
+    } else if (nextStatus && nextStatus !== 'DONE' && existingTicket?.status === 'DONE') {
+      data.completedBy = null;
+      data.completedAt = null;
+    }
+
+    const result: any = await strapi.entityService.update('api::ticket.ticket', existingTicket.id, {
+      data,
+      populate: ['category', 'serviceGroup', 'serviceGroup.department', 'assignee', 'assignee.department', 'attachments', 'requester', 'completedBy'] as any,
+    });
+    await publishTicketRealtime(strapi, result, 'tickets:updated');
+    const normalizedTicket = await (this as any).formatTicketForClient(result);
     ctx.body = { data: normalizedTicket };
   },
 
@@ -466,9 +505,10 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
 
     const body = ctx.request.body as any;
     const { requesterPhone, comment, categoryId, serviceGroupId, attachments } = body;
+    const normalizedPhone = normalizeKazakhstanPhone(requesterPhone);
 
-    if (!comment || !serviceGroupId) {
-      ctx.throw(400, 'Обязательные поля: comment, serviceGroupId');
+    if (!comment || !serviceGroupId || !normalizedPhone) {
+      ctx.throw(400, 'Required fields: requesterPhone, comment, serviceGroupId');
       return;
     }
 
@@ -513,11 +553,12 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
 
     const ticketData: any = {
       requesterName,
-      requesterPhone: requesterPhone || null,
+      requesterPhone: normalizedPhone,
       requesterDepartment:
         requesterDepartment ||
         'Не указан',
       comment,
+      requester: user.id,
       serviceGroup: serviceGroup.id,
       status: 'NEW',
       ticketNumber: 'TEMP',
@@ -695,34 +736,64 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       'plugin::users-permissions.user',
       {
         filters: { id: { $in: uniqueAssigneeIds } } as any,
-        fields: ['id'],
+        fields: ['id', 'username', 'email', 'firstName', 'lastName'],
+        populate: ['department'],
       }
     )) as any[];
     if (assignees.length !== uniqueAssigneeIds.length) {
-      ctx.throw(400, 'Пользователь не найден');
+      ctx.throw(400, 'User not found');
       return;
     }
 
-    const existing = (await strapi.entityService.findMany('api::ticket.ticket', {
-      filters: { documentId: id } as any,
-      fields: ['id'],
-      limit: 1,
-    })) as any[];
+    const invalidAssignee = assignees.find(
+      (assignee: any) => !HELP_SERVICE_DEPARTMENT_KEYS.includes(assignee?.department?.key)
+    );
+    if (invalidAssignee) {
+      ctx.throw(400, 'Assignee must belong to IT, Medical Equipment or Engineering');
+      return;
+    }
 
-    const ticketRow = existing?.[0];
+    const userWithDept = (await strapi.entityService.findOne(
+      'plugin::users-permissions.user',
+      user.id,
+      { populate: ['department'] }
+    )) as any;
+    const { isSuperAdmin } = getUserFlags(userWithDept);
+    const ticketRow = await getTicketByDocumentId(strapi, id);
     if (!ticketRow?.id) {
       ctx.throw(404, 'Ticket not found');
       return;
     }
+    if (!userCanManageTicket(userWithDept, ticketRow, isSuperAdmin)) {
+      ctx.throw(403, 'Forbidden');
+      return;
+    }
+
+    const nextDeptKeys = Array.from(
+      new Set(assignees.map((assignee: any) => assignee?.department?.key).filter(Boolean))
+    );
+    const updateData: any = {
+      assignee: {
+        set: uniqueAssigneeIds.map((assigneeId) => ({ id: assigneeId })),
+      },
+    };
+
+    if (nextDeptKeys.length === 1 && nextDeptKeys[0] !== ticketRow?.serviceGroup?.department?.key) {
+      const nextGroups = (await strapi.entityService.findMany('api::service-group.service-group', {
+        filters: { department: { key: nextDeptKeys[0] } } as any,
+        limit: 1,
+      })) as any[];
+      if (nextGroups?.[0]?.id) {
+        updateData.serviceGroup = nextGroups[0].id;
+        updateData.category = null;
+      }
+    }
 
     const ticket = (await strapi.entityService.update('api::ticket.ticket', ticketRow.id, {
-      data: {
-        assignee: {
-          set: uniqueAssigneeIds.map((assigneeId) => ({ id: assigneeId })),
-        },
-      } as any,
-      populate: ['assignee', 'category', 'serviceGroup'],
+      data: updateData,
+      populate: ['assignee', 'assignee.department', 'category', 'serviceGroup', 'serviceGroup.department', 'attachments', 'requester', 'completedBy'] as any,
     })) as any;
+    await publishTicketRealtime(strapi, ticket, 'tickets:reassigned');
 
     const normalizedTicket = await (this as any).formatTicketForClient(ticket);
     ctx.body = { data: normalizedTicket };
@@ -743,12 +814,21 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
 
     const { isSuperAdmin } = getUserFlags(userWithDept);
     const deptKey = userWithDept?.department?.key;
+    const canUseServicePool =
+      isSuperAdmin ||
+      isKuatHelpdeskHead(userWithDept) ||
+      userWithDept?.department?.canManageTickets === true ||
+      (typeof deptKey === 'string' && HELP_SERVICE_DEPARTMENT_KEYS.includes(deptKey));
 
-    const filters: any = {};
-
-    if (!isSuperAdmin && deptKey) {
-      filters.department = { key: deptKey };
+    if (!canUseServicePool) {
+      ctx.body = { data: [] };
+      return;
     }
+
+    const filters: any = {
+      department: { key: { $in: HELP_SERVICE_DEPARTMENT_KEYS } },
+      blocked: false,
+    };
 
     const users = (await strapi.entityService.findMany('plugin::users-permissions.user', {
       filters,
@@ -759,6 +839,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     const sanitized = (users || []).map((u: any) => ({
       id: u.id,
       username: u.username,
+      email: u.email,
       firstName: u.firstName,
       lastName: u.lastName,
       department: u.department
