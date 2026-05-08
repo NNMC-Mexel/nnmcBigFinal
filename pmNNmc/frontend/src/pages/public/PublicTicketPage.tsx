@@ -363,14 +363,15 @@ export default function PublicTicketPage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Фото или файл
+                Фото, видео или файл
               </label>
               <label className="flex items-center justify-center gap-2 w-full px-4 py-3 border border-dashed border-cyan-300 rounded-xl bg-cyan-50/60 text-cyan-700 cursor-pointer hover:bg-cyan-50 transition-colors">
                 <Paperclip className="w-4 h-4" />
-                <span>Добавить вложение</span>
+                <span>Добавить фото, видео или файл</span>
                 <input
                   type="file"
                   multiple
+                  accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
                   className="hidden"
                   onChange={(e) => {
                     handleAttachmentChange(e.target.files);

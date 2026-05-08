@@ -25,6 +25,14 @@ export default {
       },
     },
     {
+      method: 'POST',
+      path: '/tickets/attachments/upload',
+      handler: 'ticket.uploadAttachments',
+      config: {
+        policies: [],
+      },
+    },
+    {
       method: 'GET',
       path: '/tickets/categories',
       handler: 'ticket.categories',

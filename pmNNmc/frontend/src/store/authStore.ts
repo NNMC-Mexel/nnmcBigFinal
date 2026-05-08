@@ -164,7 +164,7 @@ export const useUserRole = () => {
   const canViewDashboard = deptFlag(dept?.canViewDashboard);
   const canViewBoard = deptFlag(dept?.canViewBoard);
   const canViewTable = deptFlag(dept?.canViewTable);
-  const canViewHelpdesk = deptFlag(dept?.canViewHelpdesk);
+  const canViewHelpdesk = Boolean(user);
   const canViewKpiIt = deptFlag(dept?.canViewKpiIt);
   const canViewKpiMedical = deptFlag(dept?.canViewKpiMedical);
   const canViewKpiEngineering = deptFlag(dept?.canViewKpiEngineering);

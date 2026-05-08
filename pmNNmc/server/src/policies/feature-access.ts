@@ -39,7 +39,7 @@ export default async (policyContext: any, config: { feature?: FeatureKey } = {})
   }
 
   if (feature === 'helpdesk') {
-    return dept?.canViewHelpdesk === true;
+    return true;
   }
 
   return true;

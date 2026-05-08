@@ -238,7 +238,7 @@ async function setupPermissions(strapi: any) {
     // Analytics
     'api::analytics.analytics': ['summary'],
     // Helpdesk content types
-    'api::ticket.ticket': ['find', 'findOne', 'findFiltered', 'myRequests', 'create', 'update', 'delete', 'reassign', 'assignableUsers', 'submit', 'categories', 'publicSubmit', 'publicCategories'],
+    'api::ticket.ticket': ['find', 'findOne', 'findFiltered', 'myRequests', 'create', 'update', 'delete', 'reassign', 'assignableUsers', 'submit', 'uploadAttachments', 'categories', 'publicSubmit', 'publicCategories'],
     'api::service-group.service-group': ['find', 'findOne'],
     'api::ticket-category.ticket-category': ['find', 'findOne'],
     // News

@@ -142,6 +142,12 @@ function normalizeFileIds(input: any): number[] {
   );
 }
 
+function normalizeUploadFiles(files: any): any[] {
+  const raw = files?.files || files?.file || files;
+  if (!raw) return [];
+  return Array.isArray(raw) ? raw : [raw];
+}
+
 async function attachTicketFiles(strapi: any, ticketId: number, fileIds: number[]) {
   if (!ticketId || fileIds.length === 0) return;
   await Promise.all(
@@ -585,6 +591,35 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
         documentId: responseTicket.documentId,
       },
     };
+  },
+
+  async uploadAttachments(ctx) {
+    const user = ctx.state.user;
+    if (!user) {
+      ctx.throw(401, 'Not authenticated');
+      return;
+    }
+
+    const files = normalizeUploadFiles((ctx.request as any).files);
+    if (files.length === 0) {
+      ctx.throw(400, 'No files uploaded');
+      return;
+    }
+
+    const uploaded = await strapi.plugin('upload').service('upload').upload({
+      data: {},
+      files,
+    });
+    const normalized = (Array.isArray(uploaded) ? uploaded : [uploaded]).map((file: any) => ({
+      id: file.id,
+      name: file.name,
+      url: file.url,
+      mime: file.mime,
+      size: file.size,
+      ext: file.ext,
+    }));
+
+    ctx.body = { data: normalized };
   },
 
   async publicSubmit(ctx) {

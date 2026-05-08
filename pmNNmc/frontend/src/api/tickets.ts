@@ -115,8 +115,8 @@ export const ticketsApi = {
     for (const file of files) {
       const formData = new FormData();
       formData.append('files', file);
-      const response = await client.post('/upload', formData);
-      const uploaded = Array.isArray(response.data) ? response.data : [response.data];
+      const response = await client.post('/tickets/attachments/upload', formData);
+      const uploaded = Array.isArray(response.data?.data) ? response.data.data : response.data?.data ? [response.data.data] : [];
       ids.push(...uploaded.map((item: any) => Number(item.id)).filter(Boolean));
     }
     return ids;
