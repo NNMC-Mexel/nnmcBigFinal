@@ -124,7 +124,7 @@ export default function AppLayout() {
             ? {
                   to: "/app/my-requests",
                   icon: ClipboardList,
-                  label: "Мои запросы",
+                  label: "HelpDesk",
                   iconColor: "text-emerald-500",
                   activeBg: "bg-emerald-50",
                   activeText: "text-emerald-700",

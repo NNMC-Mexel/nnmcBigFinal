@@ -55,7 +55,7 @@ export default function MyRequestsPage() {
         <div className="flex items-center gap-3">
           <ClipboardList className="w-7 h-7 text-emerald-600" />
           <div>
-            <h1 className="text-2xl font-bold text-slate-800">Мои запросы</h1>
+            <h1 className="text-2xl font-bold text-slate-800">HelpDesk</h1>
             <p className="text-sm text-slate-500">Статусы заявок, которые вы отправили в службу поддержки</p>
           </div>
         </div>

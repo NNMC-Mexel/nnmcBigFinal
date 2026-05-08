@@ -109,6 +109,33 @@ export const ticketsApi = {
     return response.data.data;
   },
 
+  submitWithFiles: async (
+    data: {
+      requesterName?: string;
+      requesterPhone?: string;
+      requesterDepartment?: string;
+      comment: string;
+      categoryId?: number;
+      serviceGroupId: number;
+    },
+    files: File[] = []
+  ): Promise<{ ticketNumber: string; id: number; documentId?: string }> => {
+    if (files.length === 0) {
+      return ticketsApi.submit(data);
+    }
+
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        formData.append(key, String(value));
+      }
+    });
+    files.forEach((file) => formData.append('files', file));
+
+    const response = await client.post('/tickets/submit', formData);
+    return response.data.data;
+  },
+
   uploadAttachments: async (files: File[]): Promise<number[]> => {
     if (files.length === 0) return [];
     const ids: number[] = [];

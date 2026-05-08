@@ -119,14 +119,12 @@ export default function PublicTicketPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const attachmentIds = await ticketsApi.uploadAttachments(attachmentFiles);
-      const result = await ticketsApi.submit({
+      const result = await ticketsApi.submitWithFiles({
         requesterPhone: normalizedPhone,
         comment: form.comment.trim(),
         serviceGroupId: selectedGroupId,
         categoryId: selectedCategoryId || undefined,
-        attachments: attachmentIds,
-      });
+      }, attachmentFiles);
       setTicketNumber(result.ticketNumber);
       setSubmitted(true);
     } catch (err: any) {

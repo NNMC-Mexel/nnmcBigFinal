@@ -148,6 +148,21 @@ function normalizeUploadFiles(files: any): any[] {
   return Array.isArray(raw) ? raw : [raw];
 }
 
+function normalizeTicketSubmitBody(body: any) {
+  if (!body) return {};
+  if (typeof body.data === 'string') {
+    try {
+      return JSON.parse(body.data);
+    } catch {
+      return body;
+    }
+  }
+  if (body.data && typeof body.data === 'object' && !Array.isArray(body.data)) {
+    return body.data;
+  }
+  return body;
+}
+
 async function attachTicketFiles(strapi: any, ticketId: number, fileIds: number[]) {
   if (!ticketId || fileIds.length === 0) return;
   await Promise.all(
@@ -166,6 +181,24 @@ async function attachTicketFiles(strapi: any, ticketId: number, fileIds: number[
       })
     )
   );
+}
+
+async function uploadAndAttachTicketFiles(strapi: any, ticketId: number, files: any[]) {
+  if (!ticketId || files.length === 0) return [];
+  const uploaded = await strapi.plugin('upload').service('upload').upload({
+    data: {
+      ref: TICKET_UID,
+      refId: ticketId,
+      field: 'attachments',
+    },
+    files: files.length === 1 ? files[0] : files,
+  });
+  const uploadedList = Array.isArray(uploaded) ? uploaded : [uploaded];
+  const uploadedIds = normalizeFileIds(uploadedList);
+  if (uploadedIds.length > 0) {
+    await attachTicketFiles(strapi, ticketId, uploadedIds);
+  }
+  return uploadedIds;
 }
 
 async function notifyTicketAssignees(strapi: any, ticketId: number) {
@@ -509,7 +542,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       return;
     }
 
-    const body = ctx.request.body as any;
+    const body = normalizeTicketSubmitBody(ctx.request.body as any);
     const { requesterPhone, comment, categoryId, serviceGroupId, attachments } = body;
     const normalizedPhone = normalizeKazakhstanPhone(requesterPhone);
 
@@ -581,6 +614,10 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     if (attachmentIds.length > 0) {
       await attachTicketFiles(strapi, ticket.id, attachmentIds);
     }
+    const files = normalizeUploadFiles((ctx.request as any).files);
+    if (files.length > 0) {
+      await uploadAndAttachTicketFiles(strapi, ticket.id, files);
+    }
     const ticketWithAssignees = await notifyTicketAssignees(strapi, ticket.id);
     const responseTicket = ticketWithAssignees || ticket;
 
@@ -608,7 +645,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
 
     const uploaded = await strapi.plugin('upload').service('upload').upload({
       data: {},
-      files,
+      files: files.length === 1 ? files[0] : files,
     });
     const normalized = (Array.isArray(uploaded) ? uploaded : [uploaded]).map((file: any) => ({
       id: file.id,
