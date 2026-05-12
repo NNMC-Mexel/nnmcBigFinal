@@ -1,6 +1,7 @@
 import { factories } from '@strapi/strapi';
 import { getAssignableUserFilters, getUserFlags } from '../../../utils/project-assignments';
 import { computeProjectProgressFromTasks } from '../../../utils/task-workflow';
+import { isProductionBoardStage } from '../../../utils/project-stages';
 
 async function checkSuperAdmin(
   ctx: any,
@@ -337,10 +338,11 @@ function enrichProjectWithComputedFields(project: any) {
   const { progressPercent, doneTasks, totalTasks } = computeProjectProgressFromTasks(tasks);
 
   const dueDate = project.dueDate ? new Date(project.dueDate) : null;
+  const isProductionStage = isProductionBoardStage(project.manualStageOverride);
   let overdue = false;
   let dueSoon = false;
 
-  if (dueDate && project.status === 'ACTIVE') {
+  if (dueDate && project.status === 'ACTIVE' && !isProductionStage) {
     dueDate.setHours(0, 0, 0, 0);
     overdue = today > dueDate;
 

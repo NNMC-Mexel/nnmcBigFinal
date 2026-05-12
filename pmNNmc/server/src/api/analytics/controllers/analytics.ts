@@ -1,5 +1,6 @@
 import { Context } from 'koa';
 import { computeProjectProgressFromTasks } from '../../../utils/task-workflow';
+import { isProductionBoardStage } from '../../../utils/project-stages';
 
 export default {
   async summary(ctx: Context) {
@@ -20,7 +21,7 @@ export default {
       // Получаем проекты с фильтром по отделу
       const projects = await strapi.entityService.findMany('api::project.project', {
         filters,
-        populate: ['tasks', 'department'],
+        populate: ['tasks', 'department', 'manualStageOverride'],
       });
 
       const today = new Date();
@@ -65,10 +66,11 @@ export default {
         computeProjectProgressFromTasks(tasks);
 
         const dueDate = project.dueDate ? new Date(project.dueDate) : null;
+        const isProductionStage = isProductionBoardStage(project.manualStageOverride);
         let isOverdue = false;
         let isDueSoon = false;
 
-        if (dueDate && project.status === 'ACTIVE') {
+        if (dueDate && project.status === 'ACTIVE' && !isProductionStage) {
           dueDate.setHours(0, 0, 0, 0);
           isOverdue = today > dueDate;
           
