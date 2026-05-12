@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Headphones,
@@ -41,6 +41,16 @@ function normalizeKazakhstanPhone(value: string) {
   return null;
 }
 
+const ATTACHMENT_ACCEPT = 'image/*,video/*,.jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov,.avi,.mkv,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar';
+const MAX_ATTACHMENT_SIZE = 250 * 1024 * 1024;
+
+function formatFileSize(size: number) {
+  if (!size) return '0 Б';
+  const units = ['Б', 'КБ', 'МБ', 'ГБ'];
+  const index = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
+  return `${(size / 1024 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
 export default function PublicTicketPage() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language === 'kz' ? 'kz' : 'ru';
@@ -57,6 +67,8 @@ export default function PublicTicketPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [expandedGroup, setExpandedGroup] = useState<number | null>(null);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [form, setForm] = useState({
     requesterName: '',
@@ -150,9 +162,36 @@ export default function PublicTicketPage() {
     setError(null);
   };
 
-  const handleAttachmentChange = (files: FileList | null) => {
-    if (!files) return;
-    setAttachmentFiles((prev) => [...prev, ...Array.from(files)]);
+  const handleAttachmentChange = (files: FileList | File[] | null) => {
+    const selectedFiles = Array.from(files || []);
+    if (selectedFiles.length === 0) return;
+
+    const oversized = selectedFiles.filter((file) => file.size > MAX_ATTACHMENT_SIZE);
+    if (oversized.length > 0) {
+      setError(`Файл больше 250 МБ: ${oversized.map((file) => file.name).join(', ')}`);
+    } else {
+      setError(null);
+    }
+
+    const validFiles = selectedFiles.filter((file) => file.size <= MAX_ATTACHMENT_SIZE);
+    if (validFiles.length === 0) return;
+
+    setAttachmentFiles((prev) => {
+      const existing = new Set(prev.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+      const next = validFiles.filter((file) => !existing.has(`${file.name}:${file.size}:${file.lastModified}`));
+      return [...prev, ...next];
+    });
+  };
+
+  const handleAttachmentInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleAttachmentChange(e.target.files);
+    e.target.value = '';
+  };
+
+  const handleAttachmentDrop = (e: React.DragEvent<HTMLLabelElement>) => {
+    e.preventDefault();
+    setIsDraggingFiles(false);
+    handleAttachmentChange(e.dataTransfer.files);
   };
 
   const removeAttachment = (index: number) => {
@@ -363,19 +402,41 @@ export default function PublicTicketPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Фото, видео или файл
               </label>
-              <label className="flex items-center justify-center gap-2 w-full px-4 py-3 border border-dashed border-cyan-300 rounded-xl bg-cyan-50/60 text-cyan-700 cursor-pointer hover:bg-cyan-50 transition-colors">
-                <Paperclip className="w-4 h-4" />
-                <span>Добавить фото, видео или файл</span>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,video/*,.jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.mov,.avi,.mkv,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar"
-                  className="hidden"
-                  onChange={(e) => {
-                    handleAttachmentChange(e.target.files);
-                    e.currentTarget.value = '';
-                  }}
-                />
+              <input
+                ref={fileInputRef}
+                id="helpdesk-attachments"
+                type="file"
+                multiple
+                accept={ATTACHMENT_ACCEPT}
+                className="sr-only"
+                onChange={handleAttachmentInputChange}
+              />
+              <label
+                htmlFor="helpdesk-attachments"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDraggingFiles(true);
+                }}
+                onDragLeave={() => setIsDraggingFiles(false)}
+                onDrop={handleAttachmentDrop}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+                tabIndex={0}
+                className={`flex min-h-[58px] items-center justify-center gap-3 w-full px-4 py-3 border border-dashed rounded-xl cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
+                  isDraggingFiles
+                    ? 'border-cyan-500 bg-cyan-100 text-cyan-800'
+                    : 'border-cyan-300 bg-cyan-50/60 text-cyan-700 hover:bg-cyan-50'
+                }`}
+              >
+                <Paperclip className="w-5 h-5" />
+                <span className="flex flex-col text-center leading-tight">
+                  <span className="font-medium">Добавить фото, видео или файл</span>
+                  <span className="text-xs text-cyan-600">PDF, фото, видео, Word, Excel до 250 МБ</span>
+                </span>
               </label>
               {attachmentFiles.length > 0 && (
                 <div className="mt-2 space-y-2">
@@ -384,7 +445,10 @@ export default function PublicTicketPage() {
                       key={`${file.name}-${file.size}-${index}`}
                       className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700"
                     >
-                      <span className="truncate">{file.name}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate">{file.name}</span>
+                        <span className="block text-xs text-slate-400">{formatFileSize(file.size)}</span>
+                      </span>
                       <button
                         type="button"
                         onClick={() => removeAttachment(index)}
