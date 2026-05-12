@@ -61,6 +61,24 @@ const protocolDepartments = [
     name_ru: 'Отдел бухгалтерского учета и отчетности',
     name_kz: 'Бухгалтерлік есеп және есептілік бөлімі',
   },
+  {
+    key: 'OCMK_1',
+    name_ru: 'ОЦМК-1',
+    name_kz: 'ОЦМК-1',
+    canViewKpiTimesheet: true,
+  },
+  {
+    key: 'OCMK_2',
+    name_ru: 'ОЦМК-2',
+    name_kz: 'ОЦМК-2',
+    canViewKpiTimesheet: true,
+  },
+  {
+    key: 'OCMK_3',
+    name_ru: 'ОЦМК-3',
+    name_kz: 'ОЦМК-3',
+    canViewKpiTimesheet: true,
+  },
 ];
 
 const radiologyProtocolUsers = [
@@ -154,6 +172,38 @@ const radiologyProtocolUsers = [
     firstName: 'Анар Едигеевна',
     lastName: 'Жанузакова',
     departmentKey: 'ACCOUNTING',
+  },
+  {
+    username: 'nurseitova.t',
+    email: 'nurseitova.t@nnmc.kz',
+    firstName: 'Толкын Бауезовна',
+    lastName: 'Нурсейтова',
+    departmentKey: 'PATIENT_SUPPORT',
+    position: 'врач-эксперт',
+  },
+  {
+    username: 'kikimbaeva.g',
+    email: 'kikimbaeva.g@nnmc.kz',
+    firstName: 'Гульнара Тулешевна',
+    lastName: 'Кикимбаева',
+    departmentKey: 'OCMK_1',
+    position: 'координатор по младшему медицинскому персоналу',
+  },
+  {
+    username: 'musabaeva.a',
+    email: 'musabaeva.a@nnmc.kz',
+    firstName: 'Айна Муратовна',
+    lastName: 'Мусабаева',
+    departmentKey: 'CLINIC_ADMINISTRATION',
+    position: 'руководитель сестринской службы',
+  },
+  {
+    username: 'aktanova.k',
+    email: 'aktanova.k@nnmc.kz',
+    firstName: 'К.Е.',
+    lastName: 'Актанова',
+    departmentKey: 'OCMK_2',
+    position: 'секретарь комиссии',
   },
 ];
 
@@ -1075,7 +1125,7 @@ async function seedKpiProtocolUsers(strapi: any) {
         limit: 1,
       });
 
-      const userData = {
+      const userData: any = {
         username: item.username,
         email: item.email,
         firstName: item.firstName,
@@ -1087,6 +1137,7 @@ async function seedKpiProtocolUsers(strapi: any) {
         blocked: false,
         isSuperAdmin: false,
       };
+      if (item.position) userData.position = item.position;
 
       if (existing.length === 0) {
         await strapi.entityService.create('plugin::users-permissions.user', {

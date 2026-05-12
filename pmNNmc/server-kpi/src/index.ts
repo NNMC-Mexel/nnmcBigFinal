@@ -79,6 +79,76 @@ const RADIOLOGY_PROTOCOL_TEMPLATE = {
   ],
 };
 
+const OCMK_COMMISSION_MEMBERS = [
+  {
+    role: 'Председатель',
+    name: 'Нурсейтова Толкын Бауезовна',
+    email: 'nurseitova.t@nnmc.kz',
+    order: 1,
+  },
+  {
+    role: 'Координатор ОЦМК',
+    name: 'Кикимбаева Гульнара Тулешевна',
+    email: 'kikimbaeva.g@nnmc.kz',
+    order: 2,
+  },
+  {
+    role: 'Руководитель по сестринскому делу',
+    name: 'Мусабаева Айна Муратовна',
+    email: 'musabaeva.a@nnmc.kz',
+    order: 3,
+  },
+  {
+    role: 'Руководитель отдела управления',
+    name: 'Кенжебаева Шайзат Тукеновна',
+    email: 'kenzhebaeva.s@nnmc.kz',
+    order: 4,
+  },
+  {
+    role: 'Главный экономист',
+    name: 'Мендыбаева Эльмира Манаповна',
+    email: 'mendybaeva.e@nnmc.kz',
+    order: 5,
+  },
+  {
+    role: 'Главный бухгалтер',
+    name: 'Тасеменова Дарига Кошкарбаевна',
+    email: 'tasemenova.d@nnmc.kz',
+    order: 6,
+  },
+  {
+    role: 'Секретарь комиссии',
+    name: 'Актанова К.Е.',
+    email: 'aktanova.k@nnmc.kz',
+    order: 7,
+  },
+];
+
+const OCMK_PROTOCOL_BASE = {
+  protocolNumber: '1',
+  meetingTitle: 'Заседания комиссии по оплате и мотивации труда персонала',
+  place: 'г.Астана, пр.Абылай – хана 42',
+  agendaText:
+    'Рассмотрение итогов работы за {{month}} месяц {{year}} года. Оценка достижения ключевых показателей работы эффективности выполнения внутренних стандартов, санитарно-эпидемиологического режима и трудовой дисциплины, степень достижения КПР каждым сотрудником {{department}}.\n' +
+    'Результаты фактического исполнения целевых показателей КПР за {{month}} месяц {{year}} года в соответствии с утверждённым Положением об оплате труда. Младший медицинский персонал {{department}}.',
+  footerText:
+    'Передать отделу бухгалтерии результаты рассмотрения стимулирующих и мотивирующих компонентов для своевременного начисления.',
+  secretaryName: '',
+  coordinatorRole: 'Координатор ОЦМК',
+  commissionMembers: OCMK_COMMISSION_MEMBERS,
+};
+
+const OCMK_PROTOCOL_TEMPLATES = ['ОЦМК-1', 'ОЦМК-2', 'ОЦМК-3'].map((departmentName) => ({
+  ...OCMK_PROTOCOL_BASE,
+  departmentKey: departmentName,
+  departmentName,
+}));
+
+const KPI_PROTOCOL_TEMPLATES = [
+  RADIOLOGY_PROTOCOL_TEMPLATE,
+  ...OCMK_PROTOCOL_TEMPLATES,
+];
+
 function isLegacyRadiologyDepartmentName(value: any): boolean {
   const normalized = String(value || '').trim().toLowerCase();
   return normalized.includes('лучев') && (normalized.includes('вмп') || normalized.includes('смп'));
@@ -262,32 +332,34 @@ async function ensureAuthenticatedPermissions(strapi: any) {
   }
 }
 
-async function seedRadiologyProtocolTemplate(strapi: any) {
+async function seedKpiProtocolTemplates(strapi: any) {
   try {
-    const existing = await strapi.entityService.findMany(
-      'api::department-template.department-template',
-      {
-        filters: { departmentKey: RADIOLOGY_PROTOCOL_TEMPLATE.departmentKey },
-        limit: 1,
+    for (const template of KPI_PROTOCOL_TEMPLATES) {
+      const existing = await strapi.entityService.findMany(
+        'api::department-template.department-template',
+        {
+          filters: { departmentKey: template.departmentKey },
+          limit: 1,
+        }
+      );
+
+      if (!Array.isArray(existing) || existing.length === 0) {
+        await strapi.entityService.create('api::department-template.department-template', {
+          data: template,
+        });
+        strapi.log.info(`[department-template] Seeded ${template.departmentKey} KPI protocol template`);
+        continue;
       }
-    );
 
-    if (!Array.isArray(existing) || existing.length === 0) {
-      await strapi.entityService.create('api::department-template.department-template', {
-        data: RADIOLOGY_PROTOCOL_TEMPLATE,
-      });
-      strapi.log.info('[department-template] Seeded RADIOLOGY KPI protocol template');
-      return;
+      await strapi.entityService.update(
+        'api::department-template.department-template',
+        existing[0].id,
+        { data: template }
+      );
+      strapi.log.info(`[department-template] Updated ${template.departmentKey} KPI protocol template`);
     }
-
-    await strapi.entityService.update(
-      'api::department-template.department-template',
-      existing[0].id,
-      { data: RADIOLOGY_PROTOCOL_TEMPLATE }
-    );
-    strapi.log.info('[department-template] Updated RADIOLOGY KPI protocol template');
   } catch (error: any) {
-    strapi.log.warn(`[department-template] RADIOLOGY seed failed: ${error?.message || error}`);
+    strapi.log.warn(`[department-template] KPI seed failed: ${error?.message || error}`);
   }
 }
 
@@ -368,7 +440,7 @@ export default {
     await lockPublicRole(strapi);
     await ensureAuthenticatedPermissions(strapi);
     await syncUsersFromPm(strapi);
-    await seedRadiologyProtocolTemplate(strapi);
+    await seedKpiProtocolTemplates(strapi);
     await normalizeRadiologyKpiData(strapi);
   },
 };

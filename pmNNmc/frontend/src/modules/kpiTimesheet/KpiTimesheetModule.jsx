@@ -69,6 +69,13 @@ const isUnauthorizedError = (value) => {
   );
 };
 
+const compactKpiDepartment = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[‐‑‒–—−]/g, "-")
+    .replace(/[\s\-_]+/g, "");
+
 /** Calculate working days for the 26-25 period (26 prevMonth .. 25 currentMonth) */
 const calcWorkdaysForPeriod = (year, month, allHolidays) => {
   const y = parseInt(year, 10);
@@ -1003,9 +1010,10 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         const templates = await apiTemplateList();
         const tpl = templates.find((t) => {
           const a = t?.attributes || t;
+          const requestedDepartment = compactKpiDepartment(calcDepartment);
           return (
-            String(a?.departmentName || "").toLowerCase() === String(calcDepartment || "").toLowerCase() ||
-            String(a?.departmentKey || "").toLowerCase() === String(calcDepartment || "").toLowerCase()
+            compactKpiDepartment(a?.departmentName) === requestedDepartment ||
+            compactKpiDepartment(a?.departmentKey) === requestedDepartment
           );
         });
         if (tpl) {

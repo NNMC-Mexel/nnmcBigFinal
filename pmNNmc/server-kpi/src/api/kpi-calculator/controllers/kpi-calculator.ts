@@ -195,7 +195,28 @@ async function loadDepartmentTemplate(department: string): Promise<ReportSetting
         limit: 1,
       }
     );
-    const entity = Array.isArray(results) ? results[0] : results;
+    let entity = Array.isArray(results) ? results[0] : results;
+    if (!entity) {
+      const target = normalizeDepartment(department);
+      const all: any = await (strapi.entityService as any).findMany(
+        'api::department-template.department-template',
+        {
+          populate: {
+            commissionMembers: true,
+            meetingDateOverrides: true,
+          },
+          pagination: { pageSize: 100 },
+        }
+      );
+      const templates = Array.isArray(all) ? all : all ? [all] : [];
+      entity = templates.find((item: any) => {
+        const data = item?.attributes ? item.attributes : item;
+        return (
+          normalizeDepartment(data?.departmentKey) === target ||
+          normalizeDepartment(data?.departmentName) === target
+        );
+      });
+    }
     if (!entity) return null;
     const data = entity?.attributes ? { ...entity.attributes } : { ...entity };
     return data as ReportSettings;
