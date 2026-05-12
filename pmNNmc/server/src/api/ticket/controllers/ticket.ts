@@ -550,6 +550,10 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       ctx.throw(400, 'Required fields: requesterPhone, comment, serviceGroupId');
       return;
     }
+    if (!categoryId) {
+      ctx.throw(400, 'Вы не выбрали категорию заявки');
+      return;
+    }
 
     const userWithDept = (await strapi.entityService.findOne(
       'plugin::users-permissions.user',

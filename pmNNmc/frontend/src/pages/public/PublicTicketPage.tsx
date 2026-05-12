@@ -127,6 +127,10 @@ export default function PublicTicketPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit || !selectedGroupId || !normalizedPhone) return;
+    if (!selectedCategoryId) {
+      setError('Вы не выбрали категорию заявки');
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
