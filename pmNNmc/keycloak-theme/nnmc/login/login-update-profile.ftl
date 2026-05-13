@@ -6,14 +6,14 @@
   <title>АО "ННМЦ" — Данные профиля</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="${url.resourcesPath}/css/style.css?v=20260513-logo-size">
+  <link rel="stylesheet" href="${url.resourcesPath}/css/style.css?v=20260513-logo-compact">
 </head>
 <body>
   <div class="page">
 
     <header class="header">
       <div class="brand">
-        <img src="${url.resourcesPath}/img/nnmc-logo.png?v=20260513" alt="ННМЦ" class="brand-logo" />
+        <img src="${url.resourcesPath}/img/nnmc-logo.png?v=20260513" alt="ННМЦ" class="brand-logo" width="34" height="34" style="width:34px;height:34px;max-width:34px;max-height:34px;object-fit:contain;" />
         <div>
           <div class="brand-title">АО "ННМЦ"</div>
           <div class="brand-sub">Корпоративная система</div>
@@ -26,7 +26,7 @@
 
         <div class="card-header">
           <div class="card-logo-wrap">
-            <img src="${url.resourcesPath}/img/nnmc-logo.png?v=20260513" alt="ННМЦ" class="card-logo" />
+            <img src="${url.resourcesPath}/img/nnmc-logo.png?v=20260513" alt="ННМЦ" class="card-logo" width="84" height="84" style="width:84px;height:84px;max-width:84px;max-height:84px;object-fit:contain;" />
           </div>
           <h2 class="card-title">Данные профиля</h2>
           <p class="card-sub">Заполните обязательные поля для входа в систему</p>
