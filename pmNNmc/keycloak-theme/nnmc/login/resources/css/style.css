@@ -67,6 +67,10 @@ body {
   max-width: 430px;
   box-shadow: 0 4px 24px rgba(14, 165, 233, 0.08), 0 1px 3px rgba(0,0,0,0.06);
 }
+.card-register {
+  max-width: 460px;
+  padding-top: 28px;
+}
 
 /* Card header */
 .card-header {
@@ -94,6 +98,22 @@ body {
   max-width: 84px !important;
   max-height: 84px !important;
   object-fit: contain;
+}
+.register-header {
+  margin-bottom: 18px;
+}
+.card-logo-wrap-small {
+  width: 72px !important;
+  height: 72px !important;
+  max-width: 72px !important;
+  max-height: 72px !important;
+  margin-bottom: 12px;
+}
+.card-logo-small {
+  width: 72px !important;
+  height: 72px !important;
+  max-width: 72px !important;
+  max-height: 72px !important;
 }
 .card-title {
   font-family: 'Outfit', system-ui, sans-serif;
@@ -123,6 +143,9 @@ body {
 .form { display: flex; flex-direction: column; }
 
 .field { margin-bottom: 18px; }
+.register-form .field {
+  margin-bottom: 13px;
+}
 .field label {
   display: block;
   font-size: 13px;
