@@ -6,7 +6,7 @@
   <title>АО "ННМЦ" — Вход в систему</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="${url.resourcesPath}/css/style.css">
+  <link rel="stylesheet" href="${url.resourcesPath}/css/style.css?v=20260513-logo-size">
 </head>
 <body>
   <div class="page">
