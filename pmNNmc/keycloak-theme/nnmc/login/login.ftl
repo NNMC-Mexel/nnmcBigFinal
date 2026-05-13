@@ -6,7 +6,7 @@
   <title>АО "ННМЦ" — Вход в систему</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="${url.resourcesPath}/css/style.css?v=20260513-logo-compact">
+  <link rel="stylesheet" href="${url.resourcesPath}/css/style.css?v=20260513-forgot-notice">
 </head>
 <body>
   <div class="page">
@@ -88,12 +88,18 @@
 
           <div class="auth-actions">
             <#if realm.resetPasswordAllowed>
-              <a href="${url.loginResetCredentialsUrl}" class="auth-link auth-link-secondary">Забыли пароль?</a>
+              <a href="#" id="forgotPasswordLink" class="auth-link auth-link-secondary">Забыли пароль?</a>
             </#if>
             <#if realm.registrationAllowed>
               <a href="${url.registrationUrl}" class="auth-link auth-link-primary">Зарегистрироваться</a>
             </#if>
           </div>
+
+          <#if realm.resetPasswordAllowed>
+            <div id="forgotPasswordNotice" class="inline-notice" role="status" aria-live="polite" hidden>
+              Обратитесь к администратору системы или в IT-службу для восстановления доступа.
+            </div>
+          </#if>
 
         </form>
 
@@ -102,5 +108,16 @@
 
     <footer class="footer">© 2026 ТОО "Biocraft Digital"</footer>
   </div>
+  <script>
+    (function () {
+      var link = document.getElementById('forgotPasswordLink');
+      var notice = document.getElementById('forgotPasswordNotice');
+      if (!link || !notice) return;
+      link.addEventListener('click', function (event) {
+        event.preventDefault();
+        notice.hidden = false;
+      });
+    })();
+  </script>
 </body>
 </html>

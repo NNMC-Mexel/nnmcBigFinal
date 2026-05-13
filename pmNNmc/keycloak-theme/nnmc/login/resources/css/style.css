@@ -256,6 +256,20 @@ body {
   border-color: #7dd3fc;
   color: #075985;
 }
+.inline-notice {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  color: #0f766e;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+.inline-notice[hidden] {
+  display: none;
+}
 
 /* Footer */
 .footer {
