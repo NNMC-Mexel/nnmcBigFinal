@@ -13,7 +13,7 @@
 
     <header class="header">
       <div class="brand">
-        <img src="${url.resourcesPath}/img/logo.png" alt="ННМЦ" class="brand-logo" />
+        <img src="${url.resourcesPath}/img/nnmc-logo.png?v=20260513" alt="ННМЦ" class="brand-logo" />
         <div>
           <div class="brand-title">АО "ННМЦ"</div>
           <div class="brand-sub">Корпоративная система</div>
@@ -26,7 +26,7 @@
 
         <div class="card-header">
           <div class="card-logo-wrap">
-            <img src="${url.resourcesPath}/img/logo.png" alt="ННМЦ" class="card-logo" />
+            <img src="${url.resourcesPath}/img/nnmc-logo.png?v=20260513" alt="ННМЦ" class="card-logo" />
           </div>
           <h2 class="card-title">Данные профиля</h2>
           <p class="card-sub">Заполните обязательные поля для входа в систему</p>
