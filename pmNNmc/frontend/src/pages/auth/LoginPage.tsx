@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LogIn, Mail, Lock, Eye, EyeOff, Headphones, X } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [showRegisterNotice, setShowRegisterNotice] = useState(false);
 
   useEffect(() => {
     const savedEmail = localStorage.getItem('rememberedEmail');
@@ -145,10 +146,20 @@ export default function LoginPage() {
 
         <p className="mt-6 text-center text-sm text-slate-500">
           {t('auth.noAccount')}{' '}
-          <Link to="/register" className="text-primary-600 hover:text-primary-700 font-medium">
+          <button
+            type="button"
+            onClick={() => setShowRegisterNotice(true)}
+            className="text-primary-600 hover:text-primary-700 font-medium"
+          >
             {t('auth.register')}
-          </Link>
+          </button>
         </p>
+
+        {showRegisterNotice && (
+          <div className="mt-3 p-3 rounded-lg border border-yellow-200 bg-yellow-50 text-yellow-700 text-sm text-center">
+            Данная функция пока недоступна. Если хотите зарегистрироваться, обратитесь в IT-службу.
+          </div>
+        )}
       </Card>
 
       {/* Forgot Password Modal */}
