@@ -27,6 +27,9 @@ function generatePassword(length = 12): string {
   return password;
 }
 
+const DEFAULT_KEYCLOAK_INITIAL_PASSWORD =
+  process.env.NNMC_DEFAULT_USER_PASSWORD || 'Aa123123!';
+
 // Проверка что пользователь - супер админ (по флагу isSuperAdmin)
 async function checkSuperAdmin(ctx: Context, strapi: any): Promise<boolean> {
   const user = ctx.state.user;
@@ -484,14 +487,13 @@ export default {
         emailVerified: true,
       };
 
-      if (password) {
-        userPayload.credentials = [{
-          type: 'password',
-          value: password,
-          temporary: true,
-        }];
-        userPayload.requiredActions = ['UPDATE_PASSWORD'];
-      }
+      const initialPassword = password || DEFAULT_KEYCLOAK_INITIAL_PASSWORD;
+      userPayload.credentials = [{
+        type: 'password',
+        value: initialPassword,
+        temporary: true,
+      }];
+      userPayload.requiredActions = ['UPDATE_PASSWORD'];
 
       const createRes = await fetch(
         `${keycloakUrl}/admin/realms/${keycloakRealm}/users`,
@@ -514,7 +516,7 @@ export default {
       }
 
       // 3. Create user in Strapi
-      const tempPassword = password || generatePassword();
+      const tempPassword = initialPassword;
 
       const existingUsers = await strapi.entityService.findMany('plugin::users-permissions.user', {
         filters: { $or: [{ email }, { username }] },
