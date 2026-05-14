@@ -693,7 +693,6 @@ async function ensureKeycloakHelpdeskUser(strapi: any, token: string, user: any)
       strapi.log.warn(`[helpdesk-users] Keycloak update failed for ${user.email}: HTTP ${updateRes.status}`);
       return;
     }
-    await setKeycloakPassword(adminBase, token, existing.id, HELPDESK_USER_PASSWORD);
     return;
   }
 
@@ -708,8 +707,9 @@ async function ensureKeycloakHelpdeskUser(strapi: any, token: string, user: any)
       credentials: [{
         type: 'password',
         value: HELPDESK_USER_PASSWORD,
-        temporary: false,
+        temporary: true,
       }],
+      requiredActions: ['UPDATE_PASSWORD'],
     }),
   });
 
@@ -722,7 +722,7 @@ async function ensureKeycloakHelpdeskUser(strapi: any, token: string, user: any)
   if (createRes.status === 409) {
     const conflicted = await findKeycloakUser(adminBase, token, user);
     if (conflicted?.id) {
-      await setKeycloakPassword(adminBase, token, conflicted.id, HELPDESK_USER_PASSWORD);
+      strapi.log.info(`[helpdesk-users] Keycloak user already exists, password left unchanged: ${user.email}`);
     }
   }
 }
@@ -1015,7 +1015,8 @@ async function setKeycloakPassword(
   adminBase: string,
   token: string,
   userId: string,
-  password = PROTOCOL_USER_PASSWORD
+  password = PROTOCOL_USER_PASSWORD,
+  temporary = true
 ) {
   await fetch(`${adminBase}/users/${userId}/reset-password`, {
     method: 'PUT',
@@ -1026,7 +1027,7 @@ async function setKeycloakPassword(
     body: JSON.stringify({
       type: 'password',
       value: password,
-      temporary: false,
+      temporary,
     }),
   });
 }
@@ -1053,10 +1054,7 @@ async function ensureKeycloakProtocolUser(strapi: any, token: string, user: any)
   };
 
   if (existing?.id) {
-    const shouldResetPassword =
-      process.env.NNMC_PROTOCOL_USER_RESET_PASSWORDS === 'true' ||
-      !Array.isArray(existing?.attributes?.nnmcProtocolSeedVersion) ||
-      !existing.attributes.nnmcProtocolSeedVersion.includes(PROTOCOL_USER_SEED_VERSION);
+    const shouldResetPassword = process.env.NNMC_PROTOCOL_USER_RESET_PASSWORDS === 'true';
 
     const updateRes = await fetch(`${adminBase}/users/${existing.id}`, {
       method: 'PUT',
@@ -1071,7 +1069,7 @@ async function ensureKeycloakProtocolUser(strapi: any, token: string, user: any)
       return;
     }
     if (shouldResetPassword) {
-      await setKeycloakPassword(adminBase, token, existing.id);
+      await setKeycloakPassword(adminBase, token, existing.id, PROTOCOL_USER_PASSWORD, true);
     }
     return;
   }
@@ -1087,8 +1085,9 @@ async function ensureKeycloakProtocolUser(strapi: any, token: string, user: any)
       credentials: [{
         type: 'password',
         value: PROTOCOL_USER_PASSWORD,
-        temporary: false,
+        temporary: true,
       }],
+      requiredActions: ['UPDATE_PASSWORD'],
     }),
   });
 

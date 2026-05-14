@@ -488,8 +488,9 @@ export default {
         userPayload.credentials = [{
           type: 'password',
           value: password,
-          temporary: false,
+          temporary: true,
         }];
+        userPayload.requiredActions = ['UPDATE_PASSWORD'];
       }
 
       const createRes = await fetch(
