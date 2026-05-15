@@ -90,9 +90,7 @@
             <#if realm.resetPasswordAllowed>
               <a href="#" id="forgotPasswordLink" class="auth-link auth-link-secondary">Забыли пароль?</a>
             </#if>
-            <#if realm.registrationAllowed>
-              <a href="#" id="registrationNoticeLink" class="auth-link auth-link-primary">Зарегистрироваться</a>
-            </#if>
+            <a href="#" id="registrationNoticeLink" class="auth-link auth-link-primary">Зарегистрироваться</a>
           </div>
 
           <#if realm.resetPasswordAllowed>
@@ -101,11 +99,9 @@
             </div>
           </#if>
 
-          <#if realm.registrationAllowed>
-            <div id="registrationNotice" class="inline-notice inline-notice-warning" role="status" aria-live="polite" hidden>
-              Данная функция пока недоступна. Если хотите зарегистрироваться, обратитесь в IT-службу.
-            </div>
-          </#if>
+          <div id="registrationNotice" class="inline-notice inline-notice-warning" role="status" aria-live="polite" hidden>
+            Данная функция пока недоступна. Если хотите зарегистрироваться, обратитесь в IT-службу.
+          </div>
 
         </form>
 
