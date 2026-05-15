@@ -306,6 +306,11 @@ body {
   line-height: 1.35;
   font-weight: 600;
 }
+.inline-notice-warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
 .inline-notice[hidden] {
   display: none;
 }

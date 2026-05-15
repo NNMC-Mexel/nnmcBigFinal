@@ -91,13 +91,19 @@
               <a href="#" id="forgotPasswordLink" class="auth-link auth-link-secondary">Забыли пароль?</a>
             </#if>
             <#if realm.registrationAllowed>
-              <a href="${url.registrationUrl}" class="auth-link auth-link-primary">Зарегистрироваться</a>
+              <a href="#" id="registrationNoticeLink" class="auth-link auth-link-primary">Зарегистрироваться</a>
             </#if>
           </div>
 
           <#if realm.resetPasswordAllowed>
             <div id="forgotPasswordNotice" class="inline-notice" role="status" aria-live="polite" hidden>
               Обратитесь к администратору системы или в IT-службу для восстановления доступа.
+            </div>
+          </#if>
+
+          <#if realm.registrationAllowed>
+            <div id="registrationNotice" class="inline-notice inline-notice-warning" role="status" aria-live="polite" hidden>
+              Данная функция пока недоступна. Если хотите зарегистрироваться, обратитесь в IT-службу.
             </div>
           </#if>
 
@@ -110,13 +116,18 @@
   </div>
   <script>
     (function () {
-      var link = document.getElementById('forgotPasswordLink');
-      var notice = document.getElementById('forgotPasswordNotice');
-      if (!link || !notice) return;
-      link.addEventListener('click', function (event) {
-        event.preventDefault();
-        notice.hidden = false;
-      });
+      function bindNotice(linkId, noticeId) {
+        var link = document.getElementById(linkId);
+        var notice = document.getElementById(noticeId);
+        if (!link || !notice) return;
+        link.addEventListener('click', function (event) {
+          event.preventDefault();
+          notice.hidden = false;
+        });
+      }
+
+      bindNotice('forgotPasswordLink', 'forgotPasswordNotice');
+      bindNotice('registrationNoticeLink', 'registrationNotice');
     })();
   </script>
 </body>
