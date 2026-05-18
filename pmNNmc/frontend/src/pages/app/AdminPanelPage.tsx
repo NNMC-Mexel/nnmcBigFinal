@@ -55,6 +55,7 @@ const PERMISSION_FLAGS = [
 
 type PermissionKey = typeof PERMISSION_FLAGS[number]['key'];
 type Tab = 'departments' | 'permissions' | 'users' | 'deleted';
+const STANDARD_INITIAL_PASSWORD = 'Aa123123!';
 
 export default function AdminPanelPage() {
   const { t, i18n } = useTranslation();
@@ -98,11 +99,8 @@ export default function AdminPanelPage() {
     username: '',
     firstName: '',
     lastName: '',
-    password: '',
     department: null as number | null,
     blocked: false,
-    generatePasswordAuto: true,
-    createInKeycloak: true,
     isSuperAdmin: false,
     kpiAllDepartments: false,
     kpiAllowedDepartments: [] as string[],
@@ -235,8 +233,8 @@ export default function AdminPanelPage() {
 
   const resetUserForm = () => {
     setUserForm({
-      email: '', username: '', firstName: '', lastName: '', password: '',
-      department: null, blocked: false, generatePasswordAuto: true, createInKeycloak: true, isSuperAdmin: false,
+      email: '', username: '', firstName: '', lastName: '',
+      department: null, blocked: false, isSuperAdmin: false,
       kpiAllDepartments: false, kpiAllowedDepartments: [],
     });
     setKpiAccessUserId(null);
@@ -244,36 +242,17 @@ export default function AdminPanelPage() {
 
   const handleCreateUser = async () => {
     try {
-      let result: { generatedPassword?: string | null };
+      const result = await adminUsersApi.createKeycloakUser({
+        email: userForm.email,
+        username: userForm.username,
+        firstName: userForm.firstName,
+        lastName: userForm.lastName,
+        department: userForm.department,
+        isSuperAdmin: userForm.isSuperAdmin,
+      });
 
-      if (userForm.createInKeycloak) {
-        result = await adminUsersApi.createKeycloakUser({
-          email: userForm.email,
-          username: userForm.username,
-          firstName: userForm.firstName,
-          lastName: userForm.lastName,
-          password: userForm.generatePasswordAuto ? undefined : userForm.password,
-          department: userForm.department,
-          isSuperAdmin: userForm.isSuperAdmin,
-        });
-      } else {
-        result = await adminUsersApi.create({
-          email: userForm.email,
-          username: userForm.username,
-          firstName: userForm.firstName,
-          lastName: userForm.lastName,
-          password: userForm.generatePasswordAuto ? undefined : userForm.password,
-          department: userForm.department,
-          blocked: userForm.blocked,
-          generatePasswordAuto: userForm.generatePasswordAuto,
-          isSuperAdmin: userForm.isSuperAdmin,
-        });
-      }
-
-      if (result.generatedPassword) {
-        setGeneratedPassword(result.generatedPassword);
-        setShowPassword(true);
-      }
+      setGeneratedPassword(result.generatedPassword || STANDARD_INITIAL_PASSWORD);
+      setShowPassword(true);
 
       setShowCreateUserModal(false);
       resetUserForm();
@@ -324,14 +303,11 @@ export default function AdminPanelPage() {
     }
   };
 
-  const handleResetPassword = async (generateNew: boolean, newPassword?: string) => {
+  const handleResetPassword = async () => {
     if (!selectedUser) return;
     try {
-      const result = await adminUsersApi.resetPassword(selectedUser.id, {
-        generateNew,
-        newPassword: generateNew ? undefined : newPassword,
-      });
-      setGeneratedPassword(result.newPassword);
+      const result = await adminUsersApi.resetPassword(selectedUser.id);
+      setGeneratedPassword(result.newPassword || STANDARD_INITIAL_PASSWORD);
       setShowPassword(true);
       setShowPasswordModal(false);
     } catch (error: any) {
@@ -367,11 +343,8 @@ export default function AdminPanelPage() {
       username: user.username,
       firstName: user.firstName || '',
       lastName: user.lastName || '',
-      password: '',
       department: user.department?.id || null,
       blocked: user.blocked,
-      generatePasswordAuto: true,
-      createInKeycloak: true,
       isSuperAdmin: user.isSuperAdmin === true,
       kpiAllDepartments: false,
       kpiAllowedDepartments: [],
@@ -930,18 +903,17 @@ export default function AdminPanelPage() {
             <span className="text-sm text-slate-700">SuperAdmin (полный доступ + админ-панель)</span>
           </label>
 
-          <div className="p-3 bg-slate-50 rounded-lg space-y-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={userForm.createInKeycloak} onChange={(e) => setUserForm({ ...userForm, createInKeycloak: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
-              <span className="text-sm text-slate-700">Создать в Keycloak (SSO)</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={userForm.generatePasswordAuto} onChange={(e) => setUserForm({ ...userForm, generatePasswordAuto: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
-              <span className="text-sm text-slate-700">Сгенерировать пароль автоматически</span>
-            </label>
-            {!userForm.generatePasswordAuto && (
-              <Input label="Пароль" type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} minLength={6} />
-            )}
+          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <div className="flex items-start gap-3">
+              <Key className="w-5 h-5 text-primary-600 mt-0.5" />
+              <div className="space-y-1">
+                <div className="text-sm font-medium text-slate-800">Аккаунт будет создан в Keycloak</div>
+                <div className="text-sm text-slate-600">
+                  Временный пароль: <span className="font-mono font-semibold text-slate-900">{STANDARD_INITIAL_PASSWORD}</span>.
+                  После первого входа пользователь должен задать новый пароль.
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
@@ -1029,17 +1001,14 @@ export default function AdminPanelPage() {
       {/* Password Reset Modal */}
       <Modal isOpen={showPasswordModal} onClose={() => { setShowPasswordModal(false); setSelectedUser(null); }} title={`Сброс пароля: ${selectedUser?.email}`} size="sm">
         <div className="space-y-4">
-          <p className="text-slate-600">Выберите способ сброса пароля для <strong>{selectedUser?.username}</strong></p>
-          <div className="space-y-3">
-            <Button className="w-full" onClick={() => handleResetPassword(true)} icon={<RefreshCw className="w-4 h-4" />}>Сгенерировать новый пароль</Button>
-            <div className="text-center text-sm text-slate-400">или</div>
-            <Input label="Задать пароль вручную" type="password" id="manualPassword" minLength={6} placeholder="Минимум 6 символов" />
-            <Button variant="secondary" className="w-full" onClick={() => {
-              const input = document.getElementById('manualPassword') as HTMLInputElement;
-              if (input.value.length >= 6) handleResetPassword(false, input.value);
-              else alert('Пароль должен быть минимум 6 символов');
-            }} icon={<Key className="w-4 h-4" />}>Установить пароль</Button>
+          <p className="text-slate-600">
+            Пароль для <strong>{selectedUser?.username}</strong> будет сброшен на стандартный временный пароль.
+          </p>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <span className="font-mono font-semibold text-slate-900">{STANDARD_INITIAL_PASSWORD}</span>
+            <span> После входа пользователь должен задать новый пароль.</span>
           </div>
+          <Button className="w-full" onClick={handleResetPassword} icon={<RefreshCw className="w-4 h-4" />}>Сбросить пароль</Button>
         </div>
       </Modal>
 

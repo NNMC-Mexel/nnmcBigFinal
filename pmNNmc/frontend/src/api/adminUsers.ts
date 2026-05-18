@@ -41,12 +41,10 @@ export const adminUsersApi = {
   create: async (data: {
     email: string;
     username: string;
-    password?: string;
     firstName?: string;
     lastName?: string;
     department?: number | null;
     blocked?: boolean;
-    generatePasswordAuto?: boolean;
     isSuperAdmin?: boolean;
   }): Promise<{ data: AdminUser; generatedPassword?: string }> => {
     const response = await client.post('/admin-users', data);
@@ -64,11 +62,8 @@ export const adminUsersApi = {
     return response.data.data;
   },
 
-  resetPassword: async (id: number, data: {
-    newPassword?: string;
-    generateNew?: boolean;
-  }): Promise<{ message: string; newPassword: string }> => {
-    const response = await client.post(`/admin-users/${id}/reset-password`, data);
+  resetPassword: async (id: number): Promise<{ message: string; newPassword: string; requiresPasswordUpdate?: boolean }> => {
+    const response = await client.post(`/admin-users/${id}/reset-password`, {});
     return response.data;
   },
 
@@ -81,10 +76,9 @@ export const adminUsersApi = {
     email: string;
     firstName?: string;
     lastName?: string;
-    password?: string;
     department?: number | null;
     isSuperAdmin?: boolean;
-  }): Promise<{ data: AdminUser; generatedPassword?: string; message: string }> => {
+  }): Promise<{ data: AdminUser; generatedPassword?: string; message: string; requiresPasswordUpdate?: boolean }> => {
     const response = await client.post('/admin-users/create-keycloak', data);
     return response.data;
   },
