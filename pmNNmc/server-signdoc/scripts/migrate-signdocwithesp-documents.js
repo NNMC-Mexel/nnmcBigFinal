@@ -510,31 +510,39 @@ function s3Client(config) {
 }
 
 async function objectExists(client, bucket, key) {
+  return Boolean(await headObject(client, bucket, key));
+}
+
+async function headObject(client, bucket, key) {
   try {
-    await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
-    return true;
+    return await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
   } catch {
-    return false;
+    return null;
   }
 }
 
 async function copyObject({ sourceS3, targetS3, sourceBucket, targetBucket, key, dryRun }) {
-  const exists = await objectExists(targetS3, targetBucket, key);
-  if (exists) return { key, copied: false, reason: "already_exists" };
-  const sourceExists = await objectExists(sourceS3, sourceBucket, key);
-  if (!sourceExists) return { key, copied: false, missing: true };
+  const targetHead = await headObject(targetS3, targetBucket, key);
+  if (targetHead) return { key, copied: false, reason: "already_exists" };
+  const sourceHead = await headObject(sourceS3, sourceBucket, key);
+  if (!sourceHead) return { key, copied: false, missing: true };
   if (dryRun) return { key, copied: false, reason: "dry_run" };
 
   const source = await sourceS3.send(new GetObjectCommand({ Bucket: sourceBucket, Key: key }));
-  await targetS3.send(
-    new PutObjectCommand({
-      Bucket: targetBucket,
-      Key: key,
-      Body: source.Body,
-      ContentType: source.ContentType,
-      Metadata: source.Metadata,
-    })
-  );
+  if (!source.Body) throw new Error(`Source object has no body: ${key}`);
+
+  const putObject = {
+    Bucket: targetBucket,
+    Key: key,
+    Body: source.Body,
+    ContentType: source.ContentType || sourceHead.ContentType,
+    Metadata: source.Metadata || sourceHead.Metadata,
+  };
+
+  const contentLength = source.ContentLength ?? sourceHead.ContentLength;
+  if (contentLength != null) putObject.ContentLength = Number(contentLength);
+
+  await targetS3.send(new PutObjectCommand(putObject));
   return { key, copied: true };
 }
 
