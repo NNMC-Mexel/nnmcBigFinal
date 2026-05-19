@@ -58,7 +58,7 @@
                   <circle cx="12" cy="7" r="4"/>
                 </svg>
                 <input id="username" name="username" type="text"
-                  value="${usernameValue?html}"
+                  value="${usernameValue}"
                   autocomplete="username"
                   placeholder="Введите логин"
                 />
@@ -77,7 +77,7 @@
                 <polyline points="22,6 12,13 2,6"/>
               </svg>
               <input id="email" name="email" type="email"
-                value="${emailValue?html}"
+                value="${emailValue}"
                 autocomplete="email"
                 placeholder="Введите email"
                 <#if emailReadonly>readonly</#if>
@@ -99,7 +99,7 @@
                 <circle cx="12" cy="7" r="4"/>
               </svg>
               <input id="firstName" name="firstName" type="text"
-                value="${firstNameValue?html}"
+                value="${firstNameValue}"
                 autocomplete="given-name"
                 placeholder="Введите имя"
                 <#if firstNameReadonly>readonly</#if>
@@ -121,7 +121,7 @@
                 <circle cx="12" cy="7" r="4"/>
               </svg>
               <input id="lastName" name="lastName" type="text"
-                value="${lastNameValue?html}"
+                value="${lastNameValue}"
                 autocomplete="family-name"
                 placeholder="Введите фамилию"
                 <#if lastNameReadonly>readonly</#if>
