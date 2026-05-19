@@ -23,6 +23,7 @@ out/
 .env.production.local
 .env.*backup*
 *.sqlite.backup*
+migration-input/
 
 # Logs
 logs/
