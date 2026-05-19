@@ -152,6 +152,10 @@ function jsonValue(value, fallback) {
   }
 }
 
+function jsonForDb(value) {
+  return JSON.stringify(value ?? null);
+}
+
 function rowValue(row, names, fallback = null) {
   for (const name of names) {
     if (Object.prototype.hasOwnProperty.call(row, name)) return row[name];
@@ -822,9 +826,9 @@ async function createTargetDocument({
     status: normalizeStatus(sourceDocument.status),
     signature_type: rowValue(sourceDocument, ["signature_type", "signatureType"], null),
     signature_sequential: Boolean(rowValue(sourceDocument, ["signature_sequential", "signatureSequential"], false)),
-    signers,
-    signature_history: history,
-    metadata: metadataValue,
+    signers: jsonForDb(signers),
+    signature_history: jsonForDb(history),
+    metadata: jsonForDb(metadataValue),
     created_at: sourceDocument.created_at || NOW(),
     updated_at: sourceDocument.updated_at || NOW(),
     published_at: sourceDocument.published_at || NOW(),
