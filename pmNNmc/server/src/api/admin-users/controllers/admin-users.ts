@@ -17,6 +17,25 @@ function sanitizeFields(data: Record<string, any>, allowlist: string[]): Record<
   return Object.fromEntries(Object.entries(data).filter(([k]) => allowlist.includes(k)));
 }
 
+function cleanString(value: any): string {
+  return String(value || '').trim();
+}
+
+function keycloakProfilePatch(user: any): Record<string, any> {
+  const email = cleanString(user?.email).toLowerCase();
+  const username = cleanString(user?.username) || email;
+  const fallbackName = cleanString(user?.firstName) || cleanString(user?.lastName) || username || email.split('@')[0] || 'user';
+
+  return {
+    username,
+    email,
+    firstName: cleanString(user?.firstName) || fallbackName,
+    lastName: cleanString(user?.lastName) || fallbackName,
+    enabled: user?.blocked === undefined ? true : !user.blocked,
+    emailVerified: true,
+  };
+}
+
 // Проверка что пользователь - супер админ (по флагу isSuperAdmin)
 async function checkSuperAdmin(ctx: Context, strapi: any): Promise<boolean> {
   const user = ctx.state.user;
@@ -104,12 +123,11 @@ async function updateKeycloakProfile(token: string, keycloakUser: any, patch: Re
   const { url, realm } = getKeycloakConfig();
   if (!url || !keycloakUser?.id) return;
 
-  const requiredActions = Array.from(
-    new Set([
-      ...(Array.isArray(keycloakUser.requiredActions) ? keycloakUser.requiredActions : []),
-      ...(Array.isArray(patch.requiredActions) ? patch.requiredActions : []),
-    ])
-  );
+  const requiredActions = Array.isArray(patch.requiredActions)
+    ? patch.requiredActions
+    : Array.isArray(keycloakUser.requiredActions)
+      ? keycloakUser.requiredActions
+      : [];
 
   const body: Record<string, any> = {
     username: patch.username ?? keycloakUser.username,
@@ -140,7 +158,13 @@ async function updateKeycloakProfile(token: string, keycloakUser: any, patch: Re
   }
 }
 
-async function setKeycloakTemporaryPassword(strapi: any, token: string, keycloakUser: any, password: string) {
+async function setKeycloakTemporaryPassword(
+  strapi: any,
+  token: string,
+  keycloakUser: any,
+  password: string,
+  profilePatch: Record<string, any> = {}
+) {
   const { url, realm } = getKeycloakConfig();
   if (!url || !keycloakUser?.id) {
     throw new Error('Keycloak user not found');
@@ -166,6 +190,7 @@ async function setKeycloakTemporaryPassword(strapi: any, token: string, keycloak
 
   try {
     await updateKeycloakProfile(token, keycloakUser, {
+      ...profilePatch,
       requiredActions: [KEYCLOAK_PASSWORD_REQUIRED_ACTION],
     });
   } catch (error: any) {
@@ -376,7 +401,7 @@ export default {
       if (token) {
         const keycloakUser = await findKeycloakUser(token, user);
         if (keycloakUser?.id) {
-          await setKeycloakTemporaryPassword(strapi, token, keycloakUser, password);
+          await setKeycloakTemporaryPassword(strapi, token, keycloakUser, password, keycloakProfilePatch(user));
           requiresPasswordUpdate = true;
         } else if (user.provider === 'keycloak') {
           ctx.throw(404, 'Keycloak user not found');
@@ -594,11 +619,18 @@ export default {
       }
 
       const initialPassword = DEFAULT_KEYCLOAK_INITIAL_PASSWORD;
-      const userPayload: any = {
+      const profilePatch = keycloakProfilePatch({
         username,
         email,
-        firstName: firstName || '',
-        lastName: lastName || '',
+        firstName,
+        lastName,
+        blocked: false,
+      });
+      const userPayload: any = {
+        username: profilePatch.username,
+        email: profilePatch.email,
+        firstName: profilePatch.firstName,
+        lastName: profilePatch.lastName,
         enabled: true,
         emailVerified: true,
         credentials: [{
@@ -637,15 +669,12 @@ export default {
         }
 
         await updateKeycloakProfile(accessToken, keycloakUser, {
-          username,
-          email,
-          firstName: firstName || '',
-          lastName: lastName || '',
+          ...profilePatch,
           enabled: true,
           emailVerified: true,
           requiredActions: [KEYCLOAK_PASSWORD_REQUIRED_ACTION],
         });
-        await setKeycloakTemporaryPassword(strapi, accessToken, keycloakUser, initialPassword);
+        await setKeycloakTemporaryPassword(strapi, accessToken, keycloakUser, initialPassword, profilePatch);
       }
 
       const existingUsers = await strapi.entityService.findMany('plugin::users-permissions.user', {
