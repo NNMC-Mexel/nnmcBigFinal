@@ -573,6 +573,12 @@ function dataForColumns(metadata, table, source, overrides = {}) {
   return out;
 }
 
+function clearAdminAuditColumns(data) {
+  if (Object.prototype.hasOwnProperty.call(data, "created_by_id")) data.created_by_id = null;
+  if (Object.prototype.hasOwnProperty.call(data, "updated_by_id")) data.updated_by_id = null;
+  return data;
+}
+
 async function ensureDepartment(client, metadata, name, dryRun, report) {
   const clean = String(name || "").trim();
   if (!clean || !metadata.columns.departments) return null;
@@ -583,13 +589,13 @@ async function ensureDepartment(client, metadata, name, dryRun, report) {
   return insertRow(
     client,
     "departments",
-    dataForColumns(metadata, "departments", {
+    clearAdminAuditColumns(dataForColumns(metadata, "departments", {
       name: clean,
       key: null,
       created_at: NOW(),
       updated_at: NOW(),
       published_at: NOW(),
-    })
+    }))
   );
 }
 
@@ -603,13 +609,13 @@ async function ensureDocumentType(client, metadata, name, dryRun, report) {
   return insertRow(
     client,
     "document_types",
-    dataForColumns(metadata, "document_types", {
+    clearAdminAuditColumns(dataForColumns(metadata, "document_types", {
       document_id: randomDocumentId(),
       name: clean,
       created_at: NOW(),
       updated_at: NOW(),
       published_at: NOW(),
-    })
+    }))
   );
 }
 
@@ -623,13 +629,13 @@ async function ensureSubdivision(client, metadata, name, dryRun, report) {
   return insertRow(
     client,
     "subdivisions",
-    dataForColumns(metadata, "subdivisions", {
+    clearAdminAuditColumns(dataForColumns(metadata, "subdivisions", {
       document_id: randomDocumentId(),
       name: clean,
       created_at: NOW(),
       updated_at: NOW(),
       published_at: NOW(),
-    })
+    }))
   );
 }
 
@@ -659,7 +665,7 @@ async function ensureUsers(client, metadata, dryRun, report) {
         const userId = await insertRow(
           client,
           table,
-          dataForColumns(metadata, table, {
+          clearAdminAuditColumns(dataForColumns(metadata, table, {
             document_id: randomDocumentId(),
             username: person.fullName,
             email: person.email,
@@ -675,7 +681,7 @@ async function ensureUsers(client, metadata, dryRun, report) {
             created_at: NOW(),
             updated_at: NOW(),
             published_at: NOW(),
-          })
+          }))
         );
         if (roleLink) await insertGenericLink(client, metadata, roleLink, { user_id: userId, role_id: roleId });
         if (deptLink && departmentId) {
@@ -738,7 +744,7 @@ async function ensureTargetFile(client, metadata, sourceFile, dryRun, report) {
   report.fileRowsToCreate += 1;
   if (dryRun) return null;
 
-  const data = dataForColumns(
+  const data = clearAdminAuditColumns(dataForColumns(
     metadata,
     table,
     sourceFile,
@@ -750,7 +756,7 @@ async function ensureTargetFile(client, metadata, sourceFile, dryRun, report) {
       updated_at: sourceFile.updated_at || NOW(),
       published_at: sourceFile.published_at || NOW(),
     }
-  );
+  ));
   delete data.id;
   return insertRow(client, table, data);
 }
@@ -801,7 +807,7 @@ async function createTargetDocument({
   report.documentsToCreate += 1;
   if (dryRun) return null;
 
-  const docData = dataForColumns(metadata, "documents", sourceDocument, {
+  const docData = clearAdminAuditColumns(dataForColumns(metadata, "documents", sourceDocument, {
     document_id: sourceDocumentId || randomDocumentId(),
     title: sourceDocument.title,
     uid: sourceDocument.uid || null,
@@ -814,7 +820,7 @@ async function createTargetDocument({
     created_at: sourceDocument.created_at || NOW(),
     updated_at: sourceDocument.updated_at || NOW(),
     published_at: sourceDocument.published_at || NOW(),
-  });
+  }));
   delete docData.id;
 
   const documentId = await insertRow(client, "documents", docData);
