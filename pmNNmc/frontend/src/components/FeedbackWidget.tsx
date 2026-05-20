@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { MessageSquarePlus, Send, Loader2 } from 'lucide-react';
+import { Bot, Send, Loader2, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import Modal from './ui/Modal';
 import client from '../api/client';
 
 export default function FeedbackWidget() {
   const [open, setOpen] = useState(false);
+  const [bubbleVisible, setBubbleVisible] = useState(true);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -37,14 +38,29 @@ export default function FeedbackWidget() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        aria-label="Предложить улучшение"
-        title="Предложить улучшение"
-        className="fixed bottom-5 right-5 z-40 w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg flex items-center justify-center transition-colors"
-      >
-        <MessageSquarePlus className="w-5 h-5" />
-      </button>
+      <div className="fixed bottom-5 right-5 z-40 flex items-end gap-2">
+        {bubbleVisible && (
+          <div className="relative hidden sm:flex items-center gap-2 bg-white text-slate-700 pl-3 pr-2 py-2 rounded-2xl shadow-md text-sm max-w-[220px] mb-1 animate-in fade-in">
+            <span>Что-то работает не так?<br />Сообщи нам!</span>
+            <button
+              onClick={() => setBubbleVisible(false)}
+              aria-label="Скрыть подсказку"
+              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+            <span className="absolute right-[-6px] bottom-3 w-3 h-3 bg-white rotate-45 shadow-md" style={{ clipPath: 'polygon(100% 0, 100% 100%, 0 100%)' }} />
+          </div>
+        )}
+        <button
+          onClick={() => setOpen(true)}
+          aria-label="Предложить улучшение"
+          title="Предложить улучшение"
+          className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg flex items-center justify-center transition-colors"
+        >
+          <Bot className="w-7 h-7" />
+        </button>
+      </div>
 
       <Modal
         isOpen={open}
