@@ -247,6 +247,29 @@ async function notifyTicketAssignees(strapi: any, ticketId: number) {
   }
 }
 
+async function assignDefaultCategoryAssignees(strapi: any, ticketId: number, categoryId: any) {
+  const normalizedCategoryId = Number(categoryId);
+  if (!ticketId || !Number.isFinite(normalizedCategoryId) || normalizedCategoryId <= 0) return null;
+
+  const category = (await strapi.entityService.findOne(
+    'api::ticket-category.ticket-category',
+    normalizedCategoryId,
+    { populate: ['defaultAssignee'] }
+  )) as any;
+
+  const assigneeIds = Array.from(new Set(extractRelationIds(category?.defaultAssignee)));
+  if (assigneeIds.length === 0) return null;
+
+  return await strapi.entityService.update('api::ticket.ticket', ticketId, {
+    data: {
+      assignee: {
+        set: assigneeIds.map((id) => ({ id })),
+      },
+    },
+    populate: ['category', 'serviceGroup', 'serviceGroup.department', 'assignee', 'assignee.department', 'attachments', 'requester', 'completedBy'] as any,
+  });
+}
+
 export default factories.createCoreController('api::ticket.ticket', ({ strapi }) => ({
   async formatAssigneesForClient(assigneeInput: any) {
     const assigneeList = Array.isArray(assigneeInput)
@@ -622,6 +645,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     if (files.length > 0) {
       await uploadAndAttachTicketFiles(strapi, ticket.id, files);
     }
+    await assignDefaultCategoryAssignees(strapi, ticket.id, finalCategoryId);
     const ticketWithAssignees = await notifyTicketAssignees(strapi, ticket.id);
     const responseTicket = ticketWithAssignees || ticket;
 
@@ -745,6 +769,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     const ticket = (await strapi.entityService.create('api::ticket.ticket', {
       data: ticketData,
     })) as any;
+    await assignDefaultCategoryAssignees(strapi, ticket.id, categoryId);
 
     ctx.body = {
       data: {
