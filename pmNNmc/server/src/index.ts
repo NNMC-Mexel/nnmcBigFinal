@@ -301,7 +301,7 @@ async function setupPermissions(strapi: any) {
       'find', 'findOne', 'create', 'update', 'delete',
       'createKeycloakUser', 'resetPassword',
       'getDepartments', 'createDepartment', 'updateDepartment', 'deleteDepartment',
-      'updateDepartmentPermissions',
+      'updateDepartmentPermissions', 'getHelpdeskRouting', 'updateHelpdeskRouting',
     ],
     // In-app notifications (own only — see controller for row-level filter)
     'api::notification.notification': ['mine', 'unreadCount', 'markRead', 'markAllRead', 'markReadByLink'],
