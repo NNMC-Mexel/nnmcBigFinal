@@ -26,6 +26,7 @@ import { useEffect, useState } from "react";
 import { useAuthStore, useUserRole } from "../store/authStore";
 import LanguageSwitcher from "../components/ui/LanguageSwitcher";
 import NotificationsBell from "../components/NotificationsBell";
+import FeedbackWidget from "../components/FeedbackWidget";
 import { getMediaUrl } from "../utils/media";
 import { notificationsApi } from "../api/notifications";
 
@@ -486,6 +487,7 @@ export default function AppLayout() {
                     <Outlet />
                 </main>
             </div>
+            <FeedbackWidget />
         </div>
     );
 }
