@@ -665,6 +665,8 @@ export default factories.createCoreController(
         async findMine(ctx) {
             const requestUser = ctx.state.user;
             if (!requestUser) return ctx.unauthorized("Необходима авторизация");
+            const fullUser = await getFullUser(strapi, requestUser);
+            const superAdmin = isSuperAdmin(fullUser);
 
             const allowedRoles = ["creator", "assigned", "all"];
             const role = String(ctx.query.role || "all");
@@ -674,16 +676,18 @@ export default factories.createCoreController(
 
             let filters: any;
             if (role === "creator") {
-                filters = { creator: { id: requestUser.id } };
+                filters = superAdmin ? {} : { creator: { id: requestUser.id } };
             } else if (role === "assigned") {
-                filters = { assigned_users: { id: requestUser.id } };
+                filters = superAdmin ? {} : { assigned_users: { id: requestUser.id } };
             } else {
-                filters = {
-                    $or: [
-                        { creator: { id: requestUser.id } },
-                        { assigned_users: { id: requestUser.id } },
-                    ],
-                };
+                filters = superAdmin
+                    ? {}
+                    : {
+                          $or: [
+                              { creator: { id: requestUser.id } },
+                              { assigned_users: { id: requestUser.id } },
+                          ],
+                      };
             }
 
             const pageSize = 200;
