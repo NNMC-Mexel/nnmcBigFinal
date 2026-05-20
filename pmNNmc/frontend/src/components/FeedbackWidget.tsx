@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bot, Send, Loader2, X } from 'lucide-react';
+import { Send, Loader2, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import Modal from './ui/Modal';
 import client from '../api/client';
@@ -56,9 +56,13 @@ export default function FeedbackWidget() {
           onClick={() => setOpen(true)}
           aria-label="Предложить улучшение"
           title="Предложить улучшение"
-          className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg flex items-center justify-center transition-colors"
+          className="w-16 h-16 rounded-full bg-white hover:bg-slate-50 shadow-lg flex items-center justify-center transition-colors overflow-hidden ring-2 ring-indigo-100"
         >
-          <Bot className="w-7 h-7" />
+          <img
+            src="/feedback-robot.gif"
+            alt="Робот-помощник"
+            className="w-full h-full object-cover"
+          />
         </button>
       </div>
 
