@@ -18,8 +18,9 @@ import {
   RotateCcw,
   Check,
   Save,
+  Headphones,
 } from 'lucide-react';
-import { adminUsersApi, AdminUser } from '../../api/adminUsers';
+import { adminUsersApi, AdminUser, HelpdeskRoutingData } from '../../api/adminUsers';
 import { projectsApi } from '../../api/projects';
 import { departmentsApi } from '../../api/departments';
 import type { Project, Department } from '../../types';
@@ -54,7 +55,7 @@ const PERMISSION_FLAGS = [
 ] as const;
 
 type PermissionKey = typeof PERMISSION_FLAGS[number]['key'];
-type Tab = 'departments' | 'permissions' | 'users' | 'deleted';
+type Tab = 'departments' | 'permissions' | 'helpdesk' | 'users' | 'deleted';
 const STANDARD_INITIAL_PASSWORD = 'Aa123123!';
 
 export default function AdminPanelPage() {
@@ -93,6 +94,12 @@ export default function AdminPanelPage() {
   const [matrixData, setMatrixData] = useState<Record<number, Record<string, boolean>>>({});
   const [matrixSaving, setMatrixSaving] = useState(false);
 
+  const [helpdeskRouting, setHelpdeskRouting] = useState<HelpdeskRoutingData | null>(null);
+  const [helpdeskRoutingDraft, setHelpdeskRoutingDraft] = useState<Record<number, number[]>>({});
+  const [helpdeskRoutingLoading, setHelpdeskRoutingLoading] = useState(false);
+  const [helpdeskRoutingSaving, setHelpdeskRoutingSaving] = useState(false);
+  const [helpdeskRoutingDirty, setHelpdeskRoutingDirty] = useState(false);
+
   // User form
   const [userForm, setUserForm] = useState({
     email: '',
@@ -126,6 +133,7 @@ export default function AdminPanelPage() {
     loadUsers();
     loadDeletedProjects();
     loadKpiDepartments();
+    loadHelpdeskRouting();
   }, []);
 
   const loadKpiDepartments = async () => {
@@ -226,6 +234,30 @@ export default function AdminPanelPage() {
       console.error('Failed to load deleted projects:', error);
     } finally {
       setIsDeletedProjectsLoading(false);
+    }
+  };
+
+  const applyHelpdeskRouting = (data: HelpdeskRoutingData) => {
+    const draft: Record<number, number[]> = {};
+    data.groups.forEach((group) => {
+      group.categories.forEach((category) => {
+        draft[category.id] = category.defaultAssignee.map((user) => user.id);
+      });
+    });
+    setHelpdeskRouting(data);
+    setHelpdeskRoutingDraft(draft);
+    setHelpdeskRoutingDirty(false);
+  };
+
+  const loadHelpdeskRouting = async () => {
+    setHelpdeskRoutingLoading(true);
+    try {
+      const data = await adminUsersApi.getHelpdeskRouting();
+      applyHelpdeskRouting(data);
+    } catch (error) {
+      console.error('Failed to load helpdesk routing:', error);
+    } finally {
+      setHelpdeskRoutingLoading(false);
     }
   };
 
@@ -469,6 +501,36 @@ export default function AdminPanelPage() {
     }
   };
 
+  const toggleHelpdeskAssignee = (categoryId: number, userId: number) => {
+    setHelpdeskRoutingDraft((prev) => {
+      const current = prev[categoryId] || [];
+      const next = current.includes(userId)
+        ? current.filter((id) => id !== userId)
+        : [...current, userId];
+      return { ...prev, [categoryId]: next };
+    });
+    setHelpdeskRoutingDirty(true);
+  };
+
+  const saveHelpdeskRouting = async () => {
+    if (!helpdeskRouting) return;
+    setHelpdeskRoutingSaving(true);
+    try {
+      const categories = helpdeskRouting.groups.flatMap((group) =>
+        group.categories.map((category) => ({
+          id: category.id,
+          assigneeIds: helpdeskRoutingDraft[category.id] || [],
+        }))
+      );
+      const result = await adminUsersApi.updateHelpdeskRouting(categories);
+      applyHelpdeskRouting(result.data);
+    } catch (error: any) {
+      alert(error.response?.data?.error?.message || 'Ошибка сохранения маршрутизации Helpdesk');
+    } finally {
+      setHelpdeskRoutingSaving(false);
+    }
+  };
+
   // ─── Deleted Projects ───────────────────────────────────
 
   const handleRestoreDeletedProject = async (project: Project) => {
@@ -499,6 +561,12 @@ export default function AdminPanelPage() {
     return i18n.language === 'kz' ? dept.name_kz : dept.name_ru;
   };
 
+  const getAdminUserName = (user: { firstName?: string; lastName?: string; username?: string; email?: string }) =>
+    `${user.lastName || ''} ${user.firstName || ''}`.trim() || user.username || user.email || 'Пользователь';
+
+  const getHelpdeskUsersForDepartment = (departmentKey?: string) =>
+    (helpdeskRouting?.users || []).filter((user) => user.department?.key === departmentKey);
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString(i18n.language === 'kz' ? 'kk-KZ' : 'ru-RU', {
       day: 'numeric', month: 'short', year: 'numeric',
@@ -528,6 +596,7 @@ export default function AdminPanelPage() {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'departments', label: 'Отделы' },
     { key: 'permissions', label: 'Матрица прав' },
+    { key: 'helpdesk', label: 'Helpdesk' },
     { key: 'users', label: 'Пользователи' },
     { key: 'deleted', label: 'Удалённые проекты' },
   ];
@@ -710,6 +779,114 @@ export default function AdminPanelPage() {
               </table>
             </div>
           </Card>
+        </div>
+      )}
+
+      {activeTab === 'helpdesk' && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Headphones className="w-5 h-5 text-cyan-600" />
+              <div>
+                <h3 className="font-semibold text-slate-800">Маршрутизация Helpdesk</h3>
+                <p className="text-sm text-slate-500">IT, медоборудование и хозяйственная служба</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={loadHelpdeskRouting}
+                icon={<RefreshCw className="w-4 h-4" />}
+                disabled={helpdeskRoutingLoading || helpdeskRoutingSaving}
+              >
+                Обновить
+              </Button>
+              <Button
+                onClick={saveHelpdeskRouting}
+                disabled={!helpdeskRoutingDirty || helpdeskRoutingSaving || helpdeskRoutingLoading}
+                icon={helpdeskRoutingSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              >
+                {helpdeskRoutingSaving ? 'Сохранение...' : 'Сохранить'}
+              </Button>
+            </div>
+          </div>
+
+          {helpdeskRoutingLoading && !helpdeskRouting ? (
+            <Loader text="Загрузка маршрутизации Helpdesk..." />
+          ) : !helpdeskRouting || helpdeskRouting.groups.length === 0 ? (
+            <Card>
+              <div className="py-8 text-center text-slate-500">Службы Helpdesk не найдены</div>
+            </Card>
+          ) : (
+            helpdeskRouting.groups.map((group) => {
+              const groupUsers = getHelpdeskUsersForDepartment(group.department?.key);
+              return (
+                <Card key={group.id} padding="none">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                    <div>
+                      <h4 className="font-semibold text-slate-800">{i18n.language === 'kz' ? group.name_kz : group.name_ru}</h4>
+                      <p className="text-xs text-slate-500">{group.department ? getDeptName(group.department) : group.slug}</p>
+                    </div>
+                    <Badge variant="info" size="md">{group.categories.length} типов</Badge>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200 text-left text-slate-500">
+                          <th className="px-4 py-3 font-medium min-w-[240px]">Тип заявки</th>
+                          <th className="px-4 py-3 font-medium min-w-[360px]">Исполнители</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.categories.map((category) => {
+                          const selectedIds = helpdeskRoutingDraft[category.id] || [];
+                          return (
+                            <tr key={category.id} className="border-b border-slate-100 align-top">
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-slate-800">
+                                  {i18n.language === 'kz' ? category.name_kz : category.name_ru}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-400">{category.slug}</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                {groupUsers.length === 0 ? (
+                                  <span className="text-slate-400">Нет активных сотрудников в отделе</span>
+                                ) : (
+                                  <div className="flex flex-wrap gap-2">
+                                    {groupUsers.map((user) => {
+                                      const checked = selectedIds.includes(user.id);
+                                      return (
+                                        <label
+                                          key={`${category.id}-${user.id}`}
+                                          className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm cursor-pointer transition-colors ${
+                                            checked
+                                              ? 'border-cyan-300 bg-cyan-50 text-cyan-800'
+                                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                          }`}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => toggleHelpdeskAssignee(category.id, user.id)}
+                                            className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                                          />
+                                          <span>{getAdminUserName(user)}</span>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              );
+            })
+          )}
         </div>
       )}
 

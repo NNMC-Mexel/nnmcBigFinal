@@ -40,6 +40,18 @@ export default {
       config: { policies: [] },
     },
     {
+      method: 'GET',
+      path: '/admin-users/helpdesk-routing',
+      handler: 'admin-users.getHelpdeskRouting',
+      config: { policies: [] },
+    },
+    {
+      method: 'PUT',
+      path: '/admin-users/helpdesk-routing',
+      handler: 'admin-users.updateHelpdeskRouting',
+      config: { policies: [] },
+    },
+    {
       method: 'PUT',
       path: '/admin-users/departments/:id',
       handler: 'admin-users.updateDepartment',

@@ -21,6 +21,51 @@ export interface AdminUser {
   isSuperAdmin?: boolean;
 }
 
+export interface HelpdeskRoutingUser {
+  id: number;
+  username: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  blocked?: boolean;
+  department?: {
+    id: number;
+    key: string;
+    name_ru: string;
+    name_kz: string;
+  } | null;
+}
+
+export interface HelpdeskRoutingCategory {
+  id: number;
+  documentId?: string;
+  name_ru: string;
+  name_kz: string;
+  slug: string;
+  order?: number;
+  defaultAssignee: HelpdeskRoutingUser[];
+}
+
+export interface HelpdeskRoutingGroup {
+  id: number;
+  documentId?: string;
+  name_ru: string;
+  name_kz: string;
+  slug: string;
+  department?: {
+    id: number;
+    key: string;
+    name_ru: string;
+    name_kz: string;
+  } | null;
+  categories: HelpdeskRoutingCategory[];
+}
+
+export interface HelpdeskRoutingData {
+  groups: HelpdeskRoutingGroup[];
+  users: HelpdeskRoutingUser[];
+}
+
 export const adminUsersApi = {
   // ─── Users ────────────────────────────────────────────
 
@@ -110,6 +155,18 @@ export const adminUsersApi = {
 
   updateDepartmentPermissions: async (departments: Array<{ id: number } & Partial<Department>>): Promise<{ data: Department[]; message: string }> => {
     const response = await client.put('/admin-users/departments/permissions', { departments });
+    return response.data;
+  },
+
+  getHelpdeskRouting: async (): Promise<HelpdeskRoutingData> => {
+    const response = await client.get('/admin-users/helpdesk-routing');
+    return response.data.data;
+  },
+
+  updateHelpdeskRouting: async (
+    categories: Array<{ id: number; assigneeIds: number[] }>
+  ): Promise<{ data: HelpdeskRoutingData; message: string }> => {
+    const response = await client.put('/admin-users/helpdesk-routing', { categories });
     return response.data;
   },
 };

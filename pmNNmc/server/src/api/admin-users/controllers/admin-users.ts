@@ -9,6 +9,7 @@ const DEPT_PERMISSION_FLAGS = [
   'canManageProjectAssignments', 'canManageTickets', 'canViewActivityLog',
 ];
 const ALLOWED_DEPT_FIELDS = [...DEPT_FIELDS, ...DEPT_PERMISSION_FLAGS];
+const HELPDESK_DEPARTMENT_KEYS = ['IT', 'MEDICAL_EQUIPMENT', 'ENGINEERING'];
 
 const DEFAULT_KEYCLOAK_INITIAL_PASSWORD = 'Aa123123!';
 const KEYCLOAK_PASSWORD_REQUIRED_ACTION = 'UPDATE_PASSWORD';
@@ -33,6 +34,108 @@ function keycloakProfilePatch(user: any): Record<string, any> {
     lastName: cleanString(user?.lastName) || fallbackName,
     enabled: user?.blocked === undefined ? true : !user.blocked,
     emailVerified: true,
+  };
+}
+
+function relationItems(value: any): any[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function formatHelpdeskUser(user: any) {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    blocked: user.blocked,
+    department: user.department
+      ? {
+          id: user.department.id,
+          key: user.department.key,
+          name_ru: user.department.name_ru,
+          name_kz: user.department.name_kz,
+        }
+      : null,
+  };
+}
+
+async function loadHelpdeskRouting(strapi: any) {
+  const serviceGroups = (await strapi.entityService.findMany('api::service-group.service-group', {
+    filters: { department: { key: { $in: HELPDESK_DEPARTMENT_KEYS } } } as any,
+    populate: ['department'],
+    pagination: { pageSize: 100 },
+  })) as any[];
+
+  const groupIds = (serviceGroups || []).map((group: any) => group.id).filter(Boolean);
+  const categories = groupIds.length > 0
+    ? ((await strapi.entityService.findMany('api::ticket-category.ticket-category', {
+        filters: { serviceGroup: { id: { $in: groupIds } } } as any,
+        populate: {
+          serviceGroup: true,
+          defaultAssignee: { populate: ['department'] },
+        } as any,
+        sort: { order: 'asc', name_ru: 'asc' } as any,
+        pagination: { pageSize: 1000 },
+      })) as any[])
+    : [];
+
+  const categoriesByGroup = new Map<number, any[]>();
+  for (const category of categories || []) {
+    const groupId = Number(category?.serviceGroup?.id);
+    if (!groupId) continue;
+    const list = categoriesByGroup.get(groupId) || [];
+    list.push({
+      id: category.id,
+      documentId: category.documentId,
+      name_ru: category.name_ru,
+      name_kz: category.name_kz,
+      slug: category.slug,
+      order: category.order,
+      defaultAssignee: relationItems(category.defaultAssignee).map(formatHelpdeskUser),
+    });
+    categoriesByGroup.set(groupId, list);
+  }
+
+  const order = new Map(HELPDESK_DEPARTMENT_KEYS.map((key, index) => [key, index]));
+  const groups = (serviceGroups || [])
+    .sort((a: any, b: any) => {
+      const aOrder = order.get(a?.department?.key) ?? 99;
+      const bOrder = order.get(b?.department?.key) ?? 99;
+      return aOrder - bOrder || String(a.name_ru || '').localeCompare(String(b.name_ru || ''), 'ru');
+    })
+    .map((group: any) => ({
+      id: group.id,
+      documentId: group.documentId,
+      name_ru: group.name_ru,
+      name_kz: group.name_kz,
+      slug: group.slug,
+      department: group.department
+        ? {
+            id: group.department.id,
+            key: group.department.key,
+            name_ru: group.department.name_ru,
+            name_kz: group.department.name_kz,
+          }
+        : null,
+      categories: categoriesByGroup.get(group.id) || [],
+    }));
+
+  const users = (await strapi.entityService.findMany('plugin::users-permissions.user', {
+    filters: {
+      department: { key: { $in: HELPDESK_DEPARTMENT_KEYS } },
+      blocked: false,
+    } as any,
+    fields: ['id', 'username', 'email', 'firstName', 'lastName', 'blocked'],
+    populate: ['department'],
+    sort: { firstName: 'asc', lastName: 'asc', username: 'asc' } as any,
+    pagination: { pageSize: 1000 },
+  })) as any[];
+
+  return {
+    groups,
+    users: (users || []).map(formatHelpdeskUser),
   };
 }
 
@@ -590,6 +693,136 @@ export default {
   },
 
   // Создать пользователя в Keycloak + Strapi
+  async getHelpdeskRouting(ctx: Context) {
+    const strapi = (global as any).strapi;
+    await checkSuperAdmin(ctx, strapi);
+
+    try {
+      ctx.body = { data: await loadHelpdeskRouting(strapi) };
+    } catch (error: any) {
+      if (error.status) throw error;
+      console.error('Error fetching helpdesk routing:', error);
+      ctx.throw(500, 'Error fetching helpdesk routing');
+    }
+  },
+
+  async updateHelpdeskRouting(ctx: Context) {
+    const strapi = (global as any).strapi;
+    await checkSuperAdmin(ctx, strapi);
+
+    const { categories } = ctx.request.body as any;
+    if (!Array.isArray(categories)) {
+      ctx.throw(400, 'categories array is required');
+      return;
+    }
+
+    try {
+      const categoryIds = categories
+        .map((item: any) => Number(item?.id))
+        .filter((id: number) => Number.isFinite(id) && id > 0);
+      const uniqueCategoryIds = Array.from(new Set(categoryIds));
+
+      const requestedAssigneeIds = Array.from(
+        new Set(
+          categories
+            .flatMap((item: any) => (Array.isArray(item?.assigneeIds) ? item.assigneeIds : []))
+            .map((id: any) => Number(id))
+            .filter((id: number) => Number.isFinite(id) && id > 0)
+        )
+      );
+
+      const allowedCategories = uniqueCategoryIds.length > 0
+        ? ((await strapi.entityService.findMany('api::ticket-category.ticket-category', {
+            filters: {
+              id: { $in: uniqueCategoryIds },
+              serviceGroup: { department: { key: { $in: HELPDESK_DEPARTMENT_KEYS } } },
+            } as any,
+            populate: { serviceGroup: { populate: ['department'] } } as any,
+            pagination: { pageSize: 1000 },
+          })) as any[])
+        : [];
+      const allowedCategoryIds = new Set((allowedCategories || []).map((category: any) => Number(category.id)));
+      const categoryDepartmentById = new Map(
+        (allowedCategories || []).map((category: any) => [
+          Number(category.id),
+          category?.serviceGroup?.department?.key,
+        ])
+      );
+
+      if (allowedCategoryIds.size !== uniqueCategoryIds.length) {
+        ctx.throw(400, 'One or more categories are not part of helpdesk routing');
+        return;
+      }
+
+      const allowedAssigneeIds = requestedAssigneeIds.length > 0
+        ? ((await strapi.entityService.findMany('plugin::users-permissions.user', {
+            filters: {
+              id: { $in: requestedAssigneeIds },
+              department: { key: { $in: HELPDESK_DEPARTMENT_KEYS } },
+              blocked: false,
+            } as any,
+            fields: ['id'],
+            populate: ['department'],
+            pagination: { pageSize: 1000 },
+          })) as any[])
+        : [];
+      const allowedAssigneeIdSet = new Set((allowedAssigneeIds || []).map((user: any) => Number(user.id)));
+      const assigneeDepartmentById = new Map(
+        (allowedAssigneeIds || []).map((user: any) => [
+          Number(user.id),
+          user?.department?.key,
+        ])
+      );
+
+      if (allowedAssigneeIdSet.size !== requestedAssigneeIds.length) {
+        ctx.throw(400, 'One or more assignees are not active helpdesk users');
+        return;
+      }
+
+      const updates: Array<{ categoryId: number; assigneeIds: number[] }> = [];
+      for (const item of categories) {
+        const categoryId = Number(item?.id);
+        if (!allowedCategoryIds.has(categoryId)) continue;
+        const categoryDepartmentKey = categoryDepartmentById.get(categoryId);
+
+        const assigneeIds = Array.from(
+          new Set(
+            (Array.isArray(item?.assigneeIds) ? item.assigneeIds : [])
+              .map((id: any) => Number(id))
+              .filter((id: number) => allowedAssigneeIdSet.has(id))
+          )
+        ) as number[];
+
+        const crossDepartmentAssigneeId = assigneeIds.find((id) => assigneeDepartmentById.get(id) !== categoryDepartmentKey);
+        if (crossDepartmentAssigneeId) {
+          ctx.throw(400, 'Assignee must belong to the same department as the ticket category');
+          return;
+        }
+
+        updates.push({ categoryId, assigneeIds });
+      }
+
+      for (const update of updates) {
+        await strapi.entityService.update('api::ticket-category.ticket-category', update.categoryId, {
+          data: {
+            defaultAssignee: {
+              set: update.assigneeIds.map((id: number) => ({ id })),
+            },
+          } as any,
+        });
+      }
+
+      ctx.body = {
+        data: await loadHelpdeskRouting(strapi),
+        message: 'Helpdesk routing updated successfully',
+      };
+    } catch (error: any) {
+      if (error.status) throw error;
+      console.error('Error updating helpdesk routing:', error);
+      ctx.throw(500, 'Error updating helpdesk routing');
+    }
+  },
+
   async createKeycloakUser(ctx: Context) {
     const strapi = (global as any).strapi;
     await checkSuperAdmin(ctx, strapi);

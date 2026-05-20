@@ -594,8 +594,8 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       return;
     }
 
-    if (serviceGroup.slug !== 'it-support' && serviceGroup.department?.key !== 'IT') {
-      ctx.throw(400, 'Доступна подача только в IT службу');
+    if (!HELP_SERVICE_DEPARTMENT_KEYS.includes(serviceGroup.department?.key)) {
+      ctx.throw(400, 'Доступна подача только в службы Helpdesk');
       return;
     }
 
@@ -699,7 +699,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     const serviceGroups = (await strapi.entityService.findMany(
       'api::service-group.service-group',
       {
-        filters: { slug: 'it-support' } as any,
+        filters: { department: { key: { $in: HELP_SERVICE_DEPARTMENT_KEYS } } } as any,
         populate: ['categories', 'department'],
         sort: { name_ru: 'asc' } as any,
       }
