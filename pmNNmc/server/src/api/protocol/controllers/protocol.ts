@@ -522,21 +522,24 @@ export default {
     const user = (ctx.state as any).user;
     if (!user) return ctx.unauthorized('Необходима авторизация');
 
-    const departments = await strapi.db.query(DEPARTMENT_UID).findMany({
-      orderBy: { name_ru: 'asc' },
-      select: ['id', 'key', 'name_ru'],
+    const departments: any[] = await strapi.entityService.findMany(DEPARTMENT_UID, {
+      sort: 'name_ru:asc',
+      fields: ['id', 'key', 'name_ru'],
+      limit: 1000,
     });
-    const users = await strapi.db.query(USER_UID).findMany({
-      where: { confirmed: true, blocked: false },
-      select: ['id', 'username', 'email', 'fullName'],
-      populate: { department: { select: ['id', 'name_ru'] } },
-      orderBy: { fullName: 'asc' },
+
+    const users: any[] = await strapi.entityService.findMany(USER_UID, {
+      fields: ['id', 'username', 'email', 'fullName', 'blocked'],
+      populate: { department: { fields: ['id', 'name_ru'] } },
+      sort: 'fullName:asc',
       limit: 5000,
     });
 
+    const activeUsers = users.filter((u) => u.blocked !== true);
+
     const byDept = new Map<number, any[]>();
     const noDept: any[] = [];
-    for (const u of users) {
+    for (const u of activeUsers) {
       const deptId = u.department?.id ? Number(u.department.id) : null;
       if (deptId == null) {
         noDept.push(u);
@@ -546,7 +549,7 @@ export default {
       byDept.get(deptId)!.push(u);
     }
 
-    const result = departments.map((d: any) => ({
+    const result = (departments || []).map((d: any) => ({
       id: d.id,
       name: d.name_ru || d.key,
       users: (byDept.get(Number(d.id)) || []).map((u) => ({
