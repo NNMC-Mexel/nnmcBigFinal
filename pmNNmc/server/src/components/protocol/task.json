@@ -1,0 +1,28 @@
+{
+  "collectionName": "components_protocol_tasks",
+  "info": {
+    "displayName": "Protocol Task",
+    "icon": "list",
+    "description": "Задача в протоколе"
+  },
+  "options": {},
+  "attributes": {
+    "order": {
+      "type": "integer",
+      "default": 0
+    },
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "deadline": {
+      "type": "date"
+    },
+    "responsibleId": {
+      "type": "integer"
+    },
+    "fact": {
+      "type": "string"
+    }
+  }
+}

@@ -360,6 +360,23 @@ export default function AppLayout() {
                                 )}
                             </NavLink>
                         )}
+                        <NavLink
+                            to="/app/protocols"
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
+                                    isActive
+                                        ? "bg-indigo-50 text-indigo-700 font-medium"
+                                        : "text-slate-600 hover:bg-slate-50"
+                                }`
+                            }
+                            onClick={() => setSidebarOpen(false)}>
+                            {({ isActive }) => (
+                                <>
+                                    <ClipboardList className={`w-5 h-5 ${isActive ? "text-indigo-700" : "text-indigo-500"}`} />
+                                    <span>Протоколы</span>
+                                </>
+                            )}
+                        </NavLink>
 
                         {/* Admin items */}
                         {adminNavItems.length > 0 && (

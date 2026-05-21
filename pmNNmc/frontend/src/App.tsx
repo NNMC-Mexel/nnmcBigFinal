@@ -37,6 +37,7 @@ const KpiTimesheetPage = lazy(() => import('./pages/app/KpiTimesheetPage'));
 const ConferenceRoomsPage = lazy(() => import('./pages/app/ConferenceRoomsPage'));
 const JournalPage = lazy(() => import('./pages/app/JournalPage'));
 const SignDocPage = lazy(() => import('./pages/app/SignDocPage'));
+const ProtocolsPage = lazy(() => import('./pages/app/ProtocolsPage'));
 
 // Lazy public pages
 const PublicSurveyPage = lazy(() => import('./pages/public/PublicSurveyPage'));
@@ -307,6 +308,7 @@ function App() {
         <Route path="rooms" element={<FeatureRoute allow={canAccessConf}>{withSuspense(<ConferenceRoomsPage />)}</FeatureRoute>} />
         <Route path="journal" element={<FeatureRoute allow={canAccessJournal}>{withSuspense(<JournalPage />)}</FeatureRoute>} />
         <Route path="signdoc/*" element={<FeatureRoute allow={canAccessSigndoc}>{withSuspense(<SignDocPage />)}</FeatureRoute>} />
+        <Route path="protocols/*" element={withSuspense(<ProtocolsPage />)} />
       </Route>
 
       {/* Logged out page — not protected, cleans up tokens on mount */}
