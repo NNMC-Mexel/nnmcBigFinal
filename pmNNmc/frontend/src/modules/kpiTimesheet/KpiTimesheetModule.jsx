@@ -74,7 +74,6 @@ const compactKpiDepartment = (value) =>
     .trim()
     .toLowerCase()
     .replace(/[‐‑‒–—−]/g, "-")
-    .replace(/[()]/g, "")
     .replace(/[\s\-_]+/g, "");
 
 const normalizeKpiDepartment = (value) => {

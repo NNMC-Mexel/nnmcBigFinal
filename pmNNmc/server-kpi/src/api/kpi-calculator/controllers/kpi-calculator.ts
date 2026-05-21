@@ -401,17 +401,12 @@ function compactDepartment(value: any): string {
     .trim()
     .toUpperCase()
     .replace(/[‐‑‒–—−]/g, '-')
-    .replace(/[()]/g, '')
     .replace(/[\s\-_]+/g, '');
 }
 
 function normalizeDepartment(value: any): string {
   const key = compactDepartment(value);
   return DEPARTMENT_ALIASES[key] || key;
-}
-
-function displayDepartment(value: any): string {
-  return normalizeDepartment(value) === 'RADIOLOGY' ? 'Лучевая' : String(value || '').trim();
 }
 
 function expandDepartmentFilterValues(departments: string[]): string[] {
@@ -426,8 +421,6 @@ function expandDepartmentFilterValues(departments: string[]): string[] {
       values.add('Лучевая');
       values.add('Лучевая СМП');
       values.add('Лучевая ВМП');
-      values.add('Лучевая(СМП)');
-      values.add('Лучевая(ВМП)');
       values.add('Лучевая диагностика');
     }
   }
@@ -632,20 +625,13 @@ async function calcCore(ctx: Context) {
       (item: any) => normalizeDepartment(item?.department) === target
     );
 
-    if (target === 'RADIOLOGY') {
-      finalEmployees = employees.map((emp: any) => ({
-        ...emp,
-        department: displayDepartment(requestedDepartment),
-      }));
-    } else {
-      const kpiFioSet = new Set(
-        finalKpiTable.map((item: any) => String(item?.fio || '').trim().toLowerCase()).filter(Boolean)
-      );
+    const kpiFioSet = new Set(
+      finalKpiTable.map((item: any) => String(item?.fio || '').trim().toLowerCase()).filter(Boolean)
+    );
 
-      finalEmployees = employees.filter((emp: any) =>
-        kpiFioSet.has(String(emp?.fio || '').trim().toLowerCase())
-      );
-    }
+    finalEmployees = employees.filter((emp: any) =>
+      kpiFioSet.has(String(emp?.fio || '').trim().toLowerCase())
+    );
 
     if (finalEmployees.length === 0) {
       return withDebug({
@@ -673,7 +659,7 @@ async function calcCore(ctx: Context) {
     const filteredResults = (results || []).filter(
       (r: any) => normalizeDepartment(r?.department) === target
     );
-    if (filteredResults.length === 0 && target !== 'RADIOLOGY') {
+    if (filteredResults.length === 0) {
       return withDebug({
         results: [],
         errors: [
@@ -691,7 +677,7 @@ async function calcCore(ctx: Context) {
   // Build parsed details for the "Результаты" tab
   const parsedDetails = finalEmployees.map((emp: any) => ({
     fio: emp.fio,
-    department: displayDepartment(emp.department || requestedDepartment),
+    department: emp.department || '',
     letters_weekday: emp.letters_weekday || 0,
     letters_sat: emp.letters_sat || 0,
     letters_sun: emp.letters_sun || 0,
@@ -1229,12 +1215,9 @@ export default {
 
       const employees = parsedDetails.map((p: any) => {
         const agg = aggregateDayValues(p?.dayValues || []);
-        const rowDepartment = department && normalizeDepartment(department) === 'RADIOLOGY'
-          ? displayDepartment(department)
-          : p?.department || '';
         return {
           fio: String(p?.fio || '').trim(),
-          department: rowDepartment,
+          department: p?.department || '',
           ...agg,
           dayValues: p?.dayValues || [],
         };
@@ -1271,7 +1254,7 @@ export default {
 
       const refreshedDetails = employees.map((e: any) => ({
         fio: e.fio,
-        department: displayDepartment(e.department || department),
+        department: e.department,
         letters_weekday: e.letters_weekday,
         letters_sat: e.letters_sat,
         letters_sun: e.letters_sun,
