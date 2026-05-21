@@ -12,16 +12,16 @@ const USER_UID = 'plugin::users-permissions.user';
 const DEPARTMENT_UID = 'api::department.department';
 
 const POPULATE_FULL = {
-  creator: { fields: ['id', 'username', 'email', 'fullName'], populate: { department: true } },
+  creator: { fields: ['id', 'username', 'email', 'firstName', 'lastName'], populate: { department: true } },
   creatorDepartment: { fields: ['id', 'key', 'name_ru', 'name_kz'] },
-  attendees: { fields: ['id', 'username', 'email', 'fullName'], populate: { department: { fields: ['id', 'name_ru'] } } },
-  responsibles: { fields: ['id', 'username', 'email', 'fullName'] },
+  attendees: { fields: ['id', 'username', 'email', 'firstName', 'lastName'], populate: { department: { fields: ['id', 'name_ru'] } } },
+  responsibles: { fields: ['id', 'username', 'email', 'firstName', 'lastName'] },
   tasks: true,
   pdfFiles: { fields: ['id', 'name', 'url', 'size', 'mime', 'createdAt'] },
 };
 
 const POPULATE_LIST = {
-  creator: { fields: ['id', 'username', 'email', 'fullName'] },
+  creator: { fields: ['id', 'username', 'email', 'firstName', 'lastName'] },
   creatorDepartment: { fields: ['id', 'name_ru'] },
   attendees: { fields: ['id'] },
   responsibles: { fields: ['id'] },
@@ -29,7 +29,10 @@ const POPULATE_LIST = {
 };
 
 function userLabel(user: any): string {
-  return user?.fullName || user?.username || user?.email || `User #${user?.id ?? ''}`;
+  if (!user) return '';
+  const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+  if (fullName) return fullName;
+  return user.username || user.email || `User #${user.id ?? ''}`;
 }
 
 function normalizeAllowedFilter(value: any): string {
@@ -61,16 +64,18 @@ function extractResponsibleIds(tasks: any[]): number[] {
 
 function sanitizeTasks(tasks: any): any[] {
   if (!Array.isArray(tasks)) return [];
-  return tasks.map((task, index) => ({
-    order: Number(task?.order ?? index + 1),
-    title: String(task?.title || '').trim(),
-    deadline: task?.deadline || null,
-    responsibleId:
-      task?.responsibleId == null || task?.responsibleId === ''
-        ? null
-        : Number(task.responsibleId),
-    fact: String(task?.fact || '').trim() || null,
-  }));
+  return tasks
+    .map((task, index) => ({
+      order: Number(task?.order ?? index + 1),
+      title: String(task?.title || '').trim(),
+      deadline: task?.deadline || null,
+      responsibleId:
+        task?.responsibleId == null || task?.responsibleId === ''
+          ? null
+          : Number(task.responsibleId),
+      fact: String(task?.fact || '').trim() || null,
+    }))
+    .filter((t) => t.title.length > 0);
 }
 
 function describeChanges(before: any, after: any): string[] {
@@ -102,7 +107,7 @@ async function buildPdfDataFromProtocol(strapiInstance: any, protocol: any): Pro
     responsibleIds.length > 0
       ? await strapiInstance.db
           .query(USER_UID)
-          .findMany({ where: { id: { $in: responsibleIds } }, select: ['id', 'username', 'email', 'fullName'] })
+          .findMany({ where: { id: { $in: responsibleIds } }, select: ['id', 'username', 'email', 'firstName', 'lastName'] })
       : [];
   const respMap = new Map<number, any>(responsibleUsers.map((u: any) => [Number(u.id), u]));
 
@@ -113,14 +118,14 @@ async function buildPdfDataFromProtocol(strapiInstance: any, protocol: any): Pro
     creator: protocol.creator
       ? {
           id: protocol.creator.id,
-          fullName: protocol.creator.fullName,
+          fullName: userLabel(protocol.creator),
           username: protocol.creator.username,
           email: protocol.creator.email,
         }
       : null,
     attendees: (protocol.attendees || []).map((u: any) => ({
       id: u.id,
-      fullName: u.fullName,
+      fullName: userLabel(u),
       username: u.username,
       email: u.email,
     })),
@@ -312,33 +317,39 @@ export default {
     const tasks = sanitizeTasks(body.tasks);
     const responsibles = extractResponsibleIds(tasks);
 
-    const created = await strapi.entityService.create(PROTOCOL_UID, {
-      data: {
-        theme,
-        meetingDate,
-        creator: user.id,
-        creatorDepartment: fullUser?.department?.id || body.creatorDepartment || null,
-        attendees,
-        responsibles,
-        tasks,
-        conclusion: body.conclusion ? String(body.conclusion) : null,
-        nextMeetingDate: body.nextMeetingDate || null,
-        status: 'draft',
-        version: 1,
-        history: [
-          {
-            timestamp: new Date().toISOString(),
-            userId: user.id,
-            userName: userLabel(fullUser),
-            action: 'created',
-            summary: 'Черновик создан',
-          },
-        ],
-      },
-      populate: POPULATE_FULL as any,
-    });
-
-    ctx.body = { data: created };
+    try {
+      const created = await strapi.entityService.create(PROTOCOL_UID, {
+        data: {
+          theme,
+          meetingDate,
+          creator: user.id,
+          creatorDepartment: fullUser?.department?.id || body.creatorDepartment || null,
+          attendees,
+          responsibles,
+          tasks,
+          conclusion: body.conclusion ? String(body.conclusion) : null,
+          nextMeetingDate: body.nextMeetingDate || null,
+          status: 'draft',
+          version: 1,
+          history: [
+            {
+              timestamp: new Date().toISOString(),
+              userId: user.id,
+              userName: userLabel(fullUser),
+              action: 'created',
+              summary: 'Черновик создан',
+            },
+          ],
+        },
+        populate: POPULATE_FULL as any,
+      });
+      ctx.body = { data: created };
+    } catch (e: any) {
+      strapi.log.error(
+        `[protocol/create] ${e?.message || e}\nbody=${JSON.stringify(body).slice(0, 1000)}\n${e?.stack || ''}`
+      );
+      return ctx.internalServerError(`Создание упало: ${e?.message || 'unknown'}`);
+    }
   },
 
   async update(ctx: Context) {
@@ -558,7 +569,7 @@ export default {
       name: d.name_ru || d.key,
       users: (byDept.get(Number(d.id)) || []).map((u) => ({
         id: u.id,
-        fullName: u.fullName,
+        fullName: userLabel(u),
         username: u.username,
         email: u.email,
       })),
@@ -569,7 +580,7 @@ export default {
         name: 'Без отдела',
         users: noDept.map((u) => ({
           id: u.id,
-          fullName: u.fullName,
+          fullName: userLabel(u),
           username: u.username,
           email: u.email,
         })),
