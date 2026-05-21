@@ -76,32 +76,6 @@ const compactKpiDepartment = (value) =>
     .replace(/[‐‑‒–—−]/g, "-")
     .replace(/[\s\-_]+/g, "");
 
-const normalizeKpiDepartment = (value) => {
-  const key = compactKpiDepartment(value);
-  if (
-    key === "radiology" ||
-    key === "radiologysmp" ||
-    key === "radiologyvmp" ||
-    key === "лучевая" ||
-    key === "лучеваясмп" ||
-    key === "лучеваявмп" ||
-    key === "лучеваядиагностика" ||
-    key === "отделлучевойдиагностики" ||
-    key === "отделлучеваядиагностика"
-  ) {
-    return "radiology";
-  }
-  return key;
-};
-
-const getKpiDepartmentDisplayName = (value) => (
-  normalizeKpiDepartment(value) === "radiology" ? "Лучевая" : String(value || "").trim()
-);
-
-const isSameKpiDepartment = (a, b) => (
-  normalizeKpiDepartment(a) === normalizeKpiDepartment(b)
-);
-
 /** Calculate working days for the 26-25 period (26 prevMonth .. 25 currentMonth) */
 const calcWorkdaysForPeriod = (year, month, allHolidays) => {
   const y = parseInt(year, 10);
@@ -683,16 +657,18 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   useEffect(() => { if (user && isAdmin) loadAccessUsers(); }, [user, isAdmin]);
 
   // Фильтрация
+  const normalizeDept = (value) => String(value || "").trim().toUpperCase().replace(/[\s\-–—_]+/g, "");
   const filterResultsByDept = (items, dept) => {
     if (!dept) return items || [];
-    return (items || []).filter((r) => isSameKpiDepartment(r?.department, dept));
+    const target = normalizeDept(dept);
+    return (items || []).filter((r) => normalizeDept(r?.department) === target);
   };
 
   const filteredKpiItems = kpiItems
     .filter((item) => {
       if (filterSchedule === "day" && item.scheduleType !== "day") return false;
       if (filterSchedule === "shift" && item.scheduleType !== "shift") return false;
-      if (filterDept && !isSameKpiDepartment(item.department, filterDept)) return false;
+      if (filterDept && item.department !== filterDept) return false;
       if (searchFio && !String(item.fio || "").toLowerCase().includes(searchFio.toLowerCase())) return false;
       return true;
     })
@@ -704,14 +680,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   const allDepartments = useMemo(() => {
     const kpiDepts = kpiItems.map((x) => x.department || "").filter(Boolean);
     const pmDepts = pmDepartments.map((d) => d.name_ru || d.key || "").filter(Boolean);
-    const mergedByKey = new Map();
-    for (const name of [...kpiDepts, ...pmDepts]) {
-      const displayName = getKpiDepartmentDisplayName(name);
-      if (!displayName) continue;
-      const key = normalizeKpiDepartment(displayName);
-      if (!mergedByKey.has(key)) mergedByKey.set(key, displayName);
-    }
-    const merged = Array.from(mergedByKey.values());
+    const merged = Array.from(new Set([...kpiDepts, ...pmDepts]));
 
     // Access control: user (KPI user) comes with role + allowedDepartments from server-kpi.
     // Admin role OR empty allowedDepartments → full access. Otherwise restrict.
@@ -719,9 +688,9 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     const isAdmin = roleLower.includes("admin") || pmUser?.isSuperAdmin === true;
     const allowed = Array.isArray(user?.allowedDepartments) ? user.allowedDepartments : [];
     if (!isAdmin && allowed.length > 0) {
-      const allowedSet = new Set(allowed.map(normalizeKpiDepartment).filter(Boolean));
+      const allowedSet = new Set(allowed.map((x) => String(x || "").trim()).filter(Boolean));
       return merged
-        .filter((name) => allowedSet.has(normalizeKpiDepartment(name)))
+        .filter((name) => allowedSet.has(name))
         .sort((a, b) => String(a).localeCompare(String(b), "ru"));
     }
     return merged.sort((a, b) => String(a).localeCompare(String(b), "ru"));
@@ -729,16 +698,13 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
 
   useEffect(() => {
     if (!user || !allDepartments || allDepartments.length === 0) { setCalcDepartment(""); return; }
-    const matchedDepartment = allDepartments.find((name) => isSameKpiDepartment(name, calcDepartment));
-    if (!calcDepartment || !matchedDepartment) setCalcDepartment(allDepartments[0] || "");
-    else if (matchedDepartment !== calcDepartment) setCalcDepartment(matchedDepartment);
+    if (!calcDepartment || !allDepartments.includes(calcDepartment)) setCalcDepartment(allDepartments[0] || "");
   }, [user, allDepartments]);
 
   useEffect(() => {
     if (!allDepartments || allDepartments.length === 0) { setCalcDepartment(""); return; }
     if (!filterDept) { setCalcDepartment(allDepartments[0] || ""); return; }
-    const matchedDepartment = allDepartments.find((name) => isSameKpiDepartment(name, filterDept));
-    if (matchedDepartment) setCalcDepartment(matchedDepartment);
+    if (allDepartments.includes(filterDept)) setCalcDepartment(filterDept);
   }, [filterDept, allDepartments]);
 
   useEffect(() => { setCalcResults([]); setCalcErrors([]); setParsedDetails([]); }, [calcDepartment, timesheetFile, timesheetFilePrev]);
