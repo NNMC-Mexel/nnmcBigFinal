@@ -5,6 +5,7 @@
  *   node scripts/import-employees-tsv.js
  *   node scripts/import-employees-tsv.js .\scripts\radiology.tsv
  *   node scripts/import-employees-tsv.js .\scripts\radiology.tsv --department "Лучевая"
+ *   node scripts/import-employees-tsv.js .\scripts\radiology.tsv --department "Лучевая" --replace-department
  */
 
 const fs = require('fs');
@@ -18,11 +19,36 @@ function normalizeFioKey(value) {
   return normalizeSpaces(value).toLowerCase();
 }
 
+function normalizeDepartmentKey(value) {
+  const key = normalizeSpaces(value)
+    .toLowerCase()
+    .replace(/[‐‑‒–—−]/g, '-')
+    .replace(/[()]/g, '')
+    .replace(/[\s\-_]+/g, '');
+
+  if (
+    key === 'radiology' ||
+    key === 'radiologysmp' ||
+    key === 'radiologyvmp' ||
+    key === 'лучевая' ||
+    key === 'лучеваясмп' ||
+    key === 'лучеваявмп' ||
+    key === 'лучеваядиагностика' ||
+    key === 'отделлучевойдиагностики' ||
+    key === 'отделлучеваядиагностика'
+  ) {
+    return 'radiology';
+  }
+
+  return key;
+}
+
 function parseArgs(argv) {
   const args = argv.slice(2);
   let filePath = path.join(__dirname, 'radiology.tsv');
   let forcedDepartment = '';
   let upsert = false;
+  let replaceDepartment = false;
 
   const deptFlagIndex = args.indexOf('--department');
   if (deptFlagIndex !== -1 && args[deptFlagIndex + 1]) {
@@ -36,11 +62,18 @@ function parseArgs(argv) {
     args.splice(idx, 1);
   }
 
+  if (args.includes('--replace-department')) {
+    replaceDepartment = true;
+    upsert = true;
+    const idx = args.indexOf('--replace-department');
+    args.splice(idx, 1);
+  }
+
   if (args[0]) {
     filePath = path.resolve(process.cwd(), args[0]);
   }
 
-  return { filePath, forcedDepartment, upsert };
+  return { filePath, forcedDepartment, upsert, replaceDepartment };
 }
 
 function parseRows(rawText, forcedDepartment) {
@@ -95,7 +128,7 @@ function parseRows(rawText, forcedDepartment) {
 }
 
 async function main() {
-  const { filePath, forcedDepartment, upsert } = parseArgs(process.argv);
+  const { filePath, forcedDepartment, upsert, replaceDepartment } = parseArgs(process.argv);
   if (!fs.existsSync(filePath)) {
     throw new Error(`TSV file not found: ${filePath}`);
   }
@@ -112,10 +145,29 @@ async function main() {
   app.log.level = 'error';
 
   try {
-    const existing = await strapi.entityService.findMany('api::employee.employee', {
-      fields: ['id', 'fio'],
+    let existing = await strapi.entityService.findMany('api::employee.employee', {
+      fields: ['id', 'fio', 'department'],
       pagination: { pageSize: 10000 },
     });
+
+    const replaceTarget = normalizeDepartmentKey(forcedDepartment || rows[0]?.department);
+    const deleted = [];
+
+    if (replaceDepartment) {
+      if (!replaceTarget) {
+        throw new Error('--replace-department requires --department or rows with department values');
+      }
+
+      for (const item of existing || []) {
+        if (normalizeDepartmentKey(item?.department) !== replaceTarget) continue;
+        await strapi.entityService.delete('api::employee.employee', item.id);
+        deleted.push({ id: item.id, fio: item.fio });
+      }
+
+      existing = (existing || []).filter(
+        (item) => normalizeDepartmentKey(item?.department) !== replaceTarget
+      );
+    }
 
     const existingByFio = new Map();
     for (const item of existing || []) {
@@ -196,6 +248,7 @@ async function main() {
 
     console.log('Import finished');
     console.log(`Input rows: ${rows.length}`);
+    console.log(`Deleted from department: ${deleted.length}`);
     console.log(`Created: ${created.length}`);
     console.log(`Updated: ${updated.length}`);
     console.log(`Skipped (already exists): ${skippedExists.length}`);
@@ -204,6 +257,9 @@ async function main() {
 
     if (created.length > 0) {
       console.log('Created sample:', created.slice(0, 10));
+    }
+    if (deleted.length > 0) {
+      console.log('Deleted sample:', deleted.slice(0, 10));
     }
     if (updated.length > 0) {
       console.log('Updated sample:', updated.slice(0, 10));
