@@ -1,3 +1,3 @@
 import { factories } from '@strapi/strapi';
 
-export default factories.createCoreService('api::protocol.protocol');
+export default factories.createCoreService('api::protocol.protocol' as any);
