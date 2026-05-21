@@ -522,18 +522,22 @@ export default {
     const user = (ctx.state as any).user;
     if (!user) return ctx.unauthorized('Необходима авторизация');
 
-    const departments: any[] = await strapi.entityService.findMany(DEPARTMENT_UID, {
-      sort: 'name_ru:asc',
-      fields: ['id', 'key', 'name_ru'],
-      limit: 1000,
-    });
+    let departments: any[] = [];
+    let users: any[] = [];
+    try {
+      departments = await strapi.db.query(DEPARTMENT_UID).findMany({ limit: 1000 });
+      users = await strapi.db.query(USER_UID).findMany({
+        populate: ['department'],
+        limit: 5000,
+      });
+    } catch (e: any) {
+      strapi.log.error(`[protocol/usersByDepartment] ${e?.message || e}\n${e?.stack || ''}`);
+      return ctx.internalServerError(`usersByDepartment failed: ${e?.message || 'unknown'}`);
+    }
 
-    const users: any[] = await strapi.entityService.findMany(USER_UID, {
-      fields: ['id', 'username', 'email', 'fullName', 'blocked'],
-      populate: { department: { fields: ['id', 'name_ru'] } },
-      sort: 'fullName:asc',
-      limit: 5000,
-    });
+    departments.sort((a, b) =>
+      String(a.name_ru || '').localeCompare(String(b.name_ru || ''), 'ru')
+    );
 
     const activeUsers = users.filter((u) => u.blocked !== true);
 
