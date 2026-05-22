@@ -76,9 +76,18 @@ const compactKpiDepartment = (value) =>
     .replace(/[‐‑‒–—−]/g, "-")
     .replace(/[\s\-_]+/g, "");
 
-const isNumericDayValue = (value) => {
+const isWorkedDayValue = (value) => {
   const normalized = String(value || "").trim().replace(",", ".");
-  return /^[+-]?\d+(?:\.\d+)?$/.test(normalized) && Number.isFinite(Number(normalized));
+  const workedCode = String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/I/g, "І")
+    .replace(/C/g, "С");
+  return (
+    (/^[+-]?\d+(?:\.\d+)?$/.test(normalized) && Number.isFinite(Number(normalized)))
+    || workedCode === "І/С"
+  );
 };
 
 /** Calculate working days for the 26-25 period (26 prevMonth .. 25 currentMonth) */
@@ -888,7 +897,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
           const key = `${dv.year}-${dv.month}-${dv.day}`;
           if (key !== dayKey) return dv;
           const trimmed = String(newValue || "").trim();
-          return { ...dv, value: trimmed, isNumber: isNumericDayValue(trimmed) };
+          return { ...dv, value: trimmed, isNumber: isWorkedDayValue(trimmed) };
         });
         return { ...p, dayValues };
       });

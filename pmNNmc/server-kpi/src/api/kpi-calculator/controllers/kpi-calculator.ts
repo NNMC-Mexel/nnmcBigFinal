@@ -427,11 +427,20 @@ function expandDepartmentFilterValues(departments: string[]): string[] {
   return Array.from(values);
 }
 
-function isNumericValue(value: any): boolean {
+function normalizeWorkedCode(value: any): string {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '')
+    .replace(/I/g, 'І')
+    .replace(/C/g, 'С');
+}
+
+function isWorkedDayValue(value: any): boolean {
   if (value === null || value === undefined) return false;
   const s = String(value).trim().replace(',', '.');
-  if (!/^[+-]?\d+(?:\.\d+)?$/.test(s)) return false;
-  return Number.isFinite(Number(s));
+  const isNumber = /^[+-]?\d+(?:\.\d+)?$/.test(s) && Number.isFinite(Number(s));
+  return isNumber || normalizeWorkedCode(value) === 'І/С';
 }
 
 function aggregateDayValues(dayValues: any[]): {
@@ -457,7 +466,7 @@ function aggregateDayValues(dayValues: any[]): {
   for (const dv of dayValues || []) {
     const raw = dv?.value;
     if (raw === null || raw === undefined || String(raw).trim() === '') continue;
-    const isNum = isNumericValue(raw);
+    const isNum = isWorkedDayValue(raw);
     const dayType = String(dv?.dayType || 'weekday');
     const bucket = isNum ? 'numbers' : 'letters';
     const key = `${bucket}_${dayType}` as keyof typeof out;

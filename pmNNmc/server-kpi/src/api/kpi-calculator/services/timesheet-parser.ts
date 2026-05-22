@@ -109,6 +109,19 @@ function tryFloat(val: any): number | null {
   }
 }
 
+function normalizeWorkedCode(val: any): string {
+  return String(val || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '')
+    .replace(/I/g, 'І')
+    .replace(/C/g, 'С');
+}
+
+function isWorkedDayValue(val: any): boolean {
+  return tryFloat(val) !== null || normalizeWorkedCode(val) === 'І/С';
+}
+
 
 function bufferStartsWith(buf: Buffer, signature: number[]): boolean {
   if (!buf || buf.length < signature.length) return false;
@@ -354,8 +367,7 @@ function parseKazakhTemplate(
 
       if (skip) continue;
 
-      const num = tryFloat(rawStr);
-      const isNumber = num !== null;
+      const isNumber = isWorkedDayValue(rawStr);
       // Update last dayValue with correct isNumber
       emp.dayValues![emp.dayValues!.length - 1].isNumber = isNumber;
 
@@ -453,8 +465,7 @@ function parseSimpleTemplate(
 
       if (skip) continue;
 
-      const num = tryFloat(rawStr);
-      const isNumber = num !== null;
+      const isNumber = isWorkedDayValue(rawStr);
       emp.dayValues![emp.dayValues!.length - 1].isNumber = isNumber;
 
       if (isNumber) {
