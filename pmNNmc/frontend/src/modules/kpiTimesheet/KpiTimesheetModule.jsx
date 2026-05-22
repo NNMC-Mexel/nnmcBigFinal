@@ -76,6 +76,11 @@ const compactKpiDepartment = (value) =>
     .replace(/[‐‑‒–—−]/g, "-")
     .replace(/[\s\-_]+/g, "");
 
+const isNumericDayValue = (value) => {
+  const normalized = String(value || "").trim().replace(",", ".");
+  return /^[+-]?\d+(?:\.\d+)?$/.test(normalized) && Number.isFinite(Number(normalized));
+};
+
 /** Calculate working days for the 26-25 period (26 prevMonth .. 25 currentMonth) */
 const calcWorkdaysForPeriod = (year, month, allHolidays) => {
   const y = parseInt(year, 10);
@@ -815,6 +820,22 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
 
   const buildSignablePdfBlob = async () => {
     if (!calcDepartment) throw new Error("Выберите отдел для расчёта");
+    const buildFromCurrentResults = () => apiGeneratePdfFromResults({
+      results: calcResults,
+      year: parseInt(year, 10),
+      month: parseInt(month, 10),
+      department: calcDepartment,
+      nchDay: nchDay || "0",
+      ndShift: ndShift || "0",
+    });
+
+    if (hasEdits) {
+      if (calcResults.length === 0) {
+        throw new Error("Нет отредактированных данных для подписания");
+      }
+      return buildFromCurrentResults();
+    }
+
     const hasFiles = timesheetFile && timesheetFilePrev;
     if (hasFiles) {
       const fd = new FormData();
@@ -831,14 +852,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     if (calcResults.length === 0) {
       throw new Error("Нет данных для подписания. Выполните расчёт или восстановите из архива.");
     }
-    return apiGeneratePdfFromResults({
-      results: calcResults,
-      year: parseInt(year, 10),
-      month: parseInt(month, 10),
-      department: calcDepartment,
-      nchDay: nchDay || "0",
-      ndShift: ndShift || "0",
-    });
+    return buildFromCurrentResults();
   };
 
   // ---- Edit mode for Результаты ----
@@ -874,8 +888,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
           const key = `${dv.year}-${dv.month}-${dv.day}`;
           if (key !== dayKey) return dv;
           const trimmed = String(newValue || "").trim();
-          const num = trimmed ? parseFloat(trimmed.replace(",", ".")) : NaN;
-          return { ...dv, value: trimmed, isNumber: !isNaN(num) };
+          return { ...dv, value: trimmed, isNumber: isNumericDayValue(trimmed) };
         });
         return { ...p, dayValues };
       });

@@ -430,9 +430,8 @@ function expandDepartmentFilterValues(departments: string[]): string[] {
 function isNumericValue(value: any): boolean {
   if (value === null || value === undefined) return false;
   const s = String(value).trim().replace(',', '.');
-  if (!s) return false;
-  const num = parseFloat(s);
-  return !isNaN(num);
+  if (!/^[+-]?\d+(?:\.\d+)?$/.test(s)) return false;
+  return Number.isFinite(Number(s));
 }
 
 function aggregateDayValues(dayValues: any[]): {

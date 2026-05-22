@@ -101,9 +101,9 @@ function tryFloat(val: any): number | null {
   
   try {
     const s = String(val).trim().replace(',', '.');
-    if (!s) return null;
-    const num = parseFloat(s);
-    return isNaN(num) ? null : num;
+    if (!/^[+-]?\d+(?:\.\d+)?$/.test(s)) return null;
+    const num = Number(s);
+    return Number.isFinite(num) ? num : null;
   } catch {
     return null;
   }
