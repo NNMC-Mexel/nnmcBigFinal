@@ -3,7 +3,22 @@ import path from 'path';
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 
-const ASSETS_DIR = path.resolve(__dirname, '..', 'assets');
+declare const strapi: any;
+
+function resolveAssetsDir(): string {
+  const candidates = [
+    path.resolve(__dirname, '..', 'assets'),
+    path.resolve(__dirname, '..', '..', '..', '..', 'src', 'api', 'protocol', 'assets'),
+    path.resolve(process.cwd(), 'src', 'api', 'protocol', 'assets'),
+    path.resolve(process.cwd(), 'dist', 'src', 'api', 'protocol', 'assets'),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(path.join(dir, 'times.ttf'))) return dir;
+  }
+  return candidates[0];
+}
+
+const ASSETS_DIR = resolveAssetsDir();
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
@@ -107,9 +122,15 @@ export async function generateProtocolPdf(data: ProtocolPdfData): Promise<Buffer
     const boldBytes = fs.readFileSync(path.join(ASSETS_DIR, 'timesbd.ttf'));
     regular = await doc.embedFont(regularBytes, { subset: true });
     bold = await doc.embedFont(boldBytes, { subset: true });
-  } catch {
-    regular = await doc.embedFont(StandardFonts.Helvetica);
-    bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  } catch (e: any) {
+    try {
+      strapi?.log?.error(
+        `[protocol-pdf] failed to load Times font from ${ASSETS_DIR}: ${e?.message || e}. Falling back to Helvetica (no Cyrillic).`
+      );
+    } catch {}
+    throw new Error(
+      `Cyrillic font not found in ${ASSETS_DIR}. Add times.ttf and timesbd.ttf there or fix the path.`
+    );
   }
 
   let logoImage: any = null;
