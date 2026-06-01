@@ -1,6 +1,8 @@
 import { factories } from '@strapi/strapi';
 
-const UID = 'api::news-comment.news-comment';
+// Cast to any: the content-type is new and not yet in Strapi's generated
+// ContentType union, so the literal UID would fail `strapi build` type-check.
+const UID = 'api::news-comment.news-comment' as any;
 const NEWS_UID = 'api::news-post.news-post';
 
 const AUTHOR_POPULATE = {
