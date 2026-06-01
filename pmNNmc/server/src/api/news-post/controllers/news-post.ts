@@ -1,12 +1,41 @@
 import { factories } from '@strapi/strapi';
 
+/**
+ * Управлять новостями (создавать/редактировать/удалять) могут только:
+ *  - SuperAdmin, либо
+ *  - сотрудники отдела с флагом canManageNews (например, Маркетинг).
+ * Остальные авторизованные пользователи могут только просматривать новости
+ * и оставлять комментарии (см. api::news-comment).
+ */
+async function ensureCanManageNews(ctx: any, strapi: any): Promise<boolean> {
+  const user = ctx.state.user;
+  if (!user) {
+    ctx.unauthorized('You must be logged in');
+    return false;
+  }
+
+  const fullUser = (await strapi.entityService.findOne(
+    'plugin::users-permissions.user',
+    user.id,
+    { fields: ['id', 'isSuperAdmin'], populate: ['department'] }
+  )) as any;
+
+  const allowed =
+    Boolean(fullUser?.isSuperAdmin) || fullUser?.department?.canManageNews === true;
+
+  if (!allowed) {
+    ctx.forbidden('Только суперадмин или отдел маркетинга могут управлять новостями');
+    return false;
+  }
+
+  return true;
+}
+
 export default factories.createCoreController('api::news-post.news-post', ({ strapi }) => ({
   async create(ctx) {
-    const user = ctx.state.user;
-    if (!user) {
-      return ctx.unauthorized('You must be logged in');
-    }
+    if (!(await ensureCanManageNews(ctx, strapi))) return;
 
+    const user = ctx.state.user;
     const data = ctx.request.body?.data || {};
 
     const entry = await strapi.entityService.create('api::news-post.news-post', {
@@ -21,6 +50,8 @@ export default factories.createCoreController('api::news-post.news-post', ({ str
   },
 
   async update(ctx) {
+    if (!(await ensureCanManageNews(ctx, strapi))) return;
+
     const paramId = ctx.params.id;
     const data = ctx.request.body?.data || {};
 
@@ -40,5 +71,10 @@ export default factories.createCoreController('api::news-post.news-post', ({ str
     });
 
     ctx.body = { data: entry };
+  },
+
+  async delete(ctx) {
+    if (!(await ensureCanManageNews(ctx, strapi))) return;
+    return await (super.delete as any)(ctx);
   },
 }));

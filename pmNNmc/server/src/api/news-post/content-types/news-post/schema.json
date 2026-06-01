@@ -51,6 +51,12 @@
       "type": "relation",
       "relation": "manyToOne",
       "target": "plugin::users-permissions.user"
+    },
+    "comments": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::news-comment.news-comment",
+      "mappedBy": "newsPost"
     }
   }
 }

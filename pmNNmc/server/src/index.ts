@@ -293,6 +293,8 @@ async function setupPermissions(strapi: any) {
     'api::ticket-category.ticket-category': ['find', 'findOne'],
     // News
     'api::news-post.news-post': ['find', 'findOne', 'create', 'update', 'delete'],
+    // News comments (route access only — fine-grained checks live in the controller)
+    'api::news-comment.news-comment': ['find', 'findOne', 'create', 'update', 'delete'],
     // Project sub-resources
     'api::project-document.project-document': ['find', 'findOne', 'create', 'update', 'delete'],
     'api::project-survey.project-survey': ['find', 'findOne', 'create', 'update', 'delete', 'getResults', 'toggleStatus', 'duplicate'],

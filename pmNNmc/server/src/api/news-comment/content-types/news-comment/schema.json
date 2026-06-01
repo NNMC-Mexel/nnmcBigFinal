@@ -1,0 +1,32 @@
+{
+  "kind": "collectionType",
+  "collectionName": "news_comments",
+  "info": {
+    "singularName": "news-comment",
+    "pluralName": "news-comments",
+    "displayName": "Комментарий к новости",
+    "description": "Комментарии пользователей к новостям"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "text": {
+      "type": "text",
+      "required": true,
+      "maxLength": 5000
+    },
+    "newsPost": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::news-post.news-post",
+      "inversedBy": "comments"
+    },
+    "author": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}
