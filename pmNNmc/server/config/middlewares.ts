@@ -63,6 +63,7 @@ export default ({ env }) => {
     },
     'strapi::favicon',
     'global::minio-proxy',
+    'global::mobile-keycloak-redirect',
     'strapi::public',
   ];
 };
