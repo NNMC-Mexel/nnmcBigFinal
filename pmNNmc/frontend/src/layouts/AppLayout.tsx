@@ -1,4 +1,5 @@
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { useTranslation } from "react-i18next";
 import {
     LayoutDashboard,
@@ -55,6 +56,14 @@ export default function AppLayout() {
     } = useUserRole();
 
     const handleLogout = () => {
+        // Mobile (Capacitor): don't open an external browser / Keycloak SSO logout —
+        // its post-logout redirect URI (http://localhost/...) isn't registered and
+        // Keycloak shows an error. Just clear the local session and show the
+        // logged-out screen; the in-app login WebView starts a fresh session.
+        if (Capacitor.isNativePlatform()) {
+            navigate('/logged-out');
+            return;
+        }
         // IMPORTANT: redirect FIRST, before clearing React state.
         // If we clear state first, ProtectedRoute re-renders and redirects to Keycloak login,
         // which races with our logout redirect.

@@ -52,7 +52,15 @@ export function connectNotificationsSocket() {
   if (!token) return;
 
   manualClose = false;
-  socket = new WebSocket(getSocketUrl(token));
+  try {
+    socket = new WebSocket(getSocketUrl(token));
+  } catch (err) {
+    // Constructing the socket can throw synchronously (e.g. an insecure ws://
+    // from a secure context). Realtime is best-effort — never crash the app.
+    console.warn('Realtime notifications unavailable:', err);
+    socket = null;
+    return;
+  }
   socket.onmessage = (event) => {
     try {
       emit(JSON.parse(event.data));

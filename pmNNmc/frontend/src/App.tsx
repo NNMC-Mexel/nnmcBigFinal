@@ -9,6 +9,8 @@ import AppLayout from './layouts/AppLayout';
 // Auth pages (small, on critical path)
 import LoginPage from './pages/auth/LoginPage';
 import KeycloakCallbackPage from './pages/auth/KeycloakCallbackPage';
+import DeepLinkHandler from './components/DeepLinkHandler';
+import { startKeycloakLogin } from './utils/keycloakAuth';
 
 // Lazy auth pages (rarely visited)
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
@@ -63,6 +65,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isLoading = useAuthStore((state) => state.isLoading);
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      startKeycloakLogin();
+    }
+  }, [isLoading, isAuthenticated]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -75,8 +83,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!isAuthenticated) {
-    const apiUrl = import.meta.env.VITE_API_URL;
-    window.location.href = `${apiUrl}/api/connect/keycloak`;
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
@@ -137,10 +143,7 @@ const LoggedOutPage = () => {
         <h2 className="text-xl font-semibold text-slate-800 mb-2">Вы вышли из системы</h2>
         <p className="text-slate-500 mb-6">Сессия завершена</p>
         <button
-          onClick={() => {
-            const apiUrl = import.meta.env.VITE_API_URL;
-            window.location.href = `${apiUrl}/api/connect/keycloak`;
-          }}
+          onClick={startKeycloakLogin}
           className="px-6 py-2.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-medium"
         >
           Войти снова
@@ -174,7 +177,9 @@ function App() {
   }, [checkAuth]);
 
   return (
-    <Routes>
+    <>
+      <DeepLinkHandler />
+      <Routes>
       {/* Public auth routes */}
       <Route element={<AuthLayout />}>
         <Route
@@ -323,6 +328,7 @@ function App() {
       {/* 404 */}
       <Route path="*" element={<DefaultAppRedirect />} />
     </Routes>
+    </>
   );
 }
 
