@@ -309,6 +309,8 @@ async function setupPermissions(strapi: any) {
     'api::notification.notification': ['mine', 'unreadCount', 'markRead', 'markAllRead', 'markReadByLink'],
     // Feedback widget → Telegram (any authenticated user may send a suggestion)
     'api::feedback.feedback': ['send'],
+    // Mobile push: register this device's FCM token
+    'api::device-token.device-token': ['register'],
   };
 
   // Apply public permissions and remove anything not on the allowlist

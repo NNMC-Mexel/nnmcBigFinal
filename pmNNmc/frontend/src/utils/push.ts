@@ -26,7 +26,7 @@ export async function registerPush(): Promise<void> {
     await PushNotifications.addListener('registration', async (token) => {
       console.log('[push] FCM token:', token.value);
       try {
-        await client.post('/device-tokens', {
+        await client.post('/device-tokens/register', {
           token: token.value,
           platform: Capacitor.getPlatform(),
         });
