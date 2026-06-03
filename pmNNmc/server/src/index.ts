@@ -307,6 +307,8 @@ async function setupPermissions(strapi: any) {
     ],
     // In-app notifications (own only — see controller for row-level filter)
     'api::notification.notification': ['mine', 'unreadCount', 'markRead', 'markAllRead', 'markReadByLink'],
+    // Feedback widget → Telegram (any authenticated user may send a suggestion)
+    'api::feedback.feedback': ['send'],
   };
 
   // Apply public permissions and remove anything not on the allowlist
