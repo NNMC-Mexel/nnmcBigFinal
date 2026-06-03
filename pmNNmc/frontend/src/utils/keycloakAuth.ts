@@ -1,9 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import {
-  InAppBrowser,
-  DefaultWebViewOptions,
-  ToolbarPosition,
-} from '@capacitor/inappbrowser';
+import { InAppBrowser, DefaultWebViewOptions } from '@capacitor/inappbrowser';
 
 // Window event the DeepLinkHandler listens for to finish login inside the SPA.
 export const KEYCLOAK_REDIRECT_EVENT = 'nnmc:keycloak-redirect';
@@ -56,10 +52,8 @@ export async function startKeycloakLogin(): Promise<void> {
     url: connectUrl,
     options: {
       ...DefaultWebViewOptions,
-      showURL: false, // hide the address bar — looks like a native screen
-      showToolbar: true, // keep a small bar with a Close button to cancel
-      closeButtonText: 'Закрыть',
-      toolbarPosition: ToolbarPosition.TOP,
+      showURL: false, // no address bar
+      showToolbar: false, // no top bar / "Закрыть" — full-screen, native feel
       showNavigationButtons: false,
       // Start each login fresh so logout is effective (Keycloak won't auto-SSO
       // from a lingering session cookie in the WebView).
