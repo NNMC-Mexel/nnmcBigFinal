@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "872384071320",
+    "project_id": "nnmc-portal",
+    "storage_bucket": "nnmc-portal.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:872384071320:android:b04ed01b7a94c74deab2ed",
+        "android_client_info": {
+          "package_name": "kz.nnmc.webportal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBR-FdkR12QCOCtc5Js3Mx6QWn-ikcFJIs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

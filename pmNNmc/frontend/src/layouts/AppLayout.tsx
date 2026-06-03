@@ -1,5 +1,6 @@
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
+import { registerPush } from "../utils/push";
 import { useTranslation } from "react-i18next";
 import {
     LayoutDashboard,
@@ -78,6 +79,11 @@ export default function AppLayout() {
             window.location.href = `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/logout`;
         }
     };
+
+    // Register for push notifications once the user is in the app (native only).
+    useEffect(() => {
+        void registerPush();
+    }, []);
 
     useEffect(() => {
         if (!location.pathname.startsWith("/app/")) return;
