@@ -7,6 +7,7 @@ import Card from '../../components/ui/Card';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import { startKeycloakLogin } from '../../utils/keycloakAuth';
+import { Capacitor } from '@capacitor/core';
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -23,6 +24,14 @@ export default function LoginPage() {
     const savedEmail = localStorage.getItem('rememberedEmail');
     if (savedEmail) {
       setEmail(savedEmail);
+    }
+  }, []);
+
+  // On native (Capacitor) the org uses Keycloak SSO only — skip the
+  // email/password form and open the Keycloak login immediately.
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      startKeycloakLogin();
     }
   }, []);
 
@@ -44,6 +53,24 @@ export default function LoginPage() {
       // Error is handled in store
     }
   };
+
+  // Native: no email/password form — just a waiting screen while Keycloak opens,
+  // with a button to re-open if the user backed out.
+  if (Capacitor.isNativePlatform()) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6">
+        <img src="/logo.png" alt="ННМЦ" className="w-20 h-20 object-contain mb-6" />
+        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-slate-500 text-sm mb-6">Вход через Keycloak…</p>
+        <button
+          onClick={startKeycloakLogin}
+          className="px-6 py-2.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-medium"
+        >
+          Войти через Keycloak
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
