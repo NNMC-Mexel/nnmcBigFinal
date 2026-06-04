@@ -243,7 +243,7 @@ function DeleteConfirmModal({ employee, onCancel, onConfirm }) {
 
 // ======================= Форма сотрудника =======================
 
-function EmployeeFormModal({ initial, mode, onCancel, onSave }) {
+function EmployeeFormModal({ initial, mode, departments, onCancel, onSave }) {
   const [fio, setFio] = useState(initial?.fio || "");
   const [kpiSum, setKpiSum] = useState(initial?.kpiSum || 11000);
   const [scheduleType, setScheduleType] = useState(initial?.scheduleType || "day");
@@ -290,7 +290,12 @@ function EmployeeFormModal({ initial, mode, onCancel, onSave }) {
           </label>
           <label className="modal-label">
             Отделение *
-            <input className="modal-input" value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="Например, ОЦМК-2" required />
+            <select className="modal-select" value={department} onChange={(e) => setDepartment(e.target.value)} required>
+              <option value="">Выберите отделение</option>
+              {(departments || []).map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
           </label>
           <label className="modal-label">
             Категория (код)
@@ -2204,7 +2209,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       {/* Глобальные модалки */}
       <Toast message={toast} onClose={() => setToast(null)} />
       <DeleteConfirmModal employee={deleteModalEmployee} onCancel={() => setDeleteModalEmployee(null)} onConfirm={handleDeleteConfirm} />
-      <EmployeeFormModal initial={formInitial} mode={formMode} onCancel={() => { setFormMode(null); setFormInitial(null); }} onSave={handleFormSave} />
+      <EmployeeFormModal initial={formInitial} mode={formMode} departments={allDepartments} onCancel={() => { setFormMode(null); setFormInitial(null); }} onSave={handleFormSave} />
       <AccessModal user={accessModalUser} departments={allDepartments} onCancel={() => setAccessModalUser(null)} onSave={handleAccessSave} />
 
       {/* Pre-sign confirmation modal */}
