@@ -118,6 +118,10 @@
     "canManageNews": {
       "type": "boolean"
     },
+    "canManageTickets": {
+      "type": "boolean",
+      "default": false
+    },
     "moduleAccess": {
       "type": "json",
       "default": []

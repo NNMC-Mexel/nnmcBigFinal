@@ -1,5 +1,21 @@
 import type { Schema, Struct } from '@strapi/strapi';
 
+export interface ProtocolTask extends Struct.ComponentSchema {
+  collectionName: 'components_protocol_tasks';
+  info: {
+    description: '\u0417\u0430\u0434\u0430\u0447\u0430 \u0432 \u043F\u0440\u043E\u0442\u043E\u043A\u043E\u043B\u0435';
+    displayName: 'Protocol Task';
+    icon: 'list';
+  };
+  attributes: {
+    deadline: Schema.Attribute.Date;
+    fact: Schema.Attribute.String;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    responsibleId: Schema.Attribute.Integer;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+  };
+}
+
 export interface SharedMedia extends Struct.ComponentSchema {
   collectionName: 'components_shared_media';
   info: {
@@ -85,6 +101,7 @@ export interface SurveyQuestion extends Struct.ComponentSchema {
 declare module '@strapi/strapi' {
   export module Public {
     export interface ComponentSchemas {
+      'protocol.task': ProtocolTask;
       'shared.media': SharedMedia;
       'shared.quote': SharedQuote;
       'shared.rich-text': SharedRichText;

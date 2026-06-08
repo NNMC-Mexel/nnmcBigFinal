@@ -1,35 +1,92 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Search, UserCheck, Loader2 } from 'lucide-react';
-import type { AssignableUser } from '../../types';
+import { Building2, Loader2, Search, Users, X } from 'lucide-react';
+import { departmentsApi } from '../../api/departments';
+import type { ReassignTicketPayload } from '../../api/tickets';
+import type { AssignableUser, Department } from '../../types';
+
+const HELP_SERVICE_DEPARTMENT_KEYS = ['IT', 'MEDICAL_EQUIPMENT', 'ENGINEERING'];
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onAssign: (userIds: number[]) => Promise<void>;
+  onAssign: (payload: ReassignTicketPayload) => Promise<void>;
   users: AssignableUser[];
   currentAssigneeIds?: number[];
+  currentDepartmentId?: number;
+  currentTargetDepartmentId?: number;
+  canTransferDepartments?: boolean;
 }
 
-export default function ReassignModal({ isOpen, onClose, onAssign, users, currentAssigneeIds = [] }: Props) {
-  const { t } = useTranslation();
+export default function ReassignModal({
+  isOpen,
+  onClose,
+  onAssign,
+  users,
+  currentAssigneeIds = [],
+  currentDepartmentId,
+  currentTargetDepartmentId,
+  canTransferDepartments = false,
+}: Props) {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language === 'kz' ? 'kz' : 'ru';
+  const [mode, setMode] = useState<'users' | 'department'>('users');
   const [search, setSearch] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>(currentAssigneeIds);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | ''>('');
+  const [reason, setReason] = useState('');
 
   useEffect(() => {
-    if (isOpen) {
-      setSelectedUserIds(currentAssigneeIds);
+    if (!isOpen) return;
+    setMode('users');
+    setSearch('');
+    setSelectedUserIds(currentAssigneeIds);
+    setSelectedDepartmentId('');
+    setReason('');
+    if (canTransferDepartments) {
+      departmentsApi
+        .getAll()
+        .then((items) => setDepartments(items))
+        .catch(() => setDepartments([]));
+    } else {
+      setDepartments([]);
     }
-  }, [isOpen, currentAssigneeIds]);
+  }, [isOpen, currentAssigneeIds, canTransferDepartments]);
+
+  const ownDepartmentUsers = useMemo(() => {
+    if (!currentDepartmentId) return users;
+    return users.filter((user) => Number(user.department?.id) === Number(currentDepartmentId));
+  }, [users, currentDepartmentId]);
+  const ownDepartmentUserIds = useMemo(
+    () => new Set(ownDepartmentUsers.map((user) => user.id)),
+    [ownDepartmentUsers]
+  );
+
+  useEffect(() => {
+    if (!isOpen || mode !== 'users') return;
+    setSelectedUserIds((prev) => prev.filter((id) => ownDepartmentUserIds.has(id)));
+  }, [isOpen, mode, ownDepartmentUserIds]);
+
+  const filteredUsers = ownDepartmentUsers.filter((user) => {
+    const term = search.toLowerCase().trim();
+    if (!term) return true;
+    const fullName = `${user.firstName || ''} ${user.lastName || ''} ${user.username} ${user.email || ''}`.toLowerCase();
+    return fullName.includes(term);
+  });
+
+  const transferDepartments = departments
+    .filter((department) => HELP_SERVICE_DEPARTMENT_KEYS.includes(department.key))
+    .filter((department) => Number(department.id) !== Number(currentTargetDepartmentId || currentDepartmentId))
+    .sort((a, b) => (a.name_ru || '').localeCompare(b.name_ru || '', 'ru'));
 
   if (!isOpen) return null;
 
-  const filtered = users.filter((u) => {
-    const term = search.toLowerCase();
-    const fullName = `${u.firstName || ''} ${u.lastName || ''} ${u.username}`.toLowerCase();
-    return fullName.includes(term);
-  });
+  const getDepartmentName = (department?: Department | null) => {
+    if (!department) return '';
+    return lang === 'kz' ? department.name_kz || department.name_ru : department.name_ru || department.name_kz;
+  };
 
   const getUserDisplayName = (user: AssignableUser) => {
     if (user.firstName || user.lastName) {
@@ -44,84 +101,168 @@ export default function ReassignModal({ isOpen, onClose, onAssign, users, curren
     );
   };
 
+  const canApply =
+    mode === 'users'
+      ? selectedUserIds.length > 0
+      : Boolean(canTransferDepartments && selectedDepartmentId && reason.trim().length >= 3);
+
+  const handleApply = async () => {
+    if (!canApply) return;
+    setIsAssigning(true);
+    try {
+      const payload: ReassignTicketPayload =
+        mode === 'users'
+          ? { assigneeIds: selectedUserIds }
+          : { departmentId: Number(selectedDepartmentId), reason: reason.trim() };
+      await onAssign(payload);
+      onClose();
+    } catch (error) {
+      console.error('Failed to reassign:', error);
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[86vh] flex flex-col"
+        onClick={(event) => event.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200">
           <h3 className="font-semibold text-slate-800">
             {t('helpdesk.reassign', 'Переназначить')}
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600" aria-label={t('common.close', 'Закрыть')}>
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Search */}
         <div className="p-4 border-b border-slate-100">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('helpdesk.searchUser', 'Поиск по имени...')}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-              autoFocus
-            />
+          <div className={`grid gap-2 rounded-xl bg-slate-100 p-1 ${canTransferDepartments ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            <button
+              type="button"
+              onClick={() => setMode('users')}
+              className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                mode === 'users' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-800'
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              {t('helpdesk.myDepartment', 'Мой отдел')}
+            </button>
+            {canTransferDepartments && (
+              <button
+                type="button"
+                onClick={() => setMode('department')}
+                className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  mode === 'department' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-800'
+                }`}
+              >
+                <Building2 className="h-4 w-4" />
+                {t('helpdesk.otherDepartment', 'Другой отдел')}
+              </button>
+            )}
           </div>
         </div>
 
-        {/* User List */}
-        <div className="flex-1 overflow-y-auto p-2">
-          {filtered.length === 0 ? (
-            <p className="text-center text-slate-500 py-8 text-sm">
-              {t('helpdesk.noUsers', 'Пользователи не найдены')}
-            </p>
-          ) : (
-            <div className="space-y-1">
-              {filtered.map((user) => {
-                const isCurrent = currentAssigneeIds.includes(user.id);
-                const isSelected = selectedUserIds.includes(user.id);
-                return (
-                  <button
-                    key={user.id}
-                    disabled={isAssigning}
-                    onClick={() => toggleUser(user.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
-                      isSelected
-                        ? 'bg-cyan-50 text-cyan-800'
-                        : isAssigning
-                        ? 'opacity-50 cursor-not-allowed'
-                        : 'hover:bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center text-sm font-medium text-slate-600">
-                      {(user.firstName?.[0] || user.username[0]).toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{getUserDisplayName(user)}</p>
-                      {user.department && (
-                        <p className="text-xs text-slate-500">{user.department.name_ru}</p>
-                      )}
-                    </div>
-                    {isSelected ? (
-                      <div className="w-5 h-5 rounded border border-cyan-600 bg-cyan-600 text-white flex items-center justify-center flex-shrink-0 text-xs">
-                        ✓
-                      </div>
-                    ) : (
-                      <div className="w-5 h-5 rounded border border-slate-300 bg-white flex-shrink-0" />
-                    )}
-                    {isCurrent && !isSelected && <UserCheck className="w-4 h-4 text-cyan-600 flex-shrink-0" />}
-                  </button>
-                );
-              })}
+        {mode === 'users' ? (
+          <>
+            <div className="p-4 border-b border-slate-100">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={t('helpdesk.searchUser', 'Поиск по имени...')}
+                  className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  autoFocus
+                />
+              </div>
             </div>
-          )}
-        </div>
+
+            <div className="flex-1 overflow-y-auto p-2">
+              {filteredUsers.length === 0 ? (
+                <p className="text-center text-slate-500 py-8 text-sm">
+                  {t('helpdesk.noUsersInDepartment', 'В вашем отделе нет доступных исполнителей')}
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {filteredUsers.map((user) => {
+                    const isCurrent = currentAssigneeIds.includes(user.id);
+                    const isSelected = selectedUserIds.includes(user.id);
+                    return (
+                      <button
+                        key={user.id}
+                        disabled={isAssigning}
+                        onClick={() => toggleUser(user.id)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                          isSelected
+                            ? 'bg-cyan-50 text-cyan-800'
+                            : isAssigning
+                            ? 'opacity-50 cursor-not-allowed'
+                            : 'hover:bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center text-sm font-medium text-slate-600">
+                          {(user.firstName?.[0] || user.username[0]).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{getUserDisplayName(user)}</p>
+                          {user.department && (
+                            <p className="text-xs text-slate-500 truncate">{getDepartmentName(user.department)}</p>
+                          )}
+                        </div>
+                        <div
+                          className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 text-xs ${
+                            isSelected ? 'border-cyan-600 bg-cyan-600 text-white' : 'border-slate-300 bg-white'
+                          }`}
+                        >
+                          {isSelected ? '✓' : ''}
+                        </div>
+                        {isCurrent && !isSelected && (
+                          <span className="text-xs text-cyan-700">{t('helpdesk.currentAssignee', 'текущий')}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                {t('helpdesk.targetDepartment', 'Отдел-получатель')}
+              </label>
+              <select
+                value={selectedDepartmentId}
+                onChange={(event) => setSelectedDepartmentId(event.target.value ? Number(event.target.value) : '')}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-transparent focus:ring-2 focus:ring-cyan-500"
+              >
+                <option value="">{t('helpdesk.selectDepartment', 'Выберите отдел')}</option>
+                {transferDepartments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {getDepartmentName(department)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                {t('helpdesk.transferReason', 'Причина передачи')}
+              </label>
+              <textarea
+                value={reason}
+                onChange={(event) => setReason(event.target.value)}
+                rows={4}
+                placeholder={t('helpdesk.transferReasonPlaceholder', 'Кратко объясните, почему заявка относится к другому отделу')}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-transparent focus:ring-2 focus:ring-cyan-500 resize-none"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="p-4 border-t border-slate-200 flex items-center gap-2">
           <button
@@ -133,22 +274,14 @@ export default function ReassignModal({ isOpen, onClose, onAssign, users, curren
           </button>
           <button
             type="button"
-            disabled={isAssigning}
-            onClick={async () => {
-              setIsAssigning(true);
-              try {
-                await onAssign(selectedUserIds);
-                onClose();
-              } catch (error) {
-                console.error('Failed to assign:', error);
-              } finally {
-                setIsAssigning(false);
-              }
-            }}
+            disabled={isAssigning || !canApply}
+            onClick={handleApply}
             className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-cyan-600 text-white hover:bg-cyan-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-2"
           >
             {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {t('helpdesk.applyAssignees', 'Применить')}
+            {mode === 'users'
+              ? t('helpdesk.applyAssignees', 'Применить')
+              : t('helpdesk.transferToDepartment', 'Передать')}
           </button>
         </div>
       </div>

@@ -19,6 +19,7 @@ export interface AdminUser {
     name_kz: string;
   };
   isSuperAdmin?: boolean;
+  canManageTickets?: boolean;
 }
 
 export interface HelpdeskRoutingUser {
@@ -27,7 +28,9 @@ export interface HelpdeskRoutingUser {
   email: string;
   firstName?: string;
   lastName?: string;
+  position?: string;
   blocked?: boolean;
+  canManageTickets?: boolean;
   department?: {
     id: number;
     key: string;
@@ -91,6 +94,7 @@ export const adminUsersApi = {
     department?: number | null;
     blocked?: boolean;
     isSuperAdmin?: boolean;
+    canManageTickets?: boolean;
   }): Promise<{ data: AdminUser; generatedPassword?: string }> => {
     const response = await client.post('/admin-users', data);
     return response.data;
@@ -102,6 +106,7 @@ export const adminUsersApi = {
     department?: number | null;
     blocked?: boolean;
     isSuperAdmin?: boolean;
+    canManageTickets?: boolean;
   }): Promise<AdminUser> => {
     const response = await client.put(`/admin-users/${id}`, data);
     return response.data.data;
@@ -123,6 +128,7 @@ export const adminUsersApi = {
     lastName?: string;
     department?: number | null;
     isSuperAdmin?: boolean;
+    canManageTickets?: boolean;
   }): Promise<{ data: AdminUser; generatedPassword?: string; message: string; requiresPasswordUpdate?: boolean }> => {
     const response = await client.post('/admin-users/create-keycloak', data);
     return response.data;

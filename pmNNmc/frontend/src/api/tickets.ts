@@ -12,6 +12,10 @@ export interface TicketFilters {
   pageSize?: number;
 }
 
+export type ReassignTicketPayload =
+  | { assigneeIds: number[] }
+  | { departmentId: number; reason: string };
+
 // Authenticated API
 export const ticketsApi = {
   getAll: async (filters?: TicketFilters): Promise<{ data: Ticket[]; total: number }> => {
@@ -69,8 +73,10 @@ export const ticketsApi = {
       params: {
         'populate[0]': 'category',
         'populate[1]': 'serviceGroup',
-        'populate[2]': 'assignee',
-        'populate[3]': 'attachments',
+        'populate[2]': 'serviceGroup.department',
+        'populate[3]': 'targetDepartment',
+        'populate[4]': 'assignee',
+        'populate[5]': 'attachments',
       },
     });
     return response.data.data;
@@ -81,8 +87,8 @@ export const ticketsApi = {
     return response.data.data;
   },
 
-  reassign: async (documentId: string, assigneeIds: number[]): Promise<Ticket> => {
-    const response = await client.put(`/tickets/${documentId}/reassign`, { assigneeIds });
+  reassign: async (documentId: string, payload: ReassignTicketPayload): Promise<Ticket> => {
+    const response = await client.put(`/tickets/${documentId}/reassign`, payload);
     return response.data.data;
   },
 

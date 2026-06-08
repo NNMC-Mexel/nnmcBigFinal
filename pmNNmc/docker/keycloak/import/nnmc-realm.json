@@ -1,0 +1,61 @@
+{
+  "realm": "nnmc",
+  "enabled": true,
+  "displayName": "NNMC Local",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "clients": [
+    {
+      "clientId": "pmnnmc-app",
+      "name": "PM NNMC Local Strapi OAuth",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "pmnnmc-local-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:1306/api/auth/keycloak/callback",
+        "http://localhost:1307/api/auth/keycloak/callback",
+        "http://localhost:1308/api/auth/keycloak/callback",
+        "http://localhost:1309/api/auth/keycloak/callback",
+        "http://localhost:1310/api/auth/keycloak/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:1305",
+        "http://localhost:1311"
+      ]
+    },
+    {
+      "clientId": "nnmc-admin",
+      "name": "NNMC Local Admin Client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "nnmc-admin-local-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "local.admin",
+      "email": "local.admin@example.com",
+      "firstName": "Local",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Admin123!",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

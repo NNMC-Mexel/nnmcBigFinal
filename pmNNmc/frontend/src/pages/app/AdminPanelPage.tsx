@@ -109,6 +109,7 @@ export default function AdminPanelPage() {
     department: null as number | null,
     blocked: false,
     isSuperAdmin: false,
+    canManageTickets: false,
     kpiAllDepartments: false,
     kpiAllowedDepartments: [] as string[],
   });
@@ -266,7 +267,7 @@ export default function AdminPanelPage() {
   const resetUserForm = () => {
     setUserForm({
       email: '', username: '', firstName: '', lastName: '',
-      department: null, blocked: false, isSuperAdmin: false,
+      department: null, blocked: false, isSuperAdmin: false, canManageTickets: false,
       kpiAllDepartments: false, kpiAllowedDepartments: [],
     });
     setKpiAccessUserId(null);
@@ -281,6 +282,7 @@ export default function AdminPanelPage() {
         lastName: userForm.lastName,
         department: userForm.department,
         isSuperAdmin: userForm.isSuperAdmin,
+        canManageTickets: userForm.canManageTickets,
       });
 
       setGeneratedPassword(result.generatedPassword || STANDARD_INITIAL_PASSWORD);
@@ -303,6 +305,7 @@ export default function AdminPanelPage() {
         department: userForm.department,
         blocked: userForm.blocked,
         isSuperAdmin: userForm.isSuperAdmin,
+        canManageTickets: userForm.canManageTickets,
       });
 
       // Save KPI access via server-kpi department-access endpoint
@@ -378,6 +381,7 @@ export default function AdminPanelPage() {
       department: user.department?.id || null,
       blocked: user.blocked,
       isSuperAdmin: user.isSuperAdmin === true,
+      canManageTickets: user.canManageTickets === true,
       kpiAllDepartments: false,
       kpiAllowedDepartments: [],
     });
@@ -969,14 +973,22 @@ export default function AdminPanelPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {user.isSuperAdmin ? (
-                          <Badge variant="danger">
-                            <Shield className="w-3 h-3 mr-1" />
-                            SA
-                          </Badge>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
+                        <div className="flex flex-wrap gap-1.5">
+                          {user.isSuperAdmin && (
+                            <Badge variant="danger">
+                              <Shield className="w-3 h-3 mr-1" />
+                              SA
+                            </Badge>
+                          )}
+                          {user.canManageTickets && (
+                            <Badge variant="info">
+                              HelpDesk
+                            </Badge>
+                          )}
+                          {!user.isSuperAdmin && !user.canManageTickets && (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <button
@@ -1080,6 +1092,11 @@ export default function AdminPanelPage() {
             <span className="text-sm text-slate-700">SuperAdmin (полный доступ + админ-панель)</span>
           </label>
 
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={userForm.canManageTickets} onChange={(e) => setUserForm({ ...userForm, canManageTickets: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500" />
+            <span className="text-sm text-slate-700">HelpDesk админ (передача между отделами)</span>
+          </label>
+
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
             <div className="flex items-start gap-3">
               <Key className="w-5 h-5 text-primary-600 mt-0.5" />
@@ -1112,6 +1129,11 @@ export default function AdminPanelPage() {
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={userForm.isSuperAdmin} onChange={(e) => setUserForm({ ...userForm, isSuperAdmin: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500" />
             <span className="text-sm text-slate-700">SuperAdmin (полный доступ + админ-панель)</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={userForm.canManageTickets} onChange={(e) => setUserForm({ ...userForm, canManageTickets: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500" />
+            <span className="text-sm text-slate-700">HelpDesk админ (передача между отделами)</span>
           </label>
 
           <label className="flex items-center gap-2 cursor-pointer">

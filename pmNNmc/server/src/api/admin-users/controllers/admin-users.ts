@@ -50,6 +50,8 @@ function formatHelpdeskUser(user: any) {
     firstName: user.firstName,
     lastName: user.lastName,
     blocked: user.blocked,
+    position: user.position,
+    canManageTickets: user.canManageTickets,
     department: user.department
       ? {
           id: user.department.id,
@@ -127,7 +129,7 @@ async function loadHelpdeskRouting(strapi: any) {
       department: { key: { $in: HELPDESK_DEPARTMENT_KEYS } },
       blocked: false,
     } as any,
-    fields: ['id', 'username', 'email', 'firstName', 'lastName', 'blocked'],
+    fields: ['id', 'username', 'email', 'firstName', 'lastName', 'position', 'blocked', 'canManageTickets'],
     populate: ['department'],
     sort: { firstName: 'asc', lastName: 'asc', username: 'asc' } as any,
     pagination: { pageSize: 1000 },
@@ -382,7 +384,7 @@ export default {
     await checkSuperAdmin(ctx, strapi);
 
     const {
-      email, username, firstName, lastName, department, blocked, isSuperAdmin,
+      email, username, firstName, lastName, department, blocked, isSuperAdmin, canManageTickets,
     } = ctx.request.body as any;
 
     if (!email || !username) {
@@ -430,6 +432,7 @@ export default {
           confirmed: true,
           provider: 'local',
           isSuperAdmin: isSuperAdmin || false,
+          canManageTickets: canManageTickets || false,
         },
       });
 
@@ -453,7 +456,7 @@ export default {
 
     const { id } = ctx.params;
     const {
-      firstName, lastName, department, blocked, isSuperAdmin,
+      firstName, lastName, department, blocked, isSuperAdmin, canManageTickets,
     } = ctx.request.body as any;
 
     try {
@@ -464,6 +467,7 @@ export default {
       if (department !== undefined) updateData.department = department;
       if (blocked !== undefined) updateData.blocked = blocked;
       if (isSuperAdmin !== undefined) updateData.isSuperAdmin = isSuperAdmin;
+      if (canManageTickets !== undefined) updateData.canManageTickets = canManageTickets;
 
       const user = await strapi.entityService.update('plugin::users-permissions.user', id, {
         data: updateData,
@@ -829,7 +833,7 @@ export default {
 
     const {
       username, email, firstName, lastName,
-      department, isSuperAdmin,
+      department, isSuperAdmin, canManageTickets,
     } = ctx.request.body as any;
 
     if (!username || !email) {
@@ -928,6 +932,7 @@ export default {
             confirmed: true,
             provider: 'keycloak',
             isSuperAdmin: isSuperAdmin || false,
+            canManageTickets: canManageTickets || false,
           },
         });
       } else {
@@ -951,6 +956,7 @@ export default {
             confirmed: true,
             provider: 'keycloak',
             isSuperAdmin: isSuperAdmin || false,
+            canManageTickets: canManageTickets || false,
           },
         });
       }

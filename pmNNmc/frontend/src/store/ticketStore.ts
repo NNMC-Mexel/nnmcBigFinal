@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Ticket, AssignableUser } from '../types';
-import { ticketsApi, type TicketFilters } from '../api/tickets';
+import { ticketsApi, type ReassignTicketPayload, type TicketFilters } from '../api/tickets';
 
 interface TicketState {
   tickets: Ticket[];
@@ -14,7 +14,7 @@ interface TicketState {
   fetchTickets: (filters?: TicketFilters) => Promise<void>;
   fetchTicket: (documentId: string) => Promise<void>;
   updateTicket: (documentId: string, data: Partial<Ticket>) => Promise<void>;
-  reassignTicket: (documentId: string, assigneeIds: number[]) => Promise<void>;
+  reassignTicket: (documentId: string, payload: ReassignTicketPayload) => Promise<void>;
   fetchAssignableUsers: () => Promise<void>;
   setFilters: (filters: Partial<TicketFilters>) => void;
   clearFilters: () => void;
@@ -62,10 +62,10 @@ export const useTicketStore = create<TicketState>((set, get) => ({
     }
   },
 
-  reassignTicket: async (documentId, assigneeIds) => {
+  reassignTicket: async (documentId, payload) => {
     set({ error: null });
     try {
-      await ticketsApi.reassign(documentId, assigneeIds);
+      await ticketsApi.reassign(documentId, payload);
       await get().fetchTickets();
     } catch {
       set({ error: 'Ошибка переназначения заявки' });

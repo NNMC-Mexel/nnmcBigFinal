@@ -19,11 +19,13 @@
     "@strapi/provider-upload-aws-s3": "^5.43.0",
     "@strapi/strapi": "5.33.4",
     "better-sqlite3": "12.4.1",
+    "esbuild": "^0.25.12",
     "pg": "^8.17.2",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "react-router-dom": "^6.0.0",
-    "styled-components": "^6.0.0"
+    "styled-components": "^6.0.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^20",

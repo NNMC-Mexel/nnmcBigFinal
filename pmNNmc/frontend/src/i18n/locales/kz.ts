@@ -321,8 +321,17 @@ export default {
     notAssigned: 'Тағайындалмаған',
     noTickets: 'Өтінімдер әлі жоқ',
     noUsers: 'Пайдаланушылар табылмады',
+    noUsersInDepartment: 'Бөліміңізде қолжетімді орындаушылар жоқ',
     searchUser: 'Аты бойынша іздеу...',
     applyAssignees: 'Қолдану',
+    myDepartment: 'Менің бөлімім',
+    otherDepartment: 'Басқа бөлім',
+    targetDepartment: 'Қабылдаушы бөлім',
+    selectDepartment: 'Бөлімді таңдаңыз',
+    transferReason: 'Беру себебі',
+    transferReasonPlaceholder: 'Өтінімнің басқа бөлімге неге қатысты екенін қысқаша түсіндіріңіз',
+    transferToDepartment: 'Беру',
+    currentAssignee: 'ағымдағы',
     publicForm: 'Өтінім формасы',
 
     // Statuses

@@ -486,6 +486,45 @@ export interface ApiActivityLogActivityLog extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiAuditEventAuditEvent extends Struct.CollectionTypeSchema {
+  collectionName: 'audit_events';
+  info: {
+    description: 'Compliance audit trail for critical entities';
+    displayName: 'AuditEvent';
+    pluralName: 'audit-events';
+    singularName: 'audit-event';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    action: Schema.Attribute.String & Schema.Attribute.Required;
+    actor: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    actorEmail: Schema.Attribute.Email;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    entityId: Schema.Attribute.String & Schema.Attribute.Required;
+    entityType: Schema.Attribute.String & Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::audit-event.audit-event'
+    > &
+      Schema.Attribute.Private;
+    newData: Schema.Attribute.JSON;
+    oldData: Schema.Attribute.JSON;
+    publishedAt: Schema.Attribute.DateTime;
+    timestamp: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiBoardStageBoardStage extends Struct.CollectionTypeSchema {
   collectionName: 'board_stages';
   info: {
@@ -508,26 +547,6 @@ export interface ApiBoardStageBoardStage extends Struct.CollectionTypeSchema {
       'api::board-stage.board-stage'
     > &
       Schema.Attribute.Private;
-    maxPercent: Schema.Attribute.Integer &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMax<
-        {
-          max: 100;
-          min: 0;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<100>;
-    minPercent: Schema.Attribute.Integer &
-      Schema.Attribute.Required &
-      Schema.Attribute.SetMinMax<
-        {
-          max: 100;
-          min: 0;
-        },
-        number
-      > &
-      Schema.Attribute.DefaultTo<0>;
     name_kz: Schema.Attribute.String & Schema.Attribute.Required;
     name_ru: Schema.Attribute.String & Schema.Attribute.Required;
     order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
@@ -550,13 +569,41 @@ export interface ApiDepartmentDepartment extends Struct.CollectionTypeSchema {
     draftAndPublish: false;
   };
   attributes: {
+    canAccessConf: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    canAccessJournal: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canAccessSigndoc: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canDeleteProject: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canDragProjects: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canManageNews: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    canManageProjectAssignments: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canManageTickets: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canViewActivityLog: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canViewBoard: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    canViewDashboard: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canViewHelpdesk: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canViewKpiEngineering: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canViewKpiIt: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    canViewKpiMedical: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canViewKpiTimesheet: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canViewNews: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    canViewTable: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    key: Schema.Attribute.Enumeration<
-      ['IT', 'DIGITALIZATION', 'MEDICAL_EQUIPMENT', 'ENGINEERING']
-    > &
-      Schema.Attribute.Required;
+    description: Schema.Attribute.Text;
+    key: Schema.Attribute.String & Schema.Attribute.Required;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -570,6 +617,41 @@ export interface ApiDepartmentDepartment extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+  };
+}
+
+export interface ApiDeviceTokenDeviceToken extends Struct.CollectionTypeSchema {
+  collectionName: 'device_tokens';
+  info: {
+    displayName: 'Device Token';
+    pluralName: 'device-tokens';
+    singularName: 'device-token';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::device-token.device-token'
+    > &
+      Schema.Attribute.Private;
+    platform: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    token: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    user: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
   };
 }
 
@@ -607,6 +689,47 @@ export interface ApiMeetingNoteMeetingNote extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiNewsCommentNewsComment extends Struct.CollectionTypeSchema {
+  collectionName: 'news_comments';
+  info: {
+    description: '\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u0435\u0439 \u043A \u043D\u043E\u0432\u043E\u0441\u0442\u044F\u043C';
+    displayName: '\u041A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0439 \u043A \u043D\u043E\u0432\u043E\u0441\u0442\u0438';
+    pluralName: 'news-comments';
+    singularName: 'news-comment';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    author: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::news-comment.news-comment'
+    > &
+      Schema.Attribute.Private;
+    newsPost: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::news-post.news-post'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    text: Schema.Attribute.Text &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 5000;
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiNewsPostNewsPost extends Struct.CollectionTypeSchema {
   collectionName: 'news_posts';
   info: {
@@ -631,6 +754,10 @@ export interface ApiNewsPostNewsPost extends Struct.CollectionTypeSchema {
       ['NEWS', 'ANNOUNCEMENT', 'EVENT', 'UPDATE']
     > &
       Schema.Attribute.DefaultTo<'NEWS'>;
+    comments: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::news-comment.news-comment'
+    >;
     content: Schema.Attribute.RichText;
     coverImage: Schema.Attribute.Media<'images'>;
     createdAt: Schema.Attribute.DateTime;
@@ -647,6 +774,45 @@ export interface ApiNewsPostNewsPost extends Struct.CollectionTypeSchema {
     published: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     publishedAt: Schema.Attribute.DateTime;
     title: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiNotificationNotification
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'notifications';
+  info: {
+    description: 'In-app notifications for users';
+    displayName: 'Notification';
+    pluralName: 'notifications';
+    singularName: 'notification';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    body: Schema.Attribute.Text;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    isRead: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    link: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::notification.notification'
+    > &
+      Schema.Attribute.Private;
+    metadata: Schema.Attribute.JSON;
+    publishedAt: Schema.Attribute.DateTime;
+    recipient: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    type: Schema.Attribute.String;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -770,6 +936,10 @@ export interface ApiProjectProject extends Struct.CollectionTypeSchema {
       'api::project.project'
     > &
       Schema.Attribute.Private;
+    managers: Schema.Attribute.Relation<
+      'manyToMany',
+      'plugin::users-permissions.user'
+    >;
     manualStageOverride: Schema.Attribute.Relation<
       'manyToOne',
       'api::board-stage.board-stage'
@@ -804,6 +974,106 @@ export interface ApiProjectProject extends Struct.CollectionTypeSchema {
     >;
     tasks: Schema.Attribute.Relation<'oneToMany', 'api::task.task'>;
     title: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiProtocolProtocol extends Struct.CollectionTypeSchema {
+  collectionName: 'protocols';
+  info: {
+    description: '\u041F\u0440\u043E\u0442\u043E\u043A\u043E\u043B\u044B \u0441\u043E\u0432\u0435\u0449\u0430\u043D\u0438\u0439';
+    displayName: 'Protocol';
+    pluralName: 'protocols';
+    singularName: 'protocol';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    attendees: Schema.Attribute.Relation<
+      'manyToMany',
+      'plugin::users-permissions.user'
+    >;
+    conclusion: Schema.Attribute.Text;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    creator: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    creatorDepartment: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::department.department'
+    >;
+    history: Schema.Attribute.JSON;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::protocol.protocol'
+    > &
+      Schema.Attribute.Private;
+    meetingDate: Schema.Attribute.Date & Schema.Attribute.Required;
+    nextMeetingDate: Schema.Attribute.Date;
+    pdfFiles: Schema.Attribute.Media<'files', true>;
+    publishedAt: Schema.Attribute.DateTime;
+    responsibles: Schema.Attribute.Relation<
+      'manyToMany',
+      'plugin::users-permissions.user'
+    >;
+    status: Schema.Attribute.Enumeration<['draft', 'published']> &
+      Schema.Attribute.DefaultTo<'draft'>;
+    tasks: Schema.Attribute.Component<'protocol.task', true>;
+    theme: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    version: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<1>;
+  };
+}
+
+export interface ApiRoleConfigRoleConfig extends Struct.CollectionTypeSchema {
+  collectionName: 'role_configs';
+  info: {
+    description: 'Per-role default permission settings';
+    displayName: 'RoleConfig';
+    pluralName: 'role-configs';
+    singularName: 'role-config';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    canDeleteProject: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canDragProjects: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canViewBoard: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    canViewDashboard: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<true>;
+    canViewHelpdesk: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<true>;
+    canViewKpi: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    canViewKpiTimesheet: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    canViewTable: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    defaultModuleAccess: Schema.Attribute.JSON & Schema.Attribute.DefaultTo<[]>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::role-config.role-config'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    roleId: Schema.Attribute.Integer;
+    roleName: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -990,11 +1260,17 @@ export interface ApiTicketTicket extends Struct.CollectionTypeSchema {
       'manyToMany',
       'plugin::users-permissions.user'
     >;
+    attachments: Schema.Attribute.Media<'images' | 'files' | 'videos', true>;
     category: Schema.Attribute.Relation<
       'manyToOne',
       'api::ticket-category.ticket-category'
     >;
     comment: Schema.Attribute.Text & Schema.Attribute.Required;
+    completedAt: Schema.Attribute.DateTime;
+    completedBy: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
     complexity: Schema.Attribute.Enumeration<['A', 'B', 'C', 'D']>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -1006,6 +1282,10 @@ export interface ApiTicketTicket extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
+    requester: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
     requesterDepartment: Schema.Attribute.String & Schema.Attribute.Required;
     requesterName: Schema.Attribute.String & Schema.Attribute.Required;
     requesterPhone: Schema.Attribute.String;
@@ -1019,9 +1299,14 @@ export interface ApiTicketTicket extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'NEW'>;
+    targetDepartment: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::department.department'
+    >;
     ticketNumber: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.Unique;
+    transferReason: Schema.Attribute.Text;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1485,13 +1770,22 @@ export interface PluginUsersPermissionsUser
     draftAndPublish: false;
   };
   attributes: {
+    avatarFileId: Schema.Attribute.Integer;
+    avatarUrl: Schema.Attribute.String;
     blocked: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    canDeleteProject: Schema.Attribute.Boolean;
+    canDragProjects: Schema.Attribute.Boolean;
+    canManageNews: Schema.Attribute.Boolean;
+    canManageTickets: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
     canViewBoard: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
     canViewDashboard: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<true>;
     canViewHelpdesk: Schema.Attribute.Boolean &
       Schema.Attribute.DefaultTo<true>;
     canViewKpi: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    canViewKpiTimesheet: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
     canViewTable: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
     confirmationToken: Schema.Attribute.String & Schema.Attribute.Private;
     confirmed: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
@@ -1508,6 +1802,9 @@ export interface PluginUsersPermissionsUser
         minLength: 6;
       }>;
     firstName: Schema.Attribute.String;
+    isKpiResponsible: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    isSuperAdmin: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     lastName: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -1515,11 +1812,13 @@ export interface PluginUsersPermissionsUser
       'plugin::users-permissions.user'
     > &
       Schema.Attribute.Private;
+    moduleAccess: Schema.Attribute.JSON & Schema.Attribute.DefaultTo<[]>;
     password: Schema.Attribute.Password &
       Schema.Attribute.Private &
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
+    position: Schema.Attribute.String;
     provider: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;
@@ -1551,13 +1850,19 @@ declare module '@strapi/strapi' {
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
       'api::activity-log.activity-log': ApiActivityLogActivityLog;
+      'api::audit-event.audit-event': ApiAuditEventAuditEvent;
       'api::board-stage.board-stage': ApiBoardStageBoardStage;
       'api::department.department': ApiDepartmentDepartment;
+      'api::device-token.device-token': ApiDeviceTokenDeviceToken;
       'api::meeting-note.meeting-note': ApiMeetingNoteMeetingNote;
+      'api::news-comment.news-comment': ApiNewsCommentNewsComment;
       'api::news-post.news-post': ApiNewsPostNewsPost;
+      'api::notification.notification': ApiNotificationNotification;
       'api::project-document.project-document': ApiProjectDocumentProjectDocument;
       'api::project-survey.project-survey': ApiProjectSurveyProjectSurvey;
       'api::project.project': ApiProjectProject;
+      'api::protocol.protocol': ApiProtocolProtocol;
+      'api::role-config.role-config': ApiRoleConfigRoleConfig;
       'api::service-group.service-group': ApiServiceGroupServiceGroup;
       'api::survey-response.survey-response': ApiSurveyResponseSurveyResponse;
       'api::task.task': ApiTaskTask;

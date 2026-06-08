@@ -74,6 +74,14 @@
       "relation": "manyToOne",
       "target": "api::service-group.service-group"
     },
+    "targetDepartment": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::department.department"
+    },
+    "transferReason": {
+      "type": "text"
+    },
     "assignee": {
       "type": "relation",
       "relation": "manyToMany",

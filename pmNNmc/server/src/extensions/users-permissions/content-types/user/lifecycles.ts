@@ -13,6 +13,7 @@ const snapshotUser = (user) => {
     avatarFileId: user.avatarFileId,
     department: user.department?.id || user.department || null,
     isSuperAdmin: user.isSuperAdmin,
+    canManageTickets: user.canManageTickets,
     isKpiResponsible: user.isKpiResponsible,
     blocked: user.blocked,
     confirmed: user.confirmed,

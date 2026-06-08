@@ -59,6 +59,7 @@ export interface User {
   role?: UserRole;
   department?: Department;
   isSuperAdmin?: boolean;
+  canManageTickets?: boolean;
   blocked: boolean;
   confirmed: boolean;
 }
@@ -225,6 +226,8 @@ export interface Ticket {
   completedBy?: User | null;
   category?: TicketCategory;
   serviceGroup?: ServiceGroup;
+  targetDepartment?: Department | null;
+  transferReason?: string | null;
   assignee?: User[];
   attachments?: MediaFile[];
   createdAt?: string;

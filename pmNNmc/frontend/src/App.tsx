@@ -10,7 +10,7 @@ import AppLayout from './layouts/AppLayout';
 import LoginPage from './pages/auth/LoginPage';
 import KeycloakCallbackPage from './pages/auth/KeycloakCallbackPage';
 import DeepLinkHandler from './components/DeepLinkHandler';
-import { startKeycloakLogin } from './utils/keycloakAuth';
+import { isKeycloakEnabled, startKeycloakLogin } from './utils/keycloakAuth';
 
 // Lazy auth pages (rarely visited)
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
@@ -60,13 +60,13 @@ const withSuspense = (node: React.ReactNode) => (
   <Suspense fallback={<PageLoader />}>{node}</Suspense>
 );
 
-// Protected Route component — redirects to Keycloak SSO
+// Protected Route component — redirects to Keycloak SSO when enabled.
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isLoading = useAuthStore((state) => state.isLoading);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (isKeycloakEnabled && !isLoading && !isAuthenticated) {
       startKeycloakLogin();
     }
   }, [isLoading, isAuthenticated]);
@@ -83,6 +83,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!isAuthenticated) {
+    if (!isKeycloakEnabled) {
+      return <Navigate to="/login" replace />;
+    }
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">

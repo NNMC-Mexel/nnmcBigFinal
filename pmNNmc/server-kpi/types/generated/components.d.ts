@@ -7,6 +7,7 @@ export interface ReportCommissionMember extends Struct.ComponentSchema {
     icon: 'user';
   };
   attributes: {
+    email: Schema.Attribute.Email;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     order: Schema.Attribute.Integer;
     role: Schema.Attribute.String & Schema.Attribute.Required;

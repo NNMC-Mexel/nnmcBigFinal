@@ -3,6 +3,7 @@ import { InAppBrowser, DefaultWebViewOptions } from '@capacitor/inappbrowser';
 
 // Window event the DeepLinkHandler listens for to finish login inside the SPA.
 export const KEYCLOAK_REDIRECT_EVENT = 'nnmc:keycloak-redirect';
+export const isKeycloakEnabled = import.meta.env.VITE_KEYCLOAK_ENABLED === 'true';
 
 /**
  * Start Keycloak SSO login.
@@ -13,6 +14,11 @@ export const KEYCLOAK_REDIRECT_EVENT = 'nnmc:keycloak-redirect';
  *   existing KeycloakCallbackPage via a window event.
  */
 export async function startKeycloakLogin(): Promise<void> {
+  if (!isKeycloakEnabled) {
+    window.location.href = '/login';
+    return;
+  }
+
   const apiUrl = import.meta.env.VITE_API_URL;
   const connectUrl = `${apiUrl}/api/connect/keycloak`;
 

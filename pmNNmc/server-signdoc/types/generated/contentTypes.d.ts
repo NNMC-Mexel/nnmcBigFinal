@@ -445,6 +445,7 @@ export interface ApiDepartmentDepartment extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    key: Schema.Attribute.String & Schema.Attribute.Unique;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -536,6 +537,7 @@ export interface ApiDocumentDocument extends Struct.CollectionTypeSchema {
       'api::document.document'
     > &
       Schema.Attribute.Private;
+    metadata: Schema.Attribute.JSON;
     originalFile: Schema.Attribute.Media<'files'>;
     publishedAt: Schema.Attribute.DateTime;
     signatureHistory: Schema.Attribute.JSON;
@@ -544,7 +546,14 @@ export interface ApiDocumentDocument extends Struct.CollectionTypeSchema {
     signatureType: Schema.Attribute.Enumeration<['eds', 'simple']>;
     signers: Schema.Attribute.JSON;
     status: Schema.Attribute.Enumeration<
-      ['pending', 'in_progress', 'completed', 'cancelled', 'revision']
+      [
+        'pending',
+        'in_progress',
+        'completed',
+        'cancelled',
+        'revision',
+        'revoked',
+      ]
     > &
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'pending'>;
@@ -553,6 +562,7 @@ export interface ApiDocumentDocument extends Struct.CollectionTypeSchema {
       'api::subdivision.subdivision'
     >;
     title: Schema.Attribute.String & Schema.Attribute.Required;
+    uid: Schema.Attribute.String & Schema.Attribute.Unique;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1065,6 +1075,9 @@ export interface PluginUsersPermissionsUser
         minLength: 6;
       }>;
     fullName: Schema.Attribute.String;
+    isKpiResponsible: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    isSuperAdmin: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1076,6 +1089,7 @@ export interface PluginUsersPermissionsUser
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
+    position: Schema.Attribute.String;
     provider: Schema.Attribute.String;
     publishedAt: Schema.Attribute.DateTime;
     resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;
@@ -1083,6 +1097,7 @@ export interface PluginUsersPermissionsUser
       'manyToOne',
       'plugin::users-permissions.role'
     >;
+    signdocAccess: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

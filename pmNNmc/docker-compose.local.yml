@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nnmc-local-postgres
+    restart: unless-stopped
+    ports:
+      - "1301:5432"
+    environment:
+      POSTGRES_DB: nnmc_board
+      POSTGRES_USER: nnmc
+      POSTGRES_PASSWORD: nnmc_local_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nnmc -d nnmc_board"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: nnmc-local-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    ports:
+      - "1302:9000"
+      - "1303:9001"
+    environment:
+      MINIO_ROOT_USER: nnmcminio
+      MINIO_ROOT_PASSWORD: nnmcminio123
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: nnmc-local-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 nnmcminio nnmcminio123;
+      mc mb --ignore-existing local/nnmc-main local/nnmc-kpi local/nnmc-signdoc;
+      mc anonymous set download local/nnmc-main;
+      mc anonymous set download local/nnmc-kpi;
+      mc anonymous set download local/nnmc-signdoc;
+      "
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: nnmc-local-keycloak
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm", "--hostname-strict=false"]
+    ports:
+      - "1304:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./docker/keycloak/import:/opt/keycloak/data/import:ro
+
+volumes:
+  postgres_data:
+  minio_data:
+  keycloak_data:

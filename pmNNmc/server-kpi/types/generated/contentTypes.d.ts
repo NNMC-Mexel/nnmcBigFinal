@@ -530,6 +530,107 @@ export interface ApiAuthorAuthor extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiCalculationArchiveCalculationArchive
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'calculation_archives';
+  info: {
+    description: '\u0410\u0440\u0445\u0438\u0432 \u0440\u0430\u0441\u0447\u0451\u0442\u043E\u0432 KPI \u043F\u043E \u0442\u0430\u0431\u0435\u043B\u044E';
+    displayName: 'CalculationArchive';
+    pluralName: 'calculation-archives';
+    singularName: 'calculation-archive';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    calculatedBy: Schema.Attribute.String & Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    creator: Schema.Attribute.Relation<
+      'manyToOne',
+      'plugin::users-permissions.user'
+    >;
+    creatorEmail: Schema.Attribute.String;
+    department: Schema.Attribute.String & Schema.Attribute.Required;
+    edited: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    employeeCount: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    errors: Schema.Attribute.JSON;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::calculation-archive.calculation-archive'
+    > &
+      Schema.Attribute.Private;
+    month: Schema.Attribute.Integer &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMax<
+        {
+          max: 12;
+          min: 1;
+        },
+        number
+      >;
+    nchDay: Schema.Attribute.Decimal;
+    ndShift: Schema.Attribute.Decimal;
+    parsedDetails: Schema.Attribute.JSON;
+    publishedAt: Schema.Attribute.DateTime;
+    results: Schema.Attribute.JSON & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    year: Schema.Attribute.Integer & Schema.Attribute.Required;
+  };
+}
+
+export interface ApiDepartmentTemplateDepartmentTemplate
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'department_templates';
+  info: {
+    description: 'Per-department protocol template with commission members';
+    displayName: 'DepartmentTemplate';
+    pluralName: 'department-templates';
+    singularName: 'department-template';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    agendaText: Schema.Attribute.Text;
+    commissionMembers: Schema.Attribute.Component<
+      'report.commission-member',
+      true
+    >;
+    coordinatorRole: Schema.Attribute.String;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    departmentKey: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    departmentName: Schema.Attribute.String & Schema.Attribute.Required;
+    footerText: Schema.Attribute.Text;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::department-template.department-template'
+    > &
+      Schema.Attribute.Private;
+    meetingDateOverrides: Schema.Attribute.Component<
+      'report.meeting-date',
+      true
+    >;
+    meetingTitle: Schema.Attribute.String;
+    place: Schema.Attribute.String;
+    protocolNumber: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    secretaryName: Schema.Attribute.String;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiEmployeeEmployee extends Struct.CollectionTypeSchema {
   collectionName: 'employees';
   info: {
@@ -1213,11 +1314,16 @@ export interface PluginUsersPermissionsUser
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    departmentKey: Schema.Attribute.String;
+    departmentName: Schema.Attribute.String;
     email: Schema.Attribute.Email &
       Schema.Attribute.Required &
       Schema.Attribute.SetMinMaxLength<{
         minLength: 6;
       }>;
+    isKpiResponsible: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    isSuperAdmin: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1262,6 +1368,8 @@ declare module '@strapi/strapi' {
       'api::about.about': ApiAboutAbout;
       'api::article.article': ApiArticleArticle;
       'api::author.author': ApiAuthorAuthor;
+      'api::calculation-archive.calculation-archive': ApiCalculationArchiveCalculationArchive;
+      'api::department-template.department-template': ApiDepartmentTemplateDepartmentTemplate;
       'api::employee.employee': ApiEmployeeEmployee;
       'api::g-oand-test.g-oand-test': ApiGOandTestGOandTest;
       'api::global.global': ApiGlobalGlobal;

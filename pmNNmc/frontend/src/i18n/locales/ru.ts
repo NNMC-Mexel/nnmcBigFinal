@@ -326,8 +326,17 @@ export default {
     notAssigned: 'Не назначен',
     noTickets: 'Заявок пока нет',
     noUsers: 'Пользователи не найдены',
+    noUsersInDepartment: 'В вашем отделе нет доступных исполнителей',
     searchUser: 'Поиск по имени...',
     applyAssignees: 'Применить',
+    myDepartment: 'Мой отдел',
+    otherDepartment: 'Другой отдел',
+    targetDepartment: 'Отдел-получатель',
+    selectDepartment: 'Выберите отдел',
+    transferReason: 'Причина передачи',
+    transferReasonPlaceholder: 'Кратко объясните, почему заявка относится к другому отделу',
+    transferToDepartment: 'Передать',
+    currentAssignee: 'текущий',
     publicForm: 'Форма подачи',
 
     // Statuses

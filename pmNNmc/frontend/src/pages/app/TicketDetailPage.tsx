@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useTicketStore } from '../../store/ticketStore';
 import { useAuthStore, useUserRole } from '../../store/authStore';
+import type { ReassignTicketPayload } from '../../api/tickets';
 import TicketStatusBadge from '../../components/tickets/TicketStatusBadge';
 import ReassignModal from '../../components/tickets/ReassignModal';
 import Loader from '../../components/ui/Loader';
@@ -24,6 +25,14 @@ import { subscribeToNotificationRealtime } from '../../api/notificationRealtime'
 
 const STATUSES = ['NEW', 'IN_PROGRESS', 'DONE', 'INVALID'] as const;
 const COMPLEXITIES = ['A', 'B', 'C', 'D'] as const;
+
+const normalizePermissionText = (value?: string | null) =>
+  String(value || '').toLowerCase().replace(/ё/g, 'е').trim();
+
+const hasAnyPermissionToken = (values: Array<string | undefined | null>, tokens: string[]) => {
+  const haystack = values.map(normalizePermissionText).filter(Boolean).join(' ');
+  return tokens.some((token) => haystack.includes(token));
+};
 
 export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -92,11 +101,11 @@ export default function TicketDetailPage() {
     }
   };
 
-  const handleReassign = async (userIds: number[]): Promise<void> => {
+  const handleReassign = async (payload: ReassignTicketPayload): Promise<void> => {
     if (!selectedTicket) {
       throw new Error('No ticket selected');
     }
-    await reassignTicket(selectedTicket.documentId, userIds);
+    await reassignTicket(selectedTicket.documentId, payload);
     if (id) await fetchTicket(id);
   };
 
@@ -152,10 +161,28 @@ export default function TicketDetailPage() {
       ? `${user.lastName || ''} ${user.firstName || ''}`.trim()
       : user?.username || user?.email || '-';
   const isAssignedToMe = assignees.some((a) => Number(a.id) === Number(currentUser?.id));
+  const isInMyDepartmentQueue =
+    Number(ticket.targetDepartment?.id) === Number(currentUser?.department?.id) ||
+    (!ticket.targetDepartment && Number(ticket.serviceGroup?.department?.id) === Number(currentUser?.department?.id));
   const isKuat =
     currentUser?.username?.toLowerCase() === 'kuat' ||
     currentUser?.email?.toLowerCase() === 'kuat@nnmc.kz';
-  const canEditTicket = Boolean(isSuperAdmin || isAssignedToMe || isKuat);
+  const isDepartmentHead = hasAnyPermissionToken(
+    [currentUser?.position, currentUser?.role?.name, currentUser?.role?.type, currentUser?.role?.description],
+    ['руковод', 'началь', 'завед', 'директор', 'глав', 'head', 'chief', 'lead', 'басшы']
+  );
+  const isHelpdeskAdmin = Boolean(
+    currentUser?.canManageTickets === true ||
+      hasAnyPermissionToken(
+        [currentUser?.role?.name, currentUser?.role?.type, currentUser?.role?.description],
+        ['superadmin', 'super admin', 'admin', 'админ']
+      )
+  );
+  const canTransferDepartments = Boolean(isSuperAdmin || isKuat || isDepartmentHead || isHelpdeskAdmin);
+  const canEditTicket = Boolean(
+    isSuperAdmin || isKuat || isAssignedToMe || (isInMyDepartmentQueue && (isDepartmentHead || isHelpdeskAdmin))
+  );
+  const canReassignTicket = Boolean(isSuperAdmin || isKuat || isAssignedToMe || isInMyDepartmentQueue);
 
   const hasChanges =
     editStatus !== ticket.status ||
@@ -186,7 +213,7 @@ export default function TicketDetailPage() {
           </div>
         </div>
 
-        {canEditTicket && (
+        {canReassignTicket && (
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowReassign(true)}
@@ -195,6 +222,7 @@ export default function TicketDetailPage() {
             <UserPlus className="w-4 h-4" />
             {t('helpdesk.reassign', 'Переназначить')}
           </button>
+          {canEditTicket && (
           <button
             onClick={handleSave}
             disabled={saving || !hasChanges}
@@ -207,6 +235,7 @@ export default function TicketDetailPage() {
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {t('common.save', 'Сохранить')}
           </button>
+          )}
         </div>
         )}
       </div>
@@ -414,7 +443,7 @@ export default function TicketDetailPage() {
                 )}
               </div>
             </div>
-            {canEditTicket && (
+            {canReassignTicket && (
               <button
                 onClick={() => setShowReassign(true)}
                 className="mt-3 w-full py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
@@ -438,6 +467,20 @@ export default function TicketDetailPage() {
                 <Tag className="w-4 h-4" />
                 <span>{t('helpdesk.serviceGroup', 'Служба')}: {getServiceGroupName()}</span>
               </div>
+              {ticket.targetDepartment && (
+                <div className="flex items-center gap-2 text-slate-600">
+                  <Building className="w-4 h-4" />
+                  <span>
+                    {t('helpdesk.targetDepartment', 'Отдел-получатель')}:{' '}
+                    {lang === 'kz' ? ticket.targetDepartment.name_kz : ticket.targetDepartment.name_ru}
+                  </span>
+                </div>
+              )}
+              {ticket.transferReason && (
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  {t('helpdesk.transferReason', 'Причина передачи')}: {ticket.transferReason}
+                </div>
+              )}
               {ticket.completedAt && (
                 <div className="flex items-center gap-2 text-emerald-700">
                   <CheckCircle2 className="w-4 h-4" />
@@ -462,6 +505,9 @@ export default function TicketDetailPage() {
         onAssign={handleReassign}
         users={assignableUsers}
         currentAssigneeIds={assignees.map((a) => a.id)}
+        currentDepartmentId={currentUser?.department?.id}
+        currentTargetDepartmentId={ticket.targetDepartment?.id || ticket.serviceGroup?.department?.id}
+        canTransferDepartments={canTransferDepartments}
       />
     </div>
   );
