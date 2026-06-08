@@ -239,6 +239,7 @@ export default {
     await normalizeTicketCategoryDefaultAssignees(strapi);
     await syncItHelpdeskUsers(strapi);
     await syncItTicketCategories(strapi);
+    await syncMedicalEquipmentTicketCategories(strapi);
     initNotificationRealtime(strapi);
 
     // Always ensure permissions are set correctly
@@ -428,6 +429,28 @@ const IT_TICKET_CATEGORIES = [
   { name_ru: 'Заправка картриджа', name_kz: 'Картридж толтыру', slug: 'cartridge', order: 17, users: ['ernar', 'zhandos'] },
 ];
 
+const MEDICAL_EQUIPMENT_TICKET_CATEGORIES = [
+  { name_ru: 'Не включается, индикация не горит, не загорается монитор.', name_kz: 'Не включается, индикация не горит, не загорается монитор.', slug: 'med-indicator', order: 1 },
+  { name_ru: 'Не реагируют кнопки, не загружается программа.', name_kz: 'Не реагируют кнопки, не загружается программа.', slug: 'med-non-load', order: 2 },
+  { name_ru: 'Не дает набрать объем, не регулируются настройки.', name_kz: 'Не дает набрать объем, не регулируются настройки.', slug: 'med-non-regul', order: 3 },
+  { name_ru: 'Проблема с столом (не подымается не опускается)', name_kz: 'Проблема с столом (не подымается не опускается)', slug: 'med-table', order: 4 },
+  { name_ru: 'Не работает, гудит, стучит, не греет.', name_kz: 'Не работает, гудит, стучит, не греет.', slug: 'med-not-heating', order: 5 },
+  { name_ru: 'Не светит диод, выдает ошибку.', name_kz: 'Не светит диод, выдает ошибку.', slug: 'med-diode-error', order: 6 },
+  { name_ru: 'Не работают тормоза.', name_kz: 'Не работают тормоза.', slug: 'med-brakes', order: 7 },
+  { name_ru: 'Зависает во время работы.', name_kz: 'Зависает во время работы.', slug: 'med-freezes', order: 8 },
+  { name_ru: 'Не выводит изображение на экран.', name_kz: 'Не выводит изображение на экран.', slug: 'med-no-screen-output', order: 9 },
+  { name_ru: 'Не измеряет, не верные показания.', name_kz: 'Не измеряет, не верные показания.', slug: 'med-measurement-error', order: 10 },
+  { name_ru: 'Не качает, утечка воды, утечка воздуха, утечка пара.', name_kz: 'Не качает, утечка воды, утечка воздуха, утечка пара.', slug: 'med-leak', order: 11 },
+  { name_ru: 'Нет уровня жидкости, не держит давления', name_kz: 'Нет уровня жидкости, не держит давления', slug: 'med-pressure', order: 12 },
+  { name_ru: 'Не работает блок питания.', name_kz: 'Не работает блок питания.', slug: 'med-power-supply', order: 13 },
+  { name_ru: 'Постоянно перезагружается.', name_kz: 'Постоянно перезагружается.', slug: 'med-reboots', order: 14 },
+  { name_ru: 'Не дает заряд, не держит заряд.', name_kz: 'Не дает заряд, не держит заряд.', slug: 'med-battery', order: 15 },
+  { name_ru: 'Слышен посторонний шум.', name_kz: 'Слышен посторонний шум.', slug: 'med-noise', order: 16 },
+  { name_ru: 'Запах гари, запах дыма', name_kz: 'Запах гари, запах дыма', slug: 'med-smell-smoke', order: 17 },
+  { name_ru: 'Не снимает нет передачи данных.', name_kz: 'Не снимает нет передачи данных.', slug: 'med-data-transfer', order: 18 },
+  { name_ru: 'КЗД (внеплановые смывы)', name_kz: 'КЗД (внеплановые смывы)', slug: 'med-kzd', order: 19 },
+];
+
 async function findUsersByUsernames(strapi: any, usernames: string[]) {
   if (usernames.length === 0) return [];
   const aliases = usernames.flatMap((username) => [
@@ -500,6 +523,59 @@ async function syncItTicketCategories(strapi: any) {
     strapi.log.info('[tickets] IT categories and default assignees synced');
   } catch (error: any) {
     strapi.log.warn(`[tickets] IT categories sync failed: ${error?.message || error}`);
+  }
+}
+
+async function syncMedicalEquipmentTicketCategories(strapi: any) {
+  try {
+    const groups = (await strapi.entityService.findMany('api::service-group.service-group', {
+      filters: { slug: 'medical-equipment' } as any,
+      limit: 1,
+    })) as any[];
+    const medicalGroup = groups?.[0];
+    if (!medicalGroup?.id) return;
+
+    const allowedSlugs = new Set(MEDICAL_EQUIPMENT_TICKET_CATEGORIES.map((item) => item.slug));
+    const existingCategories = (await strapi.entityService.findMany('api::ticket-category.ticket-category', {
+      filters: { serviceGroup: { id: medicalGroup.id } } as any,
+      pagination: { pageSize: 1000 },
+    })) as any[];
+
+    for (const category of existingCategories || []) {
+      if (allowedSlugs.has(category.slug)) continue;
+      try {
+        await strapi.entityService.update('api::ticket-category.ticket-category', category.id, {
+          data: { serviceGroup: null } as any,
+        });
+      } catch (error: any) {
+        strapi.log.warn(`[tickets] Could not hide legacy medical equipment category ${category.slug}: ${error?.message || error}`);
+      }
+    }
+
+    for (const item of MEDICAL_EQUIPMENT_TICKET_CATEGORIES) {
+      const data: any = {
+        name_ru: item.name_ru,
+        name_kz: item.name_kz,
+        slug: item.slug,
+        order: item.order,
+        serviceGroup: medicalGroup.id,
+      };
+
+      const existing = (await strapi.entityService.findMany('api::ticket-category.ticket-category', {
+        filters: { slug: item.slug } as any,
+        limit: 1,
+      })) as any[];
+
+      if (existing?.[0]?.id) {
+        await strapi.entityService.update('api::ticket-category.ticket-category', existing[0].id, { data });
+      } else {
+        await strapi.entityService.create('api::ticket-category.ticket-category', { data });
+      }
+    }
+
+    strapi.log.info('[tickets] Medical equipment categories synced');
+  } catch (error: any) {
+    strapi.log.warn(`[tickets] Medical equipment categories sync failed: ${error?.message || error}`);
   }
 }
 
