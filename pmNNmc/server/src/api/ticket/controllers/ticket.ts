@@ -206,6 +206,54 @@ async function getDefaultLegacyServiceGroup(strapi: any) {
   return byDepartment?.[0] || null;
 }
 
+async function findLegacyServiceGroup(strapi: any, body: any) {
+  const serviceGroupId = Number(body.serviceGroupId);
+  if (Number.isFinite(serviceGroupId) && serviceGroupId > 0) {
+    const byId = await strapi.entityService.findOne('api::service-group.service-group', serviceGroupId, {
+      populate: ['department'],
+    });
+    if (byId?.id) return byId;
+  }
+
+  const serviceGroupSlug = String(body.serviceGroupSlug || '').trim();
+  if (serviceGroupSlug) {
+    const bySlug = (await strapi.entityService.findMany('api::service-group.service-group', {
+      filters: { slug: serviceGroupSlug } as any,
+      populate: ['department'],
+      limit: 1,
+    })) as any[];
+    if (bySlug?.[0]?.id) return bySlug[0];
+  }
+
+  const departmentKey = String(body.departmentKey || body.serviceDepartmentKey || '').trim();
+  if (departmentKey) {
+    const byDepartment = (await strapi.entityService.findMany('api::service-group.service-group', {
+      filters: { department: { key: departmentKey } } as any,
+      populate: ['department'],
+      limit: 1,
+    })) as any[];
+    if (byDepartment?.[0]?.id) return byDepartment[0];
+  }
+
+  return await getDefaultLegacyServiceGroup(strapi);
+}
+
+async function findFallbackCategory(strapi: any, serviceGroupId: number) {
+  const categories = (await strapi.entityService.findMany('api::ticket-category.ticket-category', {
+    filters: { serviceGroup: { id: serviceGroupId } } as any,
+    pagination: { pageSize: 1000 },
+  })) as any[];
+
+  return (
+    (categories || []).find((category: any) => {
+      const slug = String(category.slug || '').toLowerCase();
+      const nameRu = normalizeLegacyCategoryText(category.name_ru);
+      const nameKz = normalizeLegacyCategoryText(category.name_kz);
+      return slug.endsWith('-other') || slug === 'other' || nameRu === 'другое' || nameKz === 'баска';
+    }) || null
+  );
+}
+
 async function findLegacyTicketCategory(
   strapi: any,
   serviceGroupId: number,
@@ -235,14 +283,14 @@ async function findLegacyTicketCategory(
   }
 
   const wanted = normalizeLegacyCategoryText(legacyCategoryName);
-  if (!wanted) return null;
+  if (!wanted) return await findFallbackCategory(strapi, serviceGroupId);
 
   const categories = (await strapi.entityService.findMany('api::ticket-category.ticket-category', {
     filters: { serviceGroup: { id: serviceGroupId } } as any,
     pagination: { pageSize: 1000 },
   })) as any[];
 
-  return (
+  const matchedCategory =
     (categories || []).find((category: any) => {
       const nameRu = normalizeLegacyCategoryText(category.name_ru);
       const nameKz = normalizeLegacyCategoryText(category.name_kz);
@@ -250,8 +298,9 @@ async function findLegacyTicketCategory(
         (nameRu && (nameRu === wanted || nameRu.includes(wanted) || wanted.includes(nameRu))) ||
         (nameKz && (nameKz === wanted || nameKz.includes(wanted) || wanted.includes(nameKz)))
       );
-    }) || null
-  );
+    }) || null;
+
+  return matchedCategory || (await findFallbackCategory(strapi, serviceGroupId));
 }
 
 async function attachTicketFiles(strapi: any, ticketId: number, fileIds: number[]) {
@@ -835,25 +884,19 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       body.legacyCategoryName || body.userQuery || body.categoryName || ''
     ).trim();
     const categoryId = body.categoryId;
-    let serviceGroupId = body.serviceGroupId;
 
     if (!requesterName || !rawComment || !requesterDepartment) {
       ctx.throw(400, 'Обязательные поля: requesterName, requesterDepartment, comment');
       return;
     }
 
-    let serviceGroup = serviceGroupId
-      ? await strapi.entityService.findOne('api::service-group.service-group', serviceGroupId, {
-          populate: ['department'],
-        })
-      : await getDefaultLegacyServiceGroup(strapi);
-
+    let serviceGroup = await findLegacyServiceGroup(strapi, body);
     if (!serviceGroup) {
       ctx.throw(400, 'Служба не найдена');
       return;
     }
 
-    serviceGroupId = serviceGroup.id;
+    const serviceGroupId = serviceGroup.id;
     const category = await findLegacyTicketCategory(
       strapi,
       Number(serviceGroupId),
