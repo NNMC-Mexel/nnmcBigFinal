@@ -6,6 +6,9 @@ export default ({ env }) => {
     `http://127.0.0.1:${port}`,
     `http://192.168.101.25:${port}`,
   ]);
+  const legacyHelpdeskOrigins = env.array('LEGACY_HELPDESK_ORIGINS', [
+    'http://192.168.101.25:8080',
+  ]);
 
   const minioPublicUrl = env('MINIO_PUBLIC_URL');
   const minioEndpoint = env('MINIO_ENDPOINT');
@@ -36,6 +39,7 @@ export default ({ env }) => {
         origin: [
           frontendUrl,
           ...devOrigins,
+          ...legacyHelpdeskOrigins,
           'http://localhost:1337',
           'http://127.0.0.1:1337',
         ].filter(Boolean),

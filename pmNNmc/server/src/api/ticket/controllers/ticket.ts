@@ -4,6 +4,24 @@ import { publishNotificationCreated, publishToUser } from '../../../utils/notifi
 
 const TICKET_UID = 'api::ticket.ticket';
 const HELP_SERVICE_DEPARTMENT_KEYS = ['IT', 'MEDICAL_EQUIPMENT', 'ENGINEERING'];
+const LEGACY_IT_CATEGORY_SLUG_BY_ID: Record<string, string> = {
+  PCR: 'computer-breakdown',
+  webCabel: 'network',
+  printer: 'printer',
+  printerCard: 'cartridge',
+  PO: 'office-software',
+  '1C': '1c-support',
+  Damumed: 'damumed',
+  mzrk: 'mzrk',
+  lis: 'lis',
+  DOC: 'documentolog',
+  'simbase-t': 'simbase-password',
+  'simbase-p': 'simbase-account',
+  'simbase-a': 'simbase',
+  skud: 'access-control',
+  'skud-p': 'access-control-repair',
+  Domen: 'domain-account',
+};
 
 function extractRelationId(relation: any): number | null {
   if (!relation) return null;
@@ -161,6 +179,79 @@ function normalizeTicketSubmitBody(body: any) {
     return body.data;
   }
   return body;
+}
+
+function normalizeLegacyCategoryText(value: any): string {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[^a-zа-я0-9]+/giu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function getDefaultLegacyServiceGroup(strapi: any) {
+  const bySlug = (await strapi.entityService.findMany('api::service-group.service-group', {
+    filters: { slug: 'it-support' } as any,
+    populate: ['department'],
+    limit: 1,
+  })) as any[];
+  if (bySlug?.[0]?.id) return bySlug[0];
+
+  const byDepartment = (await strapi.entityService.findMany('api::service-group.service-group', {
+    filters: { department: { key: 'IT' } } as any,
+    populate: ['department'],
+    limit: 1,
+  })) as any[];
+  return byDepartment?.[0] || null;
+}
+
+async function findLegacyTicketCategory(
+  strapi: any,
+  serviceGroupId: number,
+  categoryId: any,
+  legacyCategoryId: any,
+  legacyCategoryName: any
+) {
+  const normalizedCategoryId = Number(categoryId);
+  if (Number.isFinite(normalizedCategoryId) && normalizedCategoryId > 0) {
+    const category = (await strapi.entityService.findOne(
+      'api::ticket-category.ticket-category',
+      normalizedCategoryId,
+      { populate: ['serviceGroup'] }
+    )) as any;
+    if (category?.id && Number(category.serviceGroup?.id) === Number(serviceGroupId)) {
+      return category;
+    }
+  }
+
+  const legacySlug = LEGACY_IT_CATEGORY_SLUG_BY_ID[String(legacyCategoryId || '')];
+  if (legacySlug) {
+    const bySlug = (await strapi.entityService.findMany('api::ticket-category.ticket-category', {
+      filters: { slug: legacySlug, serviceGroup: { id: serviceGroupId } } as any,
+      limit: 1,
+    })) as any[];
+    if (bySlug?.[0]?.id) return bySlug[0];
+  }
+
+  const wanted = normalizeLegacyCategoryText(legacyCategoryName);
+  if (!wanted) return null;
+
+  const categories = (await strapi.entityService.findMany('api::ticket-category.ticket-category', {
+    filters: { serviceGroup: { id: serviceGroupId } } as any,
+    pagination: { pageSize: 1000 },
+  })) as any[];
+
+  return (
+    (categories || []).find((category: any) => {
+      const nameRu = normalizeLegacyCategoryText(category.name_ru);
+      const nameKz = normalizeLegacyCategoryText(category.name_kz);
+      return (
+        (nameRu && (nameRu === wanted || nameRu.includes(wanted) || wanted.includes(nameRu))) ||
+        (nameKz && (nameKz === wanted || nameKz.includes(wanted) || wanted.includes(nameKz)))
+      );
+    }) || null
+  );
 }
 
 async function attachTicketFiles(strapi: any, ticketId: number, fileIds: number[]) {
@@ -735,26 +826,48 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
   },
 
   async legacyPublicSubmit(ctx) {
-    const body = ctx.request.body as any;
-    const { requesterName, requesterPhone, requesterDepartment, comment, categoryId, serviceGroupId } = body;
+    const body = normalizeTicketSubmitBody(ctx.request.body as any);
+    const requesterName = String(body.requesterName || body.userName || '').trim();
+    const requesterPhone = String(body.requesterPhone || body.userPhone || '').trim() || null;
+    const requesterDepartment = String(body.requesterDepartment || body.userSide || '').trim();
+    const rawComment = String(body.comment || body.userComment || '').trim();
+    const legacyCategoryName = String(
+      body.legacyCategoryName || body.userQuery || body.categoryName || ''
+    ).trim();
+    const categoryId = body.categoryId;
+    let serviceGroupId = body.serviceGroupId;
 
-    if (!requesterName || !comment || !serviceGroupId || !requesterDepartment) {
-      ctx.throw(400, 'Обязательные поля: requesterName, requesterDepartment, comment, serviceGroupId');
+    if (!requesterName || !rawComment || !requesterDepartment) {
+      ctx.throw(400, 'Обязательные поля: requesterName, requesterDepartment, comment');
       return;
     }
 
-    const serviceGroup = await strapi.entityService.findOne(
-      'api::service-group.service-group',
-      serviceGroupId
-    );
+    let serviceGroup = serviceGroupId
+      ? await strapi.entityService.findOne('api::service-group.service-group', serviceGroupId, {
+          populate: ['department'],
+        })
+      : await getDefaultLegacyServiceGroup(strapi);
+
     if (!serviceGroup) {
       ctx.throw(400, 'Служба не найдена');
       return;
     }
 
+    serviceGroupId = serviceGroup.id;
+    const category = await findLegacyTicketCategory(
+      strapi,
+      Number(serviceGroupId),
+      categoryId,
+      body.legacyCategoryId,
+      legacyCategoryName
+    );
+    const comment = legacyCategoryName
+      ? `${rawComment}\n\nКатегория старого HelpDesk: ${legacyCategoryName}`
+      : rawComment;
+
     const ticketData: any = {
       requesterName,
-      requesterPhone: requesterPhone || null,
+      requesterPhone,
       requesterDepartment,
       comment,
       serviceGroup: serviceGroupId,
@@ -762,19 +875,24 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       ticketNumber: 'TEMP',
     };
 
-    if (categoryId) {
-      ticketData.category = categoryId;
+    if (category?.id) {
+      ticketData.category = category.id;
     }
 
     const ticket = (await strapi.entityService.create('api::ticket.ticket', {
       data: ticketData,
     })) as any;
-    await assignDefaultCategoryAssignees(strapi, ticket.id, categoryId);
+    const ticketWithAssignees = await assignDefaultCategoryAssignees(strapi, ticket.id, category?.id);
+    const notifiedTicket = await notifyTicketAssignees(strapi, ticket.id);
+    const responseTicket = notifiedTicket || ticketWithAssignees || ticket;
 
     ctx.body = {
       data: {
-        ticketNumber: ticket.ticketNumber,
-        id: ticket.id,
+        ticketNumber: responseTicket.ticketNumber,
+        id: responseTicket.id,
+        documentId: responseTicket.documentId,
+        categoryId: category?.id || null,
+        serviceGroupId,
       },
     };
   },

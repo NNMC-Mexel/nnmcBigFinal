@@ -57,6 +57,24 @@ export default {
       },
     },
     {
+      method: 'POST',
+      path: '/tickets/legacy/submit',
+      handler: 'ticket.legacyPublicSubmit',
+      config: {
+        auth: false,
+        policies: [],
+      },
+    },
+    {
+      method: 'GET',
+      path: '/tickets/legacy/categories',
+      handler: 'ticket.legacyPublicCategories',
+      config: {
+        auth: false,
+        policies: [],
+      },
+    },
+    {
       method: 'PUT',
       path: '/tickets/:id/reassign',
       handler: 'ticket.reassign',
