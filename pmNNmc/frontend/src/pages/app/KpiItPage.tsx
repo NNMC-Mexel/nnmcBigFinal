@@ -103,7 +103,7 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
   const departmentTitle = useMemo(() => {
     if (title) return title;
     if (effectiveDepartmentKey === 'MEDICAL_EQUIPMENT') return 'KPI Медоборудование';
-    if (effectiveDepartmentKey === 'ENGINEERING') return 'KPI Инженерная служба';
+    if (effectiveDepartmentKey === 'ENGINEERING') return 'KPI Хозяйственная служба';
     return 'KPI IT';
   }, [effectiveDepartmentKey, title]);
 

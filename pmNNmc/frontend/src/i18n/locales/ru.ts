@@ -380,7 +380,7 @@ export default {
     IT: 'IT отдел',
     DIGITALIZATION: 'Цифровизация',
     MEDICAL_EQUIPMENT: 'Медицинское оборудование',
-    ENGINEERING: 'Инженерная служба',
+    ENGINEERING: 'Хозяйственная служба',
   },
 
   // Status

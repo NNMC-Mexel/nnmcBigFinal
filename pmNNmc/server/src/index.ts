@@ -240,6 +240,7 @@ export default {
     await syncItHelpdeskUsers(strapi);
     await syncItTicketCategories(strapi);
     await syncMedicalEquipmentTicketCategories(strapi);
+    await syncEngineeringTicketCategories(strapi);
     initNotificationRealtime(strapi);
 
     // Always ensure permissions are set correctly
@@ -451,6 +452,41 @@ const MEDICAL_EQUIPMENT_TICKET_CATEGORIES = [
   { name_ru: 'КЗД (внеплановые смывы)', name_kz: 'КЗД (внеплановые смывы)', slug: 'med-kzd', order: 19 },
 ];
 
+const ENGINEERING_TICKET_CATEGORIES = [
+  { name_ru: 'Демонтаж и замена унитаза (установка)', name_kz: 'Демонтаж и замена унитаза (установка)', slug: 'eng-plumbing-toilet-replacement', order: 1 },
+  { name_ru: 'Демонтаж и замена раковины (установка)', name_kz: 'Демонтаж и замена раковины (установка)', slug: 'eng-plumbing-sink-replacement', order: 2 },
+  { name_ru: 'Демонтаж и замена смесителя', name_kz: 'Демонтаж и замена смесителя', slug: 'eng-plumbing-mixer-replacement', order: 3 },
+  { name_ru: 'Демонтаж и замена гофры для смесителя', name_kz: 'Демонтаж и замена гофры для смесителя', slug: 'eng-plumbing-mixer-corrugation', order: 4 },
+  { name_ru: 'Чистка аэраторов', name_kz: 'Чистка аэраторов', slug: 'eng-plumbing-aerator-cleaning', order: 5 },
+  { name_ru: 'Чистка гребенки ХВС и ГВС', name_kz: 'Чистка гребенки ХВС и ГВС', slug: 'eng-plumbing-water-comb-cleaning', order: 6 },
+  { name_ru: 'Чистка и заделка швов сантехническим силиконом', name_kz: 'Чистка и заделка швов сантехническим силиконом', slug: 'eng-plumbing-silicone-seams', order: 7 },
+  { name_ru: 'Демонтаж и монтаж кранов', name_kz: 'Демонтаж и монтаж кранов', slug: 'eng-plumbing-tap-installation', order: 8 },
+  { name_ru: 'Демонтаж и монтаж радиаторов отопления', name_kz: 'Демонтаж и монтаж радиаторов отопления', slug: 'eng-plumbing-radiator-installation', order: 9 },
+  { name_ru: 'Прочистка канализационный труб', name_kz: 'Прочистка канализационный труб', slug: 'eng-plumbing-sewer-pipe-cleaning', order: 10 },
+  { name_ru: 'Демонтаж и замена шланги для смесителя', name_kz: 'Демонтаж и замена шланги для смесителя', slug: 'eng-plumbing-mixer-hose-replacement', order: 11 },
+  { name_ru: 'Демонтаж и замена шланги для унитаза', name_kz: 'Демонтаж и замена шланги для унитаза', slug: 'eng-plumbing-toilet-hose-replacement', order: 12 },
+  { name_ru: 'Демонтаж-и-монтаж-арматуры', name_kz: 'Демонтаж-и-монтаж-арматуры', slug: 'eng-plumbing-toilet-fittings', order: 13 },
+  { name_ru: 'Прочистка слива раковины, душевых кабин.', name_kz: 'Прочистка слива раковины, душевых кабин.', slug: 'eng-plumbing-drain-cleaning', order: 14 },
+  { name_ru: 'Ежедневная обслуга парагенератора', name_kz: 'Ежедневная обслуга парагенератора', slug: 'eng-plumbing-steam-generator-service', order: 15 },
+  { name_ru: 'Обслуживание тепловых станций', name_kz: 'Обслуживание тепловых станций', slug: 'eng-plumbing-heating-stations', order: 16 },
+  { name_ru: 'Обслуживание сетей ХВС и ГВС, теплоснабжение', name_kz: 'Обслуживание сетей ХВС и ГВС, теплоснабжение', slug: 'eng-plumbing-water-heating-networks', order: 17 },
+  { name_ru: 'Демонтаж и замена выкючателя', name_kz: 'Демонтаж и замена выкючателя', slug: 'eng-electrical-switch-replacement', order: 101 },
+  { name_ru: 'Демонтаж и замена розетки', name_kz: 'Демонтаж и замена розетки', slug: 'eng-electrical-socket-replacement', order: 102 },
+  { name_ru: 'Демонтаж и замена светильника', name_kz: 'Демонтаж и замена светильника', slug: 'eng-electrical-light-replacement', order: 103 },
+  { name_ru: 'Демонтаж и замена автомата', name_kz: 'Демонтаж и замена автомата', slug: 'eng-electrical-breaker-replacement', order: 104 },
+  { name_ru: 'Своевременное устранение неисправности электооборудования и технического оснащения здания', name_kz: 'Своевременное устранение неисправности электооборудования и технического оснащения здания', slug: 'eng-electrical-equipment-troubleshooting', order: 105 },
+  { name_ru: 'Ремонт электрооборудования', name_kz: 'Ремонт электрооборудования', slug: 'eng-electrical-equipment-repair', order: 107 },
+  { name_ru: 'Демонтаж и монтаж электрооборудования', name_kz: 'Демонтаж и монтаж электрооборудования', slug: 'eng-electrical-equipment-installation', order: 108 },
+  { name_ru: 'Диагностика неисправности электрооборудования', name_kz: 'Диагностика неисправности электрооборудования', slug: 'eng-electrical-diagnostics', order: 109 },
+  { name_ru: 'Контроль температуры в помещении ИБП', name_kz: 'Контроль температуры в помещении ИБП', slug: 'eng-electrical-ups-temperature-control', order: 110 },
+  { name_ru: 'Ежедневный обход по объекту:ДГУ.РУ.', name_kz: 'Ежедневный обход по объекту:ДГУ.РУ.', slug: 'eng-electrical-dgu-ru-round', order: 111 },
+  { name_ru: 'Ежедневный обход щитовых:МДВ 1,2,3,4,', name_kz: 'Ежедневный обход щитовых:МДВ 1,2,3,4,', slug: 'eng-electrical-panel-room-round', order: 112 },
+  { name_ru: 'Обход плантронов 1-5, 3,4,6', name_kz: 'Обход плантронов 1-5, 3,4,6', slug: 'eng-ventilation-plantron-round', order: 201 },
+  { name_ru: 'Обход прачечной', name_kz: 'Обход прачечной', slug: 'eng-ventilation-laundry-round', order: 202 },
+  { name_ru: 'Обход Микробиологии и Патоморфологии', name_kz: 'Обход Микробиологии и Патоморфологии', slug: 'eng-ventilation-microbiology-pathomorphology-round', order: 203 },
+  { name_ru: 'Замена синтипона на приточных машинах', name_kz: 'Замена синтипона на приточных машинах', slug: 'eng-ventilation-sintepon-replacement', order: 204 },
+];
+
 async function findUsersByUsernames(strapi: any, usernames: string[]) {
   if (usernames.length === 0) return [];
   const aliases = usernames.flatMap((username) => [
@@ -576,6 +612,76 @@ async function syncMedicalEquipmentTicketCategories(strapi: any) {
     strapi.log.info('[tickets] Medical equipment categories synced');
   } catch (error: any) {
     strapi.log.warn(`[tickets] Medical equipment categories sync failed: ${error?.message || error}`);
+  }
+}
+
+async function syncEngineeringTicketCategories(strapi: any) {
+  try {
+    const groups = (await strapi.entityService.findMany('api::service-group.service-group', {
+      filters: { slug: 'engineering' } as any,
+      populate: ['department'],
+      limit: 1,
+    })) as any[];
+    const engineeringGroup = groups?.[0];
+    if (!engineeringGroup?.id) return;
+
+    if (engineeringGroup.department?.id) {
+      await strapi.entityService.update('api::department.department', engineeringGroup.department.id, {
+        data: {
+          name_ru: 'Хозяйственная служба',
+          name_kz: 'Шаруашылық қызметі',
+        },
+      });
+    }
+
+    await strapi.entityService.update('api::service-group.service-group', engineeringGroup.id, {
+      data: {
+        name_ru: 'Хозяйственная служба',
+        name_kz: 'Шаруашылық қызметі',
+      },
+    });
+
+    const allowedSlugs = new Set(ENGINEERING_TICKET_CATEGORIES.map((item) => item.slug));
+    const existingCategories = (await strapi.entityService.findMany('api::ticket-category.ticket-category', {
+      filters: { serviceGroup: { id: engineeringGroup.id } } as any,
+      pagination: { pageSize: 1000 },
+    })) as any[];
+
+    for (const category of existingCategories || []) {
+      if (allowedSlugs.has(category.slug)) continue;
+      try {
+        await strapi.entityService.update('api::ticket-category.ticket-category', category.id, {
+          data: { serviceGroup: null } as any,
+        });
+      } catch (error: any) {
+        strapi.log.warn(`[tickets] Could not hide legacy engineering category ${category.slug}: ${error?.message || error}`);
+      }
+    }
+
+    for (const item of ENGINEERING_TICKET_CATEGORIES) {
+      const data: any = {
+        name_ru: item.name_ru,
+        name_kz: item.name_kz,
+        slug: item.slug,
+        order: item.order,
+        serviceGroup: engineeringGroup.id,
+      };
+
+      const existing = (await strapi.entityService.findMany('api::ticket-category.ticket-category', {
+        filters: { slug: item.slug } as any,
+        limit: 1,
+      })) as any[];
+
+      if (existing?.[0]?.id) {
+        await strapi.entityService.update('api::ticket-category.ticket-category', existing[0].id, { data });
+      } else {
+        await strapi.entityService.create('api::ticket-category.ticket-category', { data });
+      }
+    }
+
+    strapi.log.info('[tickets] Engineering categories synced');
+  } catch (error: any) {
+    strapi.log.warn(`[tickets] Engineering categories sync failed: ${error?.message || error}`);
   }
 }
 

@@ -375,7 +375,7 @@ export default {
     IT: 'IT бөлімі',
     DIGITALIZATION: 'Цифрландыру',
     MEDICAL_EQUIPMENT: 'Медициналық жабдық',
-    ENGINEERING: 'Инженерлік қызмет',
+    ENGINEERING: 'Шаруашылық қызметі',
   },
 
   // Status

@@ -175,7 +175,7 @@ export default function AppLayout() {
                   {
                       to: "/app/kpi-engineering",
                       icon: Calculator,
-                      label: "KPI Инженерная служба",
+                      label: "KPI Хозяйственная служба",
                       iconColor: "text-amber-500",
                       activeBg: "bg-amber-50",
                       activeText: "text-amber-700",

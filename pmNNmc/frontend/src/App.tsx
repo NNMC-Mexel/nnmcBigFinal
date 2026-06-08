@@ -305,7 +305,7 @@ function App() {
         <Route
           path="kpi-engineering"
           element={
-            <FeatureRoute allow={canViewKpiEngineering}>{withSuspense(<KpiItPage forcedDepartmentKey="ENGINEERING" title="KPI Инженерная служба" />)}</FeatureRoute>
+            <FeatureRoute allow={canViewKpiEngineering}>{withSuspense(<KpiItPage forcedDepartmentKey="ENGINEERING" title="KPI Хозяйственная служба" />)}</FeatureRoute>
           }
         />
         <Route

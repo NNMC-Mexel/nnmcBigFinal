@@ -9,6 +9,7 @@ export default ({ env }) => {
   const legacyHelpdeskOrigins = env.array('LEGACY_HELPDESK_ORIGINS', [
     'http://192.168.101.25:8080',
     'http://192.168.101.25:8081',
+    'http://192.168.101.25:8082',
   ]);
 
   const minioPublicUrl = env('MINIO_PUBLIC_URL');
