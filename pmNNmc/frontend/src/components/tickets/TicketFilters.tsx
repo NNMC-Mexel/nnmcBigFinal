@@ -46,15 +46,15 @@ export default function TicketFilters({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+    <div className="min-w-0 space-y-4">
+      <div className="flex min-w-0 flex-col items-start gap-4 sm:flex-row sm:items-center">
         {/* Status Tabs */}
-        <div className="flex flex-wrap gap-1 bg-slate-100 rounded-lg p-1">
+        <div className="flex w-full max-w-full gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1 sm:w-auto sm:flex-wrap sm:overflow-visible">
           {STATUSES.map((s) => (
             <button
               key={s}
               onClick={() => onStatusChange(s)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              className={`flex-shrink-0 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 status === s
                   ? 'bg-white text-slate-800 shadow-sm'
                   : 'text-slate-500 hover:text-slate-700'
@@ -66,7 +66,7 @@ export default function TicketFilters({
         </div>
 
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative w-full min-w-0 flex-1 sm:min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
@@ -88,13 +88,13 @@ export default function TicketFilters({
 
       {/* Assignee filter row - only for leads/admins */}
       {showAssigneeFilter && (
-        <div className="flex flex-wrap gap-3 items-center">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           {/* My tickets / All tickets toggle */}
           {onMyTicketsChange && (
-            <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+            <div className="grid w-full grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 sm:flex sm:w-auto">
               <button
                 onClick={() => onMyTicketsChange(true)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`flex min-w-0 items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   myTicketsOnly
                     ? 'bg-white text-cyan-700 shadow-sm'
                     : 'text-slate-500 hover:text-slate-700'
@@ -105,7 +105,7 @@ export default function TicketFilters({
               </button>
               <button
                 onClick={() => onMyTicketsChange(false)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`flex min-w-0 items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   !myTicketsOnly
                     ? 'bg-white text-cyan-700 shadow-sm'
                     : 'text-slate-500 hover:text-slate-700'
@@ -122,7 +122,7 @@ export default function TicketFilters({
             <select
               value={assigneeId || ''}
               onChange={(e) => onAssigneeChange(e.target.value ? parseInt(e.target.value) : undefined)}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent bg-white"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-cyan-500 sm:w-auto"
             >
               <option value="">{t('helpdesk.allAssignees', 'Все исполнители')}</option>
               {assignableUsers.map((user) => (

@@ -190,19 +190,19 @@ export default function TicketDetailPage() {
     editStaffComment !== (ticket.staffComment || '');
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-full min-w-0 space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+            className="flex-shrink-0 p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-cyan-600 font-mono">
+          <div className="min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="min-w-0 break-words text-2xl font-bold text-cyan-600 font-mono">
                 {ticket.ticketNumber}
               </h1>
               <TicketStatusBadge status={ticket.status} />
@@ -214,25 +214,25 @@ export default function TicketDetailPage() {
         </div>
 
         {canReassignTicket && (
-        <div className="flex items-center gap-2">
+        <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
           <button
             onClick={() => setShowReassign(true)}
-            className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            className="flex w-full items-center justify-center gap-2 whitespace-nowrap px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors sm:w-auto"
           >
-            <UserPlus className="w-4 h-4" />
+            <UserPlus className="w-4 h-4 flex-shrink-0" />
             {t('helpdesk.reassign', 'Переназначить')}
           </button>
           {canEditTicket && (
           <button
             onClick={handleSave}
             disabled={saving || !hasChanges}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex w-full items-center justify-center gap-2 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors sm:w-auto ${
               hasChanges && !saving
                 ? 'bg-cyan-600 text-white hover:bg-cyan-700'
                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
           >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saving ? <Loader2 className="w-4 h-4 flex-shrink-0 animate-spin" /> : <Save className="w-4 h-4 flex-shrink-0" />}
             {t('common.save', 'Сохранить')}
           </button>
           )}
@@ -240,66 +240,66 @@ export default function TicketDetailPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-3 lg:gap-6">
         {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="min-w-0 space-y-5 lg:col-span-2 lg:space-y-6">
           {/* Requester Info */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-slate-800 mb-4">
               {t('helpdesk.requesterInfo', 'Информация о заявителе')}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <MessageSquare className="w-4 h-4 text-slate-500" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-slate-500">{t('helpdesk.requesterName', 'ФИО')}</p>
-                  <p className="text-sm font-medium text-slate-800">{ticket.requesterName}</p>
+                  <p className="break-words text-sm font-medium text-slate-800">{ticket.requesterName}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <Phone className="w-4 h-4 text-slate-500" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-slate-500">{t('helpdesk.requesterPhone', 'Телефон')}</p>
-                  <p className="text-sm font-medium text-slate-800">{ticket.requesterPhone || '-'}</p>
+                  <p className="break-words text-sm font-medium text-slate-800">{ticket.requesterPhone || '-'}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <Building className="w-4 h-4 text-slate-500" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-slate-500">{t('helpdesk.requesterDepartment', 'Отдел')}</p>
-                  <p className="text-sm font-medium text-slate-800">{ticket.requesterDepartment}</p>
+                  <p className="break-words text-sm font-medium text-slate-800">{ticket.requesterDepartment}</p>
                 </div>
               </div>
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
                   <Tag className="w-4 h-4 text-slate-500" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs text-slate-500">{t('helpdesk.category', 'Категория')}</p>
-                  <p className="text-sm font-medium text-slate-800">{getCategoryName()}</p>
+                  <p className="break-words text-sm font-medium text-slate-800">{getCategoryName()}</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Comment from requester */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-slate-800 mb-3">
               {t('helpdesk.comment', 'Описание проблемы')}
             </h2>
-            <div className="p-4 bg-slate-50 rounded-lg text-sm text-slate-700 whitespace-pre-wrap">
+            <div className="whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
               {ticket.comment}
             </div>
           </div>
 
           {ticket.attachments && ticket.attachments.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
               <h2 className="text-lg font-semibold text-slate-800 mb-3">
                 Вложения
               </h2>
@@ -310,9 +310,9 @@ export default function TicketDetailPage() {
                     href={getMediaUrl(file.url)}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-cyan-300 hover:bg-cyan-50"
+                    className="flex min-w-0 items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 hover:border-cyan-300 hover:bg-cyan-50"
                   >
-                    <Paperclip className="w-4 h-4 text-cyan-600" />
+                    <Paperclip className="w-4 h-4 flex-shrink-0 text-cyan-600" />
                     <span className="truncate">{file.name}</span>
                   </a>
                 ))}
@@ -321,7 +321,7 @@ export default function TicketDetailPage() {
           )}
 
           {/* Staff Comment */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-slate-800 mb-3">
               {t('helpdesk.staffComment', 'Комментарий специалиста')}
             </h2>
@@ -334,7 +334,7 @@ export default function TicketDetailPage() {
                 className="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
               />
             ) : (
-              <div className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap">
+              <div className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700 whitespace-pre-wrap break-words">
                 {ticket.staffComment || 'Комментарий пока не добавлен'}
               </div>
             )}
@@ -342,7 +342,7 @@ export default function TicketDetailPage() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-5 lg:space-y-6">
           {/* Status */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-sm font-semibold text-slate-800 mb-3">
@@ -416,7 +416,7 @@ export default function TicketDetailPage() {
             <h3 className="text-sm font-semibold text-slate-800 mb-3">
               {t('helpdesk.assignee', 'Исполнитель')}
             </h3>
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-sm font-medium text-slate-600">
                 {assignees.length > 0
                   ? assignees.length > 1
@@ -424,7 +424,7 @@ export default function TicketDetailPage() {
                     : (assignees[0].firstName?.[0] || assignees[0].username[0]).toUpperCase()
                   : '?'}
               </div>
-              <div>
+              <div className="min-w-0">
                 {assignees.length === 0 ? (
                   <p className="text-sm font-medium text-slate-800">
                     {t('helpdesk.notAssigned', 'Не назначен')}
@@ -434,9 +434,9 @@ export default function TicketDetailPage() {
                     {assignees.map((a) => (
                       <span
                         key={a.id}
-                        className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700"
+                        className="inline-flex max-w-full items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700"
                       >
-                        {getAssigneeName(a)}
+                        <span className="truncate">{getAssigneeName(a)}</span>
                       </span>
                     ))}
                   </div>
@@ -459,38 +459,38 @@ export default function TicketDetailPage() {
               {t('helpdesk.info', 'Информация')}
             </h3>
             <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-2 text-slate-600">
-                <Clock className="w-4 h-4" />
-                <span>{t('helpdesk.createdAt', 'Создана')}: {formatDate(ticket.createdAt)}</span>
+              <div className="flex min-w-0 items-center gap-2 text-slate-600">
+                <Clock className="w-4 h-4 flex-shrink-0" />
+                <span className="min-w-0 break-words">{t('helpdesk.createdAt', 'Создана')}: {formatDate(ticket.createdAt)}</span>
               </div>
-              <div className="flex items-center gap-2 text-slate-600">
-                <Tag className="w-4 h-4" />
-                <span>{t('helpdesk.serviceGroup', 'Служба')}: {getServiceGroupName()}</span>
+              <div className="flex min-w-0 items-center gap-2 text-slate-600">
+                <Tag className="w-4 h-4 flex-shrink-0" />
+                <span className="min-w-0 break-words">{t('helpdesk.serviceGroup', 'Служба')}: {getServiceGroupName()}</span>
               </div>
               {ticket.targetDepartment && (
-                <div className="flex items-center gap-2 text-slate-600">
-                  <Building className="w-4 h-4" />
-                  <span>
+                <div className="flex min-w-0 items-center gap-2 text-slate-600">
+                  <Building className="w-4 h-4 flex-shrink-0" />
+                  <span className="min-w-0 break-words">
                     {t('helpdesk.targetDepartment', 'Отдел-получатель')}:{' '}
                     {lang === 'kz' ? ticket.targetDepartment.name_kz : ticket.targetDepartment.name_ru}
                   </span>
                 </div>
               )}
               {ticket.transferReason && (
-                <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 break-words">
                   {t('helpdesk.transferReason', 'Причина передачи')}: {ticket.transferReason}
                 </div>
               )}
               {ticket.completedAt && (
-                <div className="flex items-center gap-2 text-emerald-700">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Выполнено: {formatDate(ticket.completedAt)}</span>
+                <div className="flex min-w-0 items-center gap-2 text-emerald-700">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                  <span className="min-w-0 break-words">Выполнено: {formatDate(ticket.completedAt)}</span>
                 </div>
               )}
               {ticket.completedBy && (
-                <div className="flex items-center gap-2 text-slate-600">
-                  <UserPlus className="w-4 h-4" />
-                  <span>Закрыл: {getUserName(ticket.completedBy)}</span>
+                <div className="flex min-w-0 items-center gap-2 text-slate-600">
+                  <UserPlus className="w-4 h-4 flex-shrink-0" />
+                  <span className="min-w-0 break-words">Закрыл: {getUserName(ticket.completedBy)}</span>
                 </div>
               )}
             </div>

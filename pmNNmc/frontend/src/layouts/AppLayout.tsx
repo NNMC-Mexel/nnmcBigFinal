@@ -495,7 +495,7 @@ export default function AppLayout() {
             </aside>
 
             {/* Main content */}
-            <div className='flex-1 flex flex-col min-w-0'>
+            <div className='flex-1 flex flex-col min-w-0 max-w-full'>
                 {/* Top bar */}
                 <header className='bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between lg:justify-end'>
                     <button
@@ -515,7 +515,7 @@ export default function AppLayout() {
                 </header>
 
                 {/* Page content */}
-                <main className='flex-1 p-4 lg:p-6 overflow-auto'>
+                <main className='flex-1 min-w-0 max-w-full overflow-y-auto overflow-x-hidden p-4 lg:p-6'>
                     <Outlet />
                 </main>
             </div>

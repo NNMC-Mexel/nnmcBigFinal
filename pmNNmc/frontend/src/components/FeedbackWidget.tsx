@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Send, Loader2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Send, Loader2, MessageCircle, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import Modal from './ui/Modal';
 import client from '../api/client';
@@ -11,7 +11,27 @@ export default function FeedbackWidget() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isScrolling, setIsScrolling] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
+    const handleScroll = () => {
+      setIsScrolling(true);
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(() => setIsScrolling(false), 700);
+    };
+
+    document.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('touchmove', handleScroll, { passive: true });
+
+    return () => {
+      document.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('touchmove', handleScroll);
+      if (timeout) clearTimeout(timeout);
+    };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,9 +58,9 @@ export default function FeedbackWidget() {
 
   return (
     <>
-      <div className="fixed bottom-5 right-5 z-40 flex items-end gap-2">
+      <div className="pointer-events-none fixed bottom-[calc(env(safe-area-inset-bottom)+96px)] right-0 z-20 flex items-end gap-2 sm:bottom-5 sm:right-5 sm:z-30">
         {bubbleVisible && (
-          <div className="relative hidden sm:flex items-center gap-2 bg-white text-slate-700 pl-3 pr-2 py-2 rounded-2xl shadow-md text-sm max-w-[220px] mb-1 animate-in fade-in">
+          <div className="pointer-events-auto relative hidden sm:flex items-center gap-2 bg-white text-slate-700 pl-3 pr-2 py-2 rounded-2xl shadow-md text-sm max-w-[220px] mb-1 animate-in fade-in">
             <span>Что-то работает не так?<br />Сообщи нам!</span>
             <button
               onClick={() => setBubbleVisible(false)}
@@ -56,12 +76,15 @@ export default function FeedbackWidget() {
           onClick={() => setOpen(true)}
           aria-label="Предложить улучшение"
           title="Предложить улучшение"
-          className="w-16 h-16 rounded-full bg-white hover:bg-slate-50 shadow-lg flex items-center justify-center transition-colors overflow-hidden ring-2 ring-indigo-100"
+          className={`flex h-11 w-9 items-center justify-center rounded-l-full bg-white text-indigo-600 shadow-lg ring-1 ring-indigo-100 transition-all duration-200 hover:bg-slate-50 sm:h-16 sm:w-16 sm:rounded-full sm:overflow-hidden sm:ring-2 ${
+            isScrolling ? 'pointer-events-none translate-x-6 opacity-0 sm:pointer-events-auto sm:translate-x-0 sm:opacity-100' : 'pointer-events-auto opacity-90 sm:opacity-100'
+          }`}
         >
+          <MessageCircle className="h-5 w-5 sm:hidden" />
           <img
             src="/feedback-robot.gif"
             alt="Робот-помощник"
-            className="w-full h-full object-cover"
+            className="hidden h-full w-full object-cover sm:block"
           />
         </button>
       </div>

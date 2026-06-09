@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Headphones, RefreshCw, ExternalLink } from 'lucide-react';
+import { Building2, CalendarClock, ExternalLink, Headphones, RefreshCw, Tag, UserRound } from 'lucide-react';
 import { useTicketStore } from '../../store/ticketStore';
 import { useAuthStore, useUserRole } from '../../store/authStore';
 import TicketStatusBadge from '../../components/tickets/TicketStatusBadge';
@@ -149,12 +149,12 @@ export default function HelpdeskPage() {
       : user?.username || user?.email || '-';
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-full min-w-0 space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Headphones className="w-7 h-7 text-cyan-600" />
-          <div>
+      <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <Headphones className="w-7 h-7 flex-shrink-0 text-cyan-600" />
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold text-slate-800">
               {t('helpdesk.title', 'Заявки')}
             </h1>
@@ -163,20 +163,21 @@ export default function HelpdeskPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <button
             onClick={() => doFetch(statusFilter, searchFilter, assigneeFilter, myTicketsOnly, currentPage)}
-            className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
             title={t('common.refresh', 'Обновить')}
+            aria-label={t('common.refresh', 'Обновить')}
           >
             <RefreshCw className="w-5 h-5" />
           </button>
           <button
             onClick={() => navigate('/app/helpdesk/submit')}
-            className="flex items-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 transition-colors"
+            className="flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-medium text-white transition-colors hover:bg-cyan-700 sm:flex-none"
           >
-            <ExternalLink className="w-4 h-4" />
-            {t('helpdesk.publicForm', 'Форма подачи')}
+            <ExternalLink className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">{t('helpdesk.publicForm', 'Форма подачи')}</span>
           </button>
         </div>
       </div>
@@ -212,74 +213,146 @@ export default function HelpdeskPage() {
       ) : (
         !isLoading && (
           <div className="space-y-3">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">
-                      {t('helpdesk.ticketNumber', '№')}
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">
-                      {t('helpdesk.requesterName', 'ФИО')}
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">
-                      {t('helpdesk.requesterDepartment', 'Отдел')}
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">
-                      {t('helpdesk.category', 'Категория')}
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">
-                      {t('helpdesk.status', 'Статус')}
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">
-                      {t('helpdesk.assignee', 'Исполнитель')}
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">
-                      Закрыл
-                    </th>
-                    <th className="text-left px-4 py-3 font-medium text-slate-600">
-                      {t('helpdesk.createdAt', 'Дата')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tickets.map((ticket) => (
-                    <tr
-                      key={ticket.id}
-                      onClick={() => navigate(`/app/helpdesk/${ticket.documentId}`)}
-                      className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-4 py-3 font-mono text-cyan-600 font-medium">
+            <div className="space-y-3 lg:hidden">
+              {tickets.map((ticket) => (
+                <button
+                  key={ticket.id}
+                  type="button"
+                  onClick={() => navigate(`/app/helpdesk/${ticket.documentId}`)}
+                  className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors active:bg-slate-50"
+                >
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-mono text-lg font-bold leading-tight text-cyan-600">
                         {ticket.ticketNumber}
-                      </td>
-                      <td className="px-4 py-3 text-slate-800">{ticket.requesterName}</td>
-                      <td className="px-4 py-3 text-slate-600">{ticket.requesterDepartment}</td>
-                      <td className="px-4 py-3 text-slate-600">{getCategoryName(ticket)}</td>
-                      <td className="px-4 py-3">
-                        <TicketStatusBadge status={ticket.status} />
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{getAssigneeName(ticket)}</td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {ticket.completedBy ? (
-                          <div>
-                            <div>{getUserName(ticket.completedBy)}</div>
-                            <div className="text-xs text-slate-400">{formatDate(ticket.completedAt || ticket.updatedAt)}</div>
-                          </div>
-                        ) : (
-                          '-'
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 text-xs">
-                        {formatDate(ticket.createdAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </p>
+                      <p className="mt-1 truncate text-base font-semibold text-slate-800">
+                        {ticket.requesterName}
+                      </p>
+                    </div>
+                    <TicketStatusBadge status={ticket.status} className="flex-shrink-0" />
+                  </div>
+
+                  <div className="mt-4 space-y-2.5 text-sm text-slate-600">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Building2 className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                      <span className="truncate">{ticket.requesterDepartment || '-'}</span>
+                    </div>
+                    <div className="flex min-w-0 items-start gap-2">
+                      <Tag className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+                      <span className="min-w-0 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                        {getCategoryName(ticket)}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500 min-[420px]:grid-cols-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <UserRound className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                        <span className="truncate">{getAssigneeName(ticket)}</span>
+                      </div>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <CalendarClock className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                        <span className="truncate">{formatDate(ticket.createdAt)}</span>
+                      </div>
+                    </div>
+                    {ticket.completedBy && (
+                      <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                        Закрыл: {getUserName(ticket.completedBy)}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              ))}
             </div>
-          </div>
-            <div className="flex items-center justify-between px-2">
+
+            <div className="hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:block">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">
+                        {t('helpdesk.ticketNumber', '№')}
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">
+                        {t('helpdesk.requesterName', 'ФИО')}
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">
+                        {t('helpdesk.requesterDepartment', 'Отдел')}
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">
+                        {t('helpdesk.category', 'Категория')}
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">
+                        {t('helpdesk.status', 'Статус')}
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">
+                        {t('helpdesk.assignee', 'Исполнитель')}
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">
+                        Закрыл
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">
+                        {t('helpdesk.createdAt', 'Дата')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tickets.map((ticket) => (
+                      <tr
+                        key={ticket.id}
+                        onClick={() => navigate(`/app/helpdesk/${ticket.documentId}`)}
+                        className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors"
+                      >
+                        <td className="px-4 py-3 font-mono text-cyan-600 font-medium">
+                          {ticket.ticketNumber}
+                        </td>
+                        <td className="px-4 py-3 text-slate-800">{ticket.requesterName}</td>
+                        <td className="px-4 py-3 text-slate-600">{ticket.requesterDepartment}</td>
+                        <td className="px-4 py-3 text-slate-600">{getCategoryName(ticket)}</td>
+                        <td className="px-4 py-3">
+                          <TicketStatusBadge status={ticket.status} />
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{getAssigneeName(ticket)}</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {ticket.completedBy ? (
+                            <div>
+                              <div>{getUserName(ticket.completedBy)}</div>
+                              <div className="text-xs text-slate-400">{formatDate(ticket.completedAt || ticket.updatedAt)}</div>
+                            </div>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 text-xs">
+                          {formatDate(ticket.createdAt)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 px-1 sm:hidden">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage <= 1}
+                className="h-11 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                {t('common.back', 'Назад')}
+              </button>
+              <p className="min-w-[72px] text-center text-sm font-medium text-slate-600">
+                {currentPage} / {totalPages}
+              </p>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                className="h-11 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                {t('survey.next', 'Далее')}
+              </button>
+            </div>
+
+            <div className="hidden items-center justify-between px-2 sm:flex">
               <p className="text-xs text-slate-500">
                 {currentPage} / {totalPages}
               </p>
