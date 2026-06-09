@@ -17,6 +17,7 @@ import {
 import { useTicketStore } from '../../store/ticketStore';
 import { useAuthStore, useUserRole } from '../../store/authStore';
 import type { ReassignTicketPayload } from '../../api/tickets';
+import type { Ticket } from '../../types';
 import TicketStatusBadge from '../../components/tickets/TicketStatusBadge';
 import ReassignModal from '../../components/tickets/ReassignModal';
 import Loader from '../../components/ui/Loader';
@@ -101,14 +102,6 @@ export default function TicketDetailPage() {
     }
   };
 
-  const handleReassign = async (payload: ReassignTicketPayload): Promise<void> => {
-    if (!selectedTicket) {
-      throw new Error('No ticket selected');
-    }
-    await reassignTicket(selectedTicket.documentId, payload);
-    if (id) await fetchTicket(id);
-  };
-
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleString(lang === 'kz' ? 'kk-KZ' : 'ru-RU', {
@@ -188,6 +181,34 @@ export default function TicketDetailPage() {
     editStatus !== ticket.status ||
     (editComplexity || '') !== (ticket.complexity || '') ||
     editStaffComment !== (ticket.staffComment || '');
+
+  const canViewUpdatedTicket = (updatedTicket: Ticket) => {
+    const updatedAssignees = Array.isArray(updatedTicket.assignee) ? updatedTicket.assignee : [];
+    const userId = Number(currentUser?.id);
+    const assignedToMe = updatedAssignees.some((assignee) => Number(assignee.id) === userId);
+    const requestedByMe = Number(updatedTicket.requester?.id) === userId;
+    const updatedDepartmentId =
+      updatedTicket.targetDepartment?.id || updatedTicket.serviceGroup?.department?.id;
+    const inMyDepartment = Boolean(
+      updatedDepartmentId && Number(updatedDepartmentId) === Number(currentUser?.department?.id)
+    );
+
+    if (isSuperAdmin || isKuat || assignedToMe || requestedByMe) return true;
+    return inMyDepartment && (isDepartmentHead || isHelpdeskAdmin);
+  };
+
+  const handleReassign = async (payload: ReassignTicketPayload): Promise<void> => {
+    if (!selectedTicket) {
+      throw new Error('No ticket selected');
+    }
+
+    const updatedTicket = await reassignTicket(selectedTicket.documentId, payload);
+    if (canViewUpdatedTicket(updatedTicket)) {
+      return;
+    }
+
+    navigate('/app/helpdesk');
+  };
 
   return (
     <div className="w-full max-w-full min-w-0 space-y-5 sm:space-y-6">

@@ -14,7 +14,7 @@ interface TicketState {
   fetchTickets: (filters?: TicketFilters) => Promise<void>;
   fetchTicket: (documentId: string) => Promise<void>;
   updateTicket: (documentId: string, data: Partial<Ticket>) => Promise<void>;
-  reassignTicket: (documentId: string, payload: ReassignTicketPayload) => Promise<void>;
+  reassignTicket: (documentId: string, payload: ReassignTicketPayload) => Promise<Ticket>;
   fetchAssignableUsers: () => Promise<void>;
   setFilters: (filters: Partial<TicketFilters>) => void;
   clearFilters: () => void;
@@ -65,10 +65,13 @@ export const useTicketStore = create<TicketState>((set, get) => ({
   reassignTicket: async (documentId, payload) => {
     set({ error: null });
     try {
-      await ticketsApi.reassign(documentId, payload);
+      const updated = await ticketsApi.reassign(documentId, payload);
+      set({ selectedTicket: updated });
       await get().fetchTickets();
+      return updated;
     } catch {
       set({ error: 'Ошибка переназначения заявки' });
+      throw new Error('Ошибка переназначения заявки');
     }
   },
 
