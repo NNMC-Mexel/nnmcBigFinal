@@ -124,8 +124,12 @@ function isHelpdeskRoutingAdmin(user: any, isSuperAdmin = false): boolean {
   return userHasAnyToken(user, ['superadmin', 'super admin', 'admin', 'админ']);
 }
 
-function userCanTransferBetweenDepartments(user: any, isSuperAdmin = false): boolean {
+function userCanViewDepartmentQueue(user: any, isSuperAdmin = false): boolean {
   return isHelpdeskRoutingAdmin(user, isSuperAdmin) || isDepartmentHead(user);
+}
+
+function userCanTransferBetweenDepartments(user: any, isSuperAdmin = false): boolean {
+  return userCanViewDepartmentQueue(user, isSuperAdmin);
 }
 
 function normalizeKazakhstanPhone(value: any): string | null {
@@ -210,7 +214,7 @@ function userCanManageTicket(userWithDept: any, ticket: any, isSuperAdmin: boole
   const assigneeIds = extractRelationIds(ticket?.assignee);
 
   if (assigneeIds.includes(userId)) return true;
-  if (isHelpdeskRoutingAdmin(userWithDept, isSuperAdmin) || isDepartmentHead(userWithDept)) {
+  if (userCanViewDepartmentQueue(userWithDept, isSuperAdmin)) {
     const userDeptKey = userWithDept?.department?.key;
     const ticketDeptKey = ticket?.targetDepartment?.key || ticket?.serviceGroup?.department?.key;
     return Boolean(userDeptKey && ticketDeptKey === userDeptKey);
@@ -219,7 +223,7 @@ function userCanManageTicket(userWithDept: any, ticket: any, isSuperAdmin: boole
   return false;
 }
 
-function userCanViewDepartmentQueue(userWithDept: any, ticket: any): boolean {
+function ticketBelongsToUserDepartment(userWithDept: any, ticket: any): boolean {
   const userDeptKey = userWithDept?.department?.key;
   if (!userDeptKey) return false;
   const ticketDeptKey = ticket?.targetDepartment?.key || ticket?.serviceGroup?.department?.key;
@@ -231,15 +235,11 @@ function userCanReassignTicket(userWithDept: any, ticket: any, isSuperAdmin: boo
   const userId = Number(userWithDept?.id);
   const assigneeIds = extractRelationIds(ticket?.assignee);
   if (assigneeIds.includes(userId)) return true;
-  if (userCanViewDepartmentQueue(userWithDept, ticket)) {
-    return true;
-  }
-  return false;
+  return userCanViewDepartmentQueue(userWithDept, isSuperAdmin) && ticketBelongsToUserDepartment(userWithDept, ticket);
 }
 
 function userCanViewTicket(userWithDept: any, ticket: any, isSuperAdmin: boolean): boolean {
   if (userCanManageTicket(userWithDept, ticket, isSuperAdmin)) return true;
-  if (userCanViewDepartmentQueue(userWithDept, ticket)) return true;
   const userId = Number(userWithDept?.id);
   const requesterIds = extractRelationIds(ticket?.requester);
   return requesterIds.includes(userId);
@@ -676,12 +676,13 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     const userWithDept = (await strapi.entityService.findOne(
       'plugin::users-permissions.user',
       user.id,
-      { populate: ['department'] }
+      { populate: ['department', 'role'] }
     )) as any;
 
     const { isSuperAdmin } = getUserFlags(userWithDept);
     const dept = userWithDept?.department;
     const isHelpdeskHead = isKuatHelpdeskHead(userWithDept);
+    const canViewQueue = userCanViewDepartmentQueue(userWithDept, isSuperAdmin);
 
     const andFilters: any[] = [];
 
@@ -723,7 +724,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       } else if (assigneeId) {
         andFilters.push({ assignee: { id: assigneeId } });
       }
-    } else {
+    } else if (canViewQueue) {
       const deptKey = dept?.key;
 
       if (!deptKey) {
@@ -731,13 +732,21 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
         return;
       }
 
-      andFilters.push({
-        $or: [
-          { assignee: { id: user.id } },
-          { targetDepartment: { key: deptKey } },
-          { serviceGroup: { department: { key: deptKey } } },
-        ],
-      });
+      if (myTicketsOnly) {
+        andFilters.push({ assignee: { id: user.id } });
+      } else {
+        andFilters.push({
+          $or: [
+            { targetDepartment: { key: deptKey } },
+            { serviceGroup: { department: { key: deptKey } } },
+          ],
+        });
+        if (assigneeId) {
+          andFilters.push({ assignee: { id: assigneeId } });
+        }
+      }
+    } else {
+      andFilters.push({ assignee: { id: user.id } });
     }
 
     const filters = andFilters.length > 1 ? { $and: andFilters } : andFilters[0] || {};
