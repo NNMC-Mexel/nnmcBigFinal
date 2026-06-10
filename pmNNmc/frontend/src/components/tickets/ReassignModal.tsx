@@ -4,6 +4,7 @@ import { Building2, Loader2, Search, Users, X } from 'lucide-react';
 import { departmentsApi } from '../../api/departments';
 import type { ReassignTicketPayload } from '../../api/tickets';
 import type { AssignableUser, Department } from '../../types';
+import ComboboxSelect, { type ComboboxOption } from '../ui/ComboboxSelect';
 
 const HELP_SERVICE_DEPARTMENT_KEYS = ['IT', 'MEDICAL_EQUIPMENT', 'ENGINEERING'];
 
@@ -16,6 +17,7 @@ interface Props {
   currentDepartmentId?: number;
   currentTargetDepartmentId?: number;
   canTransferDepartments?: boolean;
+  useTicketDepartmentUsers?: boolean;
 }
 
 export default function ReassignModal({
@@ -27,6 +29,7 @@ export default function ReassignModal({
   currentDepartmentId,
   currentTargetDepartmentId,
   canTransferDepartments = false,
+  useTicketDepartmentUsers = false,
 }: Props) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language === 'kz' ? 'kz' : 'ru';
@@ -55,10 +58,13 @@ export default function ReassignModal({
     }
   }, [isOpen, currentAssigneeIds, canTransferDepartments]);
 
+  const assignmentDepartmentId = useTicketDepartmentUsers
+    ? currentTargetDepartmentId
+    : currentDepartmentId;
   const ownDepartmentUsers = useMemo(() => {
-    if (!currentDepartmentId) return users;
-    return users.filter((user) => Number(user.department?.id) === Number(currentDepartmentId));
-  }, [users, currentDepartmentId]);
+    if (!assignmentDepartmentId) return users;
+    return users.filter((user) => Number(user.department?.id) === Number(assignmentDepartmentId));
+  }, [users, assignmentDepartmentId]);
   const ownDepartmentUserIds = useMemo(
     () => new Set(ownDepartmentUsers.map((user) => user.id)),
     [ownDepartmentUsers]
@@ -76,17 +82,22 @@ export default function ReassignModal({
     return fullName.includes(term);
   });
 
-  const transferDepartments = departments
-    .filter((department) => HELP_SERVICE_DEPARTMENT_KEYS.includes(department.key))
-    .filter((department) => Number(department.id) !== Number(currentTargetDepartmentId || currentDepartmentId))
-    .sort((a, b) => (a.name_ru || '').localeCompare(b.name_ru || '', 'ru'));
-
-  if (!isOpen) return null;
-
   const getDepartmentName = (department?: Department | null) => {
     if (!department) return '';
     return lang === 'kz' ? department.name_kz || department.name_ru : department.name_ru || department.name_kz;
   };
+
+  const transferDepartments = departments
+    .filter((department) => HELP_SERVICE_DEPARTMENT_KEYS.includes(department.key))
+    .filter((department) => Number(department.id) !== Number(currentTargetDepartmentId || currentDepartmentId))
+    .sort((a, b) => (a.name_ru || '').localeCompare(b.name_ru || '', 'ru'));
+  const transferDepartmentOptions: ComboboxOption[] = transferDepartments.map((department) => ({
+    value: String(department.id),
+    label: getDepartmentName(department),
+    description: department.key,
+  }));
+
+  if (!isOpen) return null;
 
   const getUserDisplayName = (user: AssignableUser) => {
     if (user.firstName || user.lastName) {
@@ -148,7 +159,7 @@ export default function ReassignModal({
               }`}
             >
               <Users className="h-4 w-4" />
-              {t('helpdesk.myDepartment', 'Мой отдел')}
+              {useTicketDepartmentUsers ? 'Исполнители отдела' : t('helpdesk.myDepartment', 'Мой отдел')}
             </button>
             {canTransferDepartments && (
               <button
@@ -184,7 +195,9 @@ export default function ReassignModal({
             <div className="flex-1 overflow-y-auto p-2">
               {filteredUsers.length === 0 ? (
                 <p className="text-center text-slate-500 py-8 text-sm">
-                  {t('helpdesk.noUsersInDepartment', 'В вашем отделе нет доступных исполнителей')}
+                  {useTicketDepartmentUsers
+                    ? 'Нет доступных исполнителей'
+                    : t('helpdesk.noUsersInDepartment', 'В вашем отделе нет доступных исполнителей')}
                 </p>
               ) : (
                 <div className="space-y-1">
@@ -236,18 +249,13 @@ export default function ReassignModal({
               <label className="block text-xs font-medium text-slate-500 mb-1">
                 {t('helpdesk.targetDepartment', 'Отдел-получатель')}
               </label>
-              <select
-                value={selectedDepartmentId}
-                onChange={(event) => setSelectedDepartmentId(event.target.value ? Number(event.target.value) : '')}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 focus:border-transparent focus:ring-2 focus:ring-cyan-500"
-              >
-                <option value="">{t('helpdesk.selectDepartment', 'Выберите отдел')}</option>
-                {transferDepartments.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {getDepartmentName(department)}
-                  </option>
-                ))}
-              </select>
+              <ComboboxSelect
+                value={selectedDepartmentId ? String(selectedDepartmentId) : ''}
+                onChange={(nextValue) => setSelectedDepartmentId(nextValue ? Number(nextValue) : '')}
+                options={transferDepartmentOptions}
+                placeholder={t('helpdesk.selectDepartment', 'Выберите отдел')}
+                emptyText={t('helpdesk.noDepartmentsFound', 'Отделы не найдены')}
+              />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Search } from 'lucide-react';
+import { CalendarDays, Clock, Download, Hash, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ticketsApi } from '../../api/tickets';
 import type { Ticket, AssignableUser } from '../../types';
 import Loader from '../../components/ui/Loader';
 import { useUserRole } from '../../store/authStore';
+import ComboboxSelect, { type ComboboxOption } from '../../components/ui/ComboboxSelect';
 
 type RangeMode = 'current' | 'previous' | 'all' | 'custom';
 type DepartmentKey = 'IT' | 'MEDICAL_EQUIPMENT' | 'ENGINEERING';
@@ -79,6 +80,11 @@ const getKpiState = (status: Ticket['status']) => {
   }
   return { label: 'Новая заявка', color: 'bg-slate-100 text-slate-700' };
 };
+
+const MONTH_OPTIONS: ComboboxOption[] = Array.from({ length: 12 }, (_, i) => ({
+  value: String(i + 1),
+  label: new Date(2024, i, 1).toLocaleDateString('ru-RU', { month: 'long' }),
+}));
 
 export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) {
   const { t } = useTranslation();
@@ -171,8 +177,15 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
     tickets.forEach((t) => {
       if (t.createdAt) unique.add(new Date(t.createdAt).getFullYear());
     });
+    if (unique.size === 0) unique.add(new Date().getFullYear());
     return Array.from(unique).sort((a, b) => b - a);
   }, [tickets]);
+  const yearOptions: ComboboxOption[] = years.map((y) => ({ value: String(y), label: String(y) }));
+  const userOptions: ComboboxOption[] = users.map((user) => ({
+    value: String(user.id),
+    label: toUserName(user),
+    description: user.email || user.department?.name_ru || user.department?.name_kz,
+  }));
 
   const selectedUser = users.find((u) => u.id === selectedUserId) || null;
 
@@ -252,12 +265,75 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
 
   if (isLoading) return <Loader />;
 
-  return (
-    <div className="space-y-5">
-      <h1 className="text-2xl font-bold text-slate-800">{departmentTitle}</h1>
+  const renderTicketCard = (ticket: Ticket) => {
+    const actual = toMinutesDiff(ticket.createdAt, ticket.completedAt || ticket.updatedAt);
+    const kpi = getKpiState(ticket.status);
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
+    return (
+      <button
+        key={ticket.id}
+        type="button"
+        onClick={() => setSelectedTicket(ticket)}
+        className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors active:bg-slate-50"
+      >
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-mono text-lg font-bold leading-tight text-cyan-700">
+              {ticket.ticketNumber}
+            </p>
+            <p className="mt-1 truncate text-sm font-medium text-slate-800">
+              {selectedUser ? toUserName(selectedUser) : '-'}
+            </p>
+          </div>
+          <span className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${kpi.color}`}>
+            {kpi.label}
+          </span>
+        </div>
+
+        <div className="mt-4 space-y-2.5 text-sm text-slate-600">
+          <div className="flex min-w-0 items-center gap-2">
+            <CalendarDays className="h-4 w-4 flex-shrink-0 text-slate-400" />
+            <span className="truncate">{formatDateTime(ticket.createdAt) || '-'}</span>
+          </div>
+          <div className="flex min-w-0 items-center gap-2">
+            <Clock className="h-4 w-4 flex-shrink-0 text-slate-400" />
+            <span className="truncate">{formatDuration(actual)}</span>
+          </div>
+          <div className="flex min-w-0 items-start gap-2">
+            <Hash className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+            <span className="min-w-0 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+              {ticket.requesterName} · {ticket.requesterDepartment}
+            </span>
+          </div>
+        </div>
+      </button>
+    );
+  };
+
+  return (
+    <div className="w-full max-w-full min-w-0 space-y-4 sm:space-y-5">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold text-slate-800">{departmentTitle}</h1>
+        <p className="mt-1 text-sm text-slate-500 lg:hidden">
+          {selectedUser ? toUserName(selectedUser) : 'Выберите сотрудника'} · {filtered.length} записей
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:hidden">
+        <p className="mb-2 text-sm font-semibold text-slate-800">Сотрудник</p>
+        <ComboboxSelect
+          value={selectedUserId ? String(selectedUserId) : ''}
+          onChange={(nextValue) => setSelectedUserId(nextValue ? Number(nextValue) : null)}
+          options={userOptions}
+          placeholder="Выберите сотрудника"
+          searchable={users.length > 6}
+          searchPlaceholder="Поиск сотрудника..."
+          emptyText="Сотрудники не найдены"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
+        <div className="hidden rounded-xl border border-slate-200 bg-white p-4 lg:block">
           <p className="font-semibold text-slate-800 mb-3">Сотрудники</p>
           <div className="space-y-1 max-h-[560px] overflow-auto">
             {users.map((u) => (
@@ -274,26 +350,28 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200">
-          <div className="p-4 border-b border-slate-100 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-lg font-semibold text-slate-800">Заявки {selectedUser ? toUserName(selectedUser) : ''}</p>
+        <div className="min-w-0 rounded-xl border border-slate-200 bg-white">
+          <div className="space-y-4 border-b border-slate-100 p-4">
+            <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="min-w-0">
+                <p className="text-lg font-semibold text-slate-800">
+                  Заявки {selectedUser ? toUserName(selectedUser) : ''}
+                </p>
                 <p className="text-sm text-slate-500">Всего записей: {filtered.length}</p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="relative">
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row xl:items-center">
+                <div className="relative w-full sm:min-w-[220px] xl:w-64">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder={t('common.search', 'Поиск')}
-                    className="pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm w-64"
+                    className="h-11 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm outline-none transition-colors focus:border-cyan-500 focus:ring-2 focus:ring-cyan-100"
                   />
                 </div>
                 <button
                   onClick={exportCsv}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900 text-white text-sm hover:bg-slate-800"
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 sm:w-auto"
                 >
                   <Download className="w-4 h-4" />
                   Скачать отчет
@@ -301,56 +379,46 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
-              <select
-                value={year}
-                onChange={(e) => {
-                  setYear(Number(e.target.value));
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <ComboboxSelect
+                value={String(year)}
+                onChange={(nextValue) => {
+                  setYear(Number(nextValue));
                   setRangeMode('custom');
                 }}
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-              >
-                {years.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={month}
-                onChange={(e) => {
-                  setMonth(Number(e.target.value));
+                options={yearOptions}
+                className="min-w-0 sm:w-32"
+              />
+              <ComboboxSelect
+                value={String(month)}
+                onChange={(nextValue) => {
+                  setMonth(Number(nextValue));
                   setRangeMode('custom');
                 }}
-                className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
-              >
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+                options={MONTH_OPTIONS}
+                className="min-w-0 sm:w-44"
+              />
               <button
                 onClick={() => setRangeMode('current')}
-                className={`px-3 py-2 rounded-lg text-sm border ${rangeMode === 'current' ? 'bg-cyan-50 border-cyan-300 text-cyan-700' : 'border-slate-300 text-slate-600'}`}
+                className={`h-11 rounded-lg border px-3 text-sm font-medium sm:w-auto ${rangeMode === 'current' ? 'bg-cyan-50 border-cyan-300 text-cyan-700' : 'border-slate-300 text-slate-600'}`}
               >
                 Текущий месяц
               </button>
               <button
                 onClick={() => setRangeMode('previous')}
-                className={`px-3 py-2 rounded-lg text-sm border ${rangeMode === 'previous' ? 'bg-cyan-50 border-cyan-300 text-cyan-700' : 'border-slate-300 text-slate-600'}`}
+                className={`h-11 rounded-lg border px-3 text-sm font-medium sm:w-auto ${rangeMode === 'previous' ? 'bg-cyan-50 border-cyan-300 text-cyan-700' : 'border-slate-300 text-slate-600'}`}
               >
                 Прошлый месяц
               </button>
               <button
                 onClick={() => setRangeMode('all')}
-                className={`px-3 py-2 rounded-lg text-sm border ${rangeMode === 'all' ? 'bg-cyan-50 border-cyan-300 text-cyan-700' : 'border-slate-300 text-slate-600'}`}
+                className={`col-span-2 h-11 rounded-lg border px-3 text-sm font-medium sm:col-span-1 sm:w-auto ${rangeMode === 'all' ? 'bg-cyan-50 border-cyan-300 text-cyan-700' : 'border-slate-300 text-slate-600'}`}
               >
                 Весь период
               </button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
               <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
                 <p className="text-xs text-slate-500">Сделано</p>
                 <p className="text-lg font-semibold text-slate-800">{stats.done}</p>
@@ -367,14 +435,24 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
                 <p className="text-xs text-slate-500">Некорректные</p>
                 <p className="text-lg font-semibold text-slate-800">{stats.invalid}</p>
               </div>
-              <div className="rounded-lg bg-cyan-50 border border-cyan-200 px-3 py-2">
+              <div className="col-span-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 md:col-span-1">
                 <p className="text-xs text-cyan-700">Среднее (done)</p>
-                <p className="text-lg font-semibold text-cyan-800">{formatDuration(stats.avgDoneMinutes)}</p>
+                <p className="break-words text-lg font-semibold text-cyan-800">{formatDuration(stats.avgDoneMinutes)}</p>
               </div>
             </div>
           </div>
 
-          <div className="overflow-auto">
+          <div className="space-y-3 bg-slate-50/50 p-3 md:hidden">
+            {filtered.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                Нет заявок за выбранный период
+              </div>
+            ) : (
+              filtered.map(renderTicketCard)
+            )}
+          </div>
+
+          <div className="hidden overflow-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">

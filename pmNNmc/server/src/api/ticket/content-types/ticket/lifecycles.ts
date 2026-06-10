@@ -65,6 +65,22 @@ export default {
 
     // Auto-assign all default category executors to ticket
     const categoryId = extractRelationId(event.params.data.category);
+    const serviceGroupId = extractRelationId(event.params.data.serviceGroup);
+
+    if (!event.params.data.complexity && serviceGroupId) {
+      try {
+        const serviceGroup = await strapi.entityService.findOne(
+          'api::service-group.service-group',
+          serviceGroupId,
+          { populate: ['department'] }
+        );
+        if (serviceGroup?.department?.key === 'IT') {
+          event.params.data.complexity = 'C';
+        }
+      } catch {
+        // Complexity default failed silently — ticket can still be created.
+      }
+    }
 
     if (categoryId && existingAssigneeIds.length === 0) {
       try {

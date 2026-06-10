@@ -87,6 +87,10 @@ export const ticketsApi = {
     return response.data.data;
   },
 
+  delete: async (documentId: string): Promise<void> => {
+    await client.delete(`/tickets/${documentId}`);
+  },
+
   reassign: async (documentId: string, payload: ReassignTicketPayload): Promise<Ticket> => {
     const response = await client.put(`/tickets/${documentId}/reassign`, payload);
     return response.data.data;

@@ -140,49 +140,53 @@ export default function Calendar({ rooms, onSlotClick, onBookingClick, onBooking
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-w-0">
       {/* Week navigation */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <button
-            onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-            className="px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 rounded-lg transition-colors"
-          >
-            Сегодня
-          </button>
-          <button
-            onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+      <div className="px-4 sm:px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+            <button
+              onClick={() => setCurrentWeekStart(subWeeks(currentWeekStart, 1))}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Предыдущая неделя"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+              className="px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/5 rounded-lg transition-colors"
+            >
+              Сегодня
+            </button>
+            <button
+              onClick={() => setCurrentWeekStart(addWeeks(currentWeekStart, 1))}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Следующая неделя"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          <h2 className="text-sm sm:text-lg font-semibold text-gray-900 text-right leading-snug">
+            {format(currentWeekStart, 'd MMM', { locale: ru })} —{' '}
+            {format(weekEnd, 'd MMM yyyy', { locale: ru })}
+          </h2>
         </div>
-        <h2 className="text-lg font-semibold text-gray-900">
-          {format(currentWeekStart, 'd MMM', { locale: ru })} —{' '}
-          {format(weekEnd, 'd MMM yyyy', { locale: ru })}
-        </h2>
-        <div className="flex items-center gap-4">
+        <div className="hidden sm:flex items-center justify-end gap-4 mt-3">
           {rooms.map((room, idx) => (
-            <div key={room.id} className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${ROOM_COLORS[idx]}`} />
-              <span className="text-sm text-gray-600">{shortName(room.name)}</span>
+            <div key={room.id} className="flex items-center gap-2 min-w-0">
+              <div className={`w-3 h-3 rounded-full shrink-0 ${ROOM_COLORS[idx]}`} />
+              <span className="text-sm text-gray-600 truncate">{shortName(room.name)}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Day selector (mobile) */}
-      <div className="sm:hidden flex gap-1 px-4 py-3 overflow-x-auto border-b border-gray-100">
+      <div className="sm:hidden flex gap-1 px-4 py-3 overflow-x-auto border-b border-gray-100 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {days.map((day) => (
           <button
             key={day.toISOString()}
@@ -205,7 +209,7 @@ export default function Calendar({ rooms, onSlotClick, onBookingClick, onBooking
 
       {/* Desktop: Week grid */}
       <div className="hidden sm:block overflow-x-auto">
-        <div className="min-w-200">
+        <div className="min-w-[980px]">
           {/* Day headers */}
           <div className="grid grid-cols-[60px_1fr] border-b border-gray-100">
             <div />
@@ -288,24 +292,24 @@ export default function Calendar({ rooms, onSlotClick, onBookingClick, onBooking
 
       {/* Mobile: Day view */}
       <div className="sm:hidden">
-        <div className="grid grid-cols-[50px_1fr] border-b border-gray-100">
+        <div className="grid grid-cols-[44px_minmax(0,1fr)] border-b border-gray-100">
           <div />
           <div className="grid grid-cols-2">
             {rooms.map((room, idx) => (
               <div
                 key={room.id}
-                className={`flex items-center justify-center gap-1.5 py-2 ${idx === 0 ? '' : 'border-l border-gray-100'}`}
+                className={`min-w-0 flex items-center justify-center gap-1.5 py-2 px-1 ${idx === 0 ? '' : 'border-l border-gray-100'}`}
               >
-                <div className={`w-2.5 h-2.5 rounded-full ${ROOM_COLORS[idx]}`} />
-                <span className="text-xs font-medium text-gray-500">{shortName(room.name)}</span>
+                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${ROOM_COLORS[idx]}`} />
+                <span className="text-xs font-medium text-gray-500 truncate">{shortName(room.name)}</span>
               </div>
             ))}
           </div>
         </div>
-        <div className="grid grid-cols-[50px_1fr]">
+        <div className="grid grid-cols-[44px_minmax(0,1fr)]">
           <div>
             {HOURS.map((hour) => (
-              <div key={hour} className="h-20 flex items-start justify-end pr-2 pt-0">
+              <div key={hour} className="h-20 flex items-start justify-end pr-1.5 pt-0">
                 <span className="text-xs text-gray-400 -mt-2">
                   {String(hour).padStart(2, '0')}:00
                 </span>

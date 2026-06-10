@@ -14,6 +14,7 @@ interface TicketState {
   fetchTickets: (filters?: TicketFilters) => Promise<void>;
   fetchTicket: (documentId: string) => Promise<void>;
   updateTicket: (documentId: string, data: Partial<Ticket>) => Promise<void>;
+  deleteTicket: (documentId: string) => Promise<void>;
   reassignTicket: (documentId: string, payload: ReassignTicketPayload) => Promise<Ticket>;
   fetchAssignableUsers: () => Promise<void>;
   setFilters: (filters: Partial<TicketFilters>) => void;
@@ -57,8 +58,24 @@ export const useTicketStore = create<TicketState>((set, get) => ({
       const updated = await ticketsApi.update(documentId, data);
       set({ selectedTicket: updated });
       await get().fetchTickets();
-    } catch {
+    } catch (error) {
       set({ error: 'Ошибка обновления заявки' });
+      throw error;
+    }
+  },
+
+  deleteTicket: async (documentId) => {
+    set({ error: null });
+    try {
+      await ticketsApi.delete(documentId);
+      set((state) => ({
+        tickets: state.tickets.filter((ticket) => ticket.documentId !== documentId),
+        selectedTicket: state.selectedTicket?.documentId === documentId ? null : state.selectedTicket,
+        total: Math.max(0, state.total - 1),
+      }));
+    } catch (error) {
+      set({ error: 'Ошибка удаления заявки' });
+      throw error;
     }
   },
 

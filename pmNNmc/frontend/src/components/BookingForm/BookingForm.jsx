@@ -197,13 +197,13 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
         {/* Room select */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Зал</label>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {rooms.map((room, idx) => (
               <button
                 key={room.id}
                 type="button"
                 onClick={() => setRoomId(room.id)}
-                className={`flex-1 py-3 px-4 rounded-xl border-2 text-sm font-medium transition-all ${
+                className={`py-3 px-4 rounded-xl border-2 text-sm font-medium leading-snug break-words transition-all ${
                   roomId === room.id
                     ? idx === 0
                       ? 'border-cyan-700 bg-cyan-600 text-white shadow-sm'
@@ -313,7 +313,7 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 min-[420px]:grid-cols-4 gap-1.5">
                 {selectableSlots.map((slot) => {
                   const state = getSlotState(slot);
                   const booking = state === 'occupied' ? getSlotBooking(slot, dayBookings) : null;
@@ -349,7 +349,7 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
                 })}
               </div>
 
-              <div className="flex items-center gap-4 mt-2 text-[11px] text-gray-500">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-[11px] text-gray-500">
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-white border border-gray-200" />
                   <span>Свободно</span>
@@ -426,7 +426,7 @@ export default function BookingForm({ isOpen, onClose, rooms, initialData, onSuc
         <button
           type="submit"
           disabled={submitting || !startSlot || !endSlot}
-          className="w-full py-3 bg-emerald-600 text-white rounded-xl font-medium hover:bg-emerald-700 transition-colors disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
+          className="w-full px-3 py-3 bg-emerald-600 text-white rounded-xl text-sm sm:text-base leading-snug font-medium hover:bg-emerald-700 transition-colors disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed"
         >
           {submitting
             ? 'Бронирование...'

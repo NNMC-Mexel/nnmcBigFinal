@@ -168,6 +168,10 @@ function formatDepartmentForClient(department: any) {
   };
 }
 
+function getInitialComplexityForDepartment(department: any): 'C' | null {
+  return department?.key === 'IT' ? 'C' : null;
+}
+
 function getTicketUserIds(ticket: any): number[] {
   return Array.from(
     new Set([
@@ -885,6 +889,56 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     ctx.body = { data: normalizedTicket };
   },
 
+  async delete(ctx) {
+    const user = ctx.state.user;
+    if (!user) {
+      ctx.throw(401, 'Not authenticated');
+      return;
+    }
+
+    const userWithDept = (await strapi.entityService.findOne(
+      'plugin::users-permissions.user',
+      user.id,
+      { populate: ['department', 'role'] }
+    )) as any;
+    const { isSuperAdmin } = getUserFlags(userWithDept);
+    if (!isSuperAdmin) {
+      ctx.throw(403, 'Only SuperAdmin can delete tickets');
+      return;
+    }
+
+    const existingTicket = await getTicketByDocumentId(strapi, ctx.params.id);
+    if (!existingTicket) {
+      ctx.throw(404, 'Ticket not found');
+      return;
+    }
+
+    await strapi.entityService.delete('api::ticket.ticket', existingTicket.id);
+    await publishTicketRealtime(strapi, existingTicket, 'tickets:deleted');
+    await createAuditEvent(strapi, {
+      action: 'ticket.delete',
+      entityType: TICKET_UID,
+      entityId: existingTicket.id,
+      actor: Number(user.id),
+      oldData: {
+        ticketNumber: existingTicket.ticketNumber || null,
+        requesterName: existingTicket.requesterName || null,
+        targetDepartment: formatDepartmentForClient(
+          existingTicket.targetDepartment || existingTicket.serviceGroup?.department
+        ),
+        assigneeIds: extractRelationIds(existingTicket.assignee),
+        status: existingTicket.status || null,
+      },
+    });
+
+    ctx.body = {
+      data: {
+        id: existingTicket.id,
+        documentId: existingTicket.documentId,
+      },
+    };
+  },
+
   async submit(ctx) {
     const user = ctx.state.user;
     if (!user) {
@@ -957,6 +1011,10 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       status: 'NEW',
       ticketNumber: 'TEMP',
     };
+    const initialComplexity = getInitialComplexityForDepartment(serviceGroup.department);
+    if (initialComplexity) {
+      ticketData.complexity = initialComplexity;
+    }
 
     if (finalCategoryId) {
       ticketData.category = finalCategoryId;
@@ -1106,6 +1164,10 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       status: 'NEW',
       ticketNumber: 'TEMP',
     };
+    const initialComplexity = getInitialComplexityForDepartment(serviceGroup.department);
+    if (initialComplexity) {
+      ticketData.complexity = initialComplexity;
+    }
 
     if (category?.id) {
       ticketData.category = category.id;
@@ -1238,6 +1300,10 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
         category: null,
         status: ticketRow.status === 'DONE' ? ticketRow.status : 'NEW',
       };
+      const initialComplexity = getInitialComplexityForDepartment(department);
+      if (initialComplexity) {
+        updateData.complexity = initialComplexity;
+      }
 
       const ticket = (await strapi.entityService.update('api::ticket.ticket', ticketRow.id, {
         data: updateData,
@@ -1328,6 +1394,12 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     if (nextDeptKeys.length === 1) {
       updateData.targetDepartment = assignees[0].department.id;
       updateData.transferReason = null;
+      const movedIntoIt =
+        nextDeptKeys[0] === 'IT' &&
+        nextDeptKeys[0] !== (ticketRow?.targetDepartment?.key || ticketRow?.serviceGroup?.department?.key);
+      if (movedIntoIt) {
+        updateData.complexity = 'C';
+      }
     }
 
     const ticket = (await strapi.entityService.update('api::ticket.ticket', ticketRow.id, {

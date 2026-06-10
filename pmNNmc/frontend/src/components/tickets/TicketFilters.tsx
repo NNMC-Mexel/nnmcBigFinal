@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { Search, X, User, Users } from 'lucide-react';
 import type { AssignableUser } from '../../types';
+import ComboboxSelect, { type ComboboxOption } from '../ui/ComboboxSelect';
 
 const STATUSES = ['ALL', 'NEW', 'IN_PROGRESS', 'DONE', 'INVALID'] as const;
 
@@ -44,6 +45,14 @@ export default function TicketFilters({
     const fullName = `${user.lastName || ''} ${user.firstName || ''}`.trim();
     return fullName || user.username;
   };
+  const assigneeOptions: ComboboxOption[] = [
+    { value: '', label: t('helpdesk.allAssignees', 'Все исполнители') },
+    ...assignableUsers.map((user) => ({
+      value: String(user.id),
+      label: getUserLabel(user),
+      description: user.email || user.department?.name_ru || user.department?.name_kz,
+    })),
+  ];
 
   return (
     <div className="min-w-0 space-y-4">
@@ -119,18 +128,17 @@ export default function TicketFilters({
 
           {/* Assignee dropdown - only visible when viewing all tickets */}
           {!myTicketsOnly && onAssigneeChange && assignableUsers.length > 0 && (
-            <select
-              value={assigneeId || ''}
-              onChange={(e) => onAssigneeChange(e.target.value ? parseInt(e.target.value) : undefined)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-cyan-500 sm:w-auto"
-            >
-              <option value="">{t('helpdesk.allAssignees', 'Все исполнители')}</option>
-              {assignableUsers.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {getUserLabel(user)}
-                </option>
-              ))}
-            </select>
+            <ComboboxSelect
+              value={assigneeId ? String(assigneeId) : ''}
+              onChange={(nextValue) =>
+                onAssigneeChange(nextValue ? parseInt(nextValue, 10) : undefined)
+              }
+              options={assigneeOptions}
+              searchable={assignableUsers.length > 6}
+              searchPlaceholder={t('helpdesk.searchUser', 'Поиск по имени...')}
+              emptyText={t('helpdesk.noUsersFound', 'Исполнитель не найден')}
+              className="w-full sm:w-72"
+            />
           )}
         </div>
       )}
