@@ -47,6 +47,8 @@ import {
   apiTemplateUpdate,
   apiTemplateDelete,
   apiPmDepartments,
+  apiOnecTimesheets,
+  apiOnecTimesheetFile,
 } from "./kpiApi";
 import "./kpi.css";
 
@@ -352,6 +354,81 @@ function AccessModal({ user, departments, onCancel, onSave }) {
 
 // ======================= Основной модуль =======================
 
+function OneCTimesheetModal({ target, items, loading, downloadingId, onCancel, onSelect }) {
+  if (!target) return null;
+
+  const formatDate = (value, withTime = false) => {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString("ru-RU", withTime
+      ? { dateStyle: "short", timeStyle: "short" }
+      : { dateStyle: "short" });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal modal-onec" onClick={(e) => e.stopPropagation()}>
+        <div className="card-header-row">
+          <div>
+            <h3 className="modal-title">Загрузить табель из 1С</h3>
+            <p className="modal-subtext">
+              {target.department} · {String(target.month).padStart(2, "0")}.{target.year}
+            </p>
+          </div>
+          <button type="button" className="btn btn-secondary btn-small" onClick={onCancel}>Закрыть</button>
+        </div>
+
+        {loading ? (
+          <div className="empty-state">Получение списка проведённых табелей из 1С...</div>
+        ) : items.length === 0 ? (
+          <div className="empty-state">Для выбранного отдела и периода проведённые табели не найдены.</div>
+        ) : (
+          <div className="table-wrapper onec-table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Дата</th>
+                  <th>Номер</th>
+                  <th>Период</th>
+                  <th>Организация</th>
+                  <th>Подразделение</th>
+                  <th>Начало</th>
+                  <th>Окончание</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id}>
+                    <td>{formatDate(item.date, true)}</td>
+                    <td>{item.number}</td>
+                    <td>{formatDate(item.period)}</td>
+                    <td>{item.organization}</td>
+                    <td>{item.department}</td>
+                    <td>{formatDate(item.dateFrom)}</td>
+                    <td>{formatDate(item.dateTo)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-small"
+                        disabled={Boolean(downloadingId)}
+                        onClick={() => onSelect(item)}
+                      >
+                        {downloadingId === item.id ? "Загрузка..." : "Выбрать"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const MONTH_NAMES_RU = ["", "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
 const ACTIVE_KPI_DOCUMENT_STATUSES = new Set(["pending", "in_progress"]);
 
@@ -416,6 +493,12 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
 
   // Departments from server-pm
   const [pmDepartments, setPmDepartments] = useState([]);
+
+  // Read-only import from 1C
+  const [oneCModalTarget, setOneCModalTarget] = useState(null);
+  const [oneCItems, setOneCItems] = useState([]);
+  const [oneCLoading, setOneCLoading] = useState(false);
+  const [oneCDownloadingId, setOneCDownloadingId] = useState("");
 
   // Edit mode for Результаты tab
   const [editMode, setEditMode] = useState(false);
@@ -767,6 +850,49 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     }
     if (isPrev) setTimesheetFilePrev(file);
     else setTimesheetFile(file);
+  };
+
+  const openOneCTimesheets = async (isPrev = false) => {
+    if (!calcDepartment) {
+      showToast("Выберите отдел перед загрузкой табеля из 1С", "error");
+      return;
+    }
+
+    const target = isPrev
+      ? { isPrev: true, department: calcDepartment, year: prevMonthInfo.year, month: prevMonthInfo.month }
+      : { isPrev: false, department: calcDepartment, year: parseInt(year, 10), month: parseInt(month, 10) };
+    setOneCModalTarget(target);
+    setOneCItems([]);
+    setOneCLoading(true);
+    try {
+      const items = await apiOnecTimesheets(target);
+      setOneCItems(items);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : String(err) || "Не удалось получить табели из 1С", "error");
+      setOneCModalTarget(null);
+    } finally {
+      setOneCLoading(false);
+    }
+  };
+
+  const selectOneCTimesheet = async (item) => {
+    if (!oneCModalTarget || !item?.id) return;
+    setOneCDownloadingId(item.id);
+    try {
+      const { blob, filename } = await apiOnecTimesheetFile(item.id, oneCModalTarget.department);
+      const file = new File([blob], filename, {
+        type: blob.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      if (oneCModalTarget.isPrev) setTimesheetFilePrev(file);
+      else setTimesheetFile(file);
+      setOneCModalTarget(null);
+      setOneCItems([]);
+      showToast(`Табель ${item.number} загружен из 1С`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : String(err) || "Не удалось загрузить табель из 1С", "error");
+    } finally {
+      setOneCDownloadingId("");
+    }
   };
 
   const handleCalc = async () => {
@@ -1317,6 +1443,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                     <div className="file-drop-actions">
                       <label className="btn btn-primary upload-btn" htmlFor="kpi-timesheet-prev-input">Выбрать файл</label>
                       <input id="kpi-timesheet-prev-input" className="file-input-hidden" type="file" accept=".xls,.xlsx" onChange={(e) => handleTimesheetFile(e.target.files[0] || null, true)} />
+                      <button type="button" className="btn btn-outline" onClick={() => openOneCTimesheets(true)}>Загрузить из 1С</button>
                     </div>
                     <div className="file-drop-hint">XLSX, XLS</div>
                     {timesheetFilePrev && <div className="file-drop-name">Выбран: {timesheetFilePrev.name}</div>}
@@ -1336,6 +1463,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                     <div className="file-drop-actions">
                       <label className="btn btn-primary upload-btn" htmlFor="kpi-timesheet-input">Выбрать файл</label>
                       <input id="kpi-timesheet-input" className="file-input-hidden" type="file" accept=".xls,.xlsx" onChange={(e) => handleTimesheetFile(e.target.files[0] || null)} />
+                      <button type="button" className="btn btn-outline" onClick={() => openOneCTimesheets(false)}>Загрузить из 1С</button>
                     </div>
                     <div className="file-drop-hint">XLSX, XLS</div>
                     {timesheetFile && <div className="file-drop-name">Выбран: {timesheetFile.name}</div>}
@@ -2211,6 +2339,14 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       <DeleteConfirmModal employee={deleteModalEmployee} onCancel={() => setDeleteModalEmployee(null)} onConfirm={handleDeleteConfirm} />
       <EmployeeFormModal initial={formInitial} mode={formMode} departments={allDepartments} onCancel={() => { setFormMode(null); setFormInitial(null); }} onSave={handleFormSave} />
       <AccessModal user={accessModalUser} departments={allDepartments} onCancel={() => setAccessModalUser(null)} onSave={handleAccessSave} />
+      <OneCTimesheetModal
+        target={oneCModalTarget}
+        items={oneCItems}
+        loading={oneCLoading}
+        downloadingId={oneCDownloadingId}
+        onCancel={() => { if (!oneCDownloadingId) setOneCModalTarget(null); }}
+        onSelect={selectOneCTimesheet}
+      />
 
       {/* Pre-sign confirmation modal */}
       {signPreview && (

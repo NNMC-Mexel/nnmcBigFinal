@@ -304,6 +304,43 @@ export async function apiArchiveDelete(documentId) {
   return handleResponse(res);
 }
 
+// --- 1C timesheets ---
+
+export async function apiOnecTimesheets(params = {}) {
+  const query = new URLSearchParams();
+  if (params.department) query.set("department", params.department);
+  if (params.year) query.set("year", String(params.year));
+  if (params.month) query.set("month", String(params.month));
+  const res = await fetch(`${STRAPI_BASE}/onec-timesheets?${query.toString()}`, {
+    headers: { ...getAuthHeader() },
+  });
+  const data = await handleResponse(res);
+  return data?.items || [];
+}
+
+export async function apiOnecTimesheetFile(id, department) {
+  const query = new URLSearchParams();
+  if (department) query.set("department", department);
+  const res = await fetch(
+    `${STRAPI_BASE}/onec-timesheets/${encodeURIComponent(id)}/download?${query.toString()}`,
+    { headers: { ...getAuthHeader() } }
+  );
+  if (!res.ok) {
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      const data = await res.json();
+      throw new Error(data?.error || data?.message || `HTTP ${res.status}`);
+    }
+    throw new Error((await res.text()) || `HTTP ${res.status}`);
+  }
+  const disposition = res.headers.get("content-disposition") || "";
+  const match = disposition.match(/filename="?([^"]+)"?/i);
+  return {
+    blob: await res.blob(),
+    filename: match?.[1] || "1C_timesheet.xlsx",
+  };
+}
+
 // --- Department Templates ---
 
 export async function apiTemplateList() {

@@ -282,6 +282,8 @@
 .kpi-wrapper .file-drop-actions {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
@@ -691,6 +693,22 @@
 
 .kpi-wrapper .modal-wide {
   width: min(680px, 100%);
+}
+
+.kpi-wrapper .modal-onec {
+  width: min(1320px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.kpi-wrapper .onec-table-wrapper {
+  max-height: 66vh;
+}
+
+.kpi-wrapper .onec-table-wrapper th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .kpi-wrapper .modal-title {
