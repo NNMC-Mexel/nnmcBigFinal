@@ -305,6 +305,8 @@ async function ensureAuthenticatedPermissions(strapi: any) {
     'api::department-template.department-template.create',
     'api::department-template.department-template.update',
     'api::department-template.department-template.delete',
+    'api::onec-timesheet.onec-timesheet.list',
+    'api::onec-timesheet.onec-timesheet.download',
   ];
 
   for (const action of actions) {
