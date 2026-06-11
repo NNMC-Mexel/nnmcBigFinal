@@ -1,0 +1,29 @@
+{
+  "kind": "collectionType",
+  "collectionName": "household_executors",
+  "info": {
+    "singularName": "household-executor",
+    "pluralName": "household-executors",
+    "displayName": "Household Executor",
+    "description": "Исполнители хозяйственной службы без аккаунтов"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "required": true
+    },
+    "sortOrder": {
+      "type": "integer",
+      "default": 0
+    }
+  }
+}

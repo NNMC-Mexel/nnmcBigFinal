@@ -4,12 +4,14 @@ import { publishNotificationCreated, publishToUser } from '../../../utils/notifi
 import { createAuditEvent } from '../../../utils/audit-event';
 
 const TICKET_UID = 'api::ticket.ticket';
+const HOUSEHOLD_EXECUTOR_UID = 'api::household-executor.household-executor';
 const HELP_SERVICE_DEPARTMENT_KEYS = ['IT', 'MEDICAL_EQUIPMENT', 'ENGINEERING'];
 const TICKET_POPULATE = [
   'category',
   'serviceGroup',
   'serviceGroup.department',
   'targetDepartment',
+  'householdExecutor',
   'assignee',
   'assignee.department',
   'attachments',
@@ -33,6 +35,11 @@ const LEGACY_IT_CATEGORY_SLUG_BY_ID: Record<string, string> = {
   skud: 'access-control',
   'skud-p': 'access-control-repair',
   Domen: 'domain-account',
+};
+const LEGACY_DEPARTMENT_KEY_BY_PORT: Record<string, string> = {
+  '8080': 'IT',
+  '8081': 'MEDICAL_EQUIPMENT',
+  '8082': 'ENGINEERING',
 };
 
 function extractRelationId(relation: any): number | null {
@@ -132,6 +139,15 @@ function userCanTransferBetweenDepartments(user: any, isSuperAdmin = false): boo
   return userCanViewDepartmentQueue(user, isSuperAdmin);
 }
 
+function userCanManageHouseholdExecutors(user: any, isSuperAdmin = false): boolean {
+  // Deliberately narrower than isHelpdeskRoutingAdmin: the free-text "админ/admin"
+  // position match would grant executor management to unrelated staff
+  // (e.g. "Администратор регистратуры"), so only explicit signals count here.
+  if (isSuperAdmin || isKuatHelpdeskHead(user)) return true;
+  if (user?.canManageTickets === true) return true;
+  return user?.department?.key === 'ENGINEERING' && userCanViewDepartmentQueue(user, isSuperAdmin);
+}
+
 function normalizeKazakhstanPhone(value: any): string | null {
   const digits = String(value || '').replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('7')) return `+${digits}`;
@@ -165,6 +181,17 @@ function formatDepartmentForClient(department: any) {
     key: department.key,
     name_ru: department.name_ru,
     name_kz: department.name_kz,
+  };
+}
+
+function formatHouseholdExecutorForClient(executor: any) {
+  if (!executor) return null;
+  return {
+    id: executor.id,
+    documentId: executor.documentId,
+    name: executor.name,
+    active: executor.active !== false,
+    sortOrder: executor.sortOrder || 0,
   };
 }
 
@@ -316,7 +343,28 @@ async function getDefaultLegacyServiceGroup(strapi: any) {
   return byDepartment?.[0] || null;
 }
 
-async function findLegacyServiceGroup(strapi: any, body: any) {
+export function getLegacyDepartmentKeyFromHeaders(headers: any): string {
+  const rawOrigin = String(headers?.origin || headers?.Origin || '').trim();
+  const rawReferer = String(headers?.referer || headers?.Referer || '').trim();
+  const candidates = [rawOrigin, rawReferer].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      const url = new URL(candidate);
+      const departmentKey = LEGACY_DEPARTMENT_KEY_BY_PORT[url.port];
+      if (departmentKey) return departmentKey;
+    } catch {
+      const matchedPort = candidate.match(/:(8080|8081|8082)(?:\/|$)/)?.[1];
+      if (matchedPort && LEGACY_DEPARTMENT_KEY_BY_PORT[matchedPort]) {
+        return LEGACY_DEPARTMENT_KEY_BY_PORT[matchedPort];
+      }
+    }
+  }
+
+  return '';
+}
+
+async function findLegacyServiceGroup(strapi: any, body: any, headers?: any) {
   const serviceGroupId = Number(body.serviceGroupId);
   if (Number.isFinite(serviceGroupId) && serviceGroupId > 0) {
     const byId = await strapi.entityService.findOne('api::service-group.service-group', serviceGroupId, {
@@ -339,6 +387,16 @@ async function findLegacyServiceGroup(strapi: any, body: any) {
   if (departmentKey) {
     const byDepartment = (await strapi.entityService.findMany('api::service-group.service-group', {
       filters: { department: { key: departmentKey } } as any,
+      populate: ['department'],
+      limit: 1,
+    })) as any[];
+    if (byDepartment?.[0]?.id) return byDepartment[0];
+  }
+
+  const departmentKeyFromHeaders = getLegacyDepartmentKeyFromHeaders(headers);
+  if (departmentKeyFromHeaders) {
+    const byDepartment = (await strapi.entityService.findMany('api::service-group.service-group', {
+      filters: { department: { key: departmentKeyFromHeaders } } as any,
       populate: ['department'],
       limit: 1,
     })) as any[];
@@ -652,6 +710,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     if (!ticket) return ticket;
     return {
       ...ticket,
+      householdExecutor: formatHouseholdExecutorForClient(ticket.householdExecutor),
       assignee: await (this as any).formatAssigneesForClient(ticket.assignee),
       requester: formatUserForClient(ticket.requester),
       completedBy: formatUserForClient(ticket.completedBy),
@@ -736,7 +795,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
         return;
       }
 
-      if (myTicketsOnly) {
+      if (myTicketsOnly && deptKey !== 'ENGINEERING') {
         andFilters.push({ assignee: { id: user.id } });
       } else {
         andFilters.push({
@@ -1136,7 +1195,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       return;
     }
 
-    let serviceGroup = await findLegacyServiceGroup(strapi, body);
+    let serviceGroup = await findLegacyServiceGroup(strapi, body, ctx.request?.headers);
     if (!serviceGroup) {
       ctx.throw(400, 'Служба не найдена');
       return;
@@ -1298,6 +1357,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
         assignee: { set: [] },
         serviceGroup: nextGroup.id,
         category: null,
+        householdExecutor: null,
         status: ticketRow.status === 'DONE' ? ticketRow.status : 'NEW',
       };
       const initialComplexity = getInitialComplexityForDepartment(department);
@@ -1419,6 +1479,266 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       newData: {
         targetDepartment: formatDepartmentForClient(ticket.targetDepartment),
         assigneeIds: uniqueAssigneeIds,
+      },
+    });
+
+    const normalizedTicket = await (this as any).formatTicketForClient(ticket);
+    ctx.body = { data: normalizedTicket };
+  },
+
+  async householdExecutors(ctx) {
+    const user = ctx.state.user;
+    if (!user) {
+      ctx.throw(401, 'Not authenticated');
+      return;
+    }
+
+    const userWithDept = (await strapi.entityService.findOne(
+      'plugin::users-permissions.user',
+      user.id,
+      { populate: ['department', 'role'] }
+    )) as any;
+    const { isSuperAdmin } = getUserFlags(userWithDept);
+    if (!userCanManageHouseholdExecutors(userWithDept, isSuperAdmin)) {
+      ctx.throw(403, 'Forbidden');
+      return;
+    }
+
+    const includeInactive = ctx.query?.includeInactive === 'true' || ctx.query?.includeInactive === true;
+    const executors = (await strapi.entityService.findMany(HOUSEHOLD_EXECUTOR_UID as any, {
+      filters: includeInactive ? {} : { active: true },
+      sort: [{ sortOrder: 'asc' }, { name: 'asc' }] as any,
+      pagination: { pageSize: 1000 },
+    })) as any[];
+
+    ctx.body = { data: (executors || []).map(formatHouseholdExecutorForClient) };
+  },
+
+  async createHouseholdExecutor(ctx) {
+    const user = ctx.state.user;
+    if (!user) {
+      ctx.throw(401, 'Not authenticated');
+      return;
+    }
+
+    const userWithDept = (await strapi.entityService.findOne(
+      'plugin::users-permissions.user',
+      user.id,
+      { populate: ['department', 'role'] }
+    )) as any;
+    const { isSuperAdmin } = getUserFlags(userWithDept);
+    if (!userCanManageHouseholdExecutors(userWithDept, isSuperAdmin)) {
+      ctx.throw(403, 'Forbidden');
+      return;
+    }
+
+    const input = ctx.request.body?.data || ctx.request.body || {};
+    const name = String(input.name || '').trim();
+    const sortOrder = Number(input.sortOrder || 0);
+    if (!name) {
+      ctx.throw(400, 'Executor name is required');
+      return;
+    }
+
+    const duplicates = (await strapi.entityService.findMany(HOUSEHOLD_EXECUTOR_UID as any, {
+      filters: { name: { $eqi: name } } as any,
+      limit: 1,
+    })) as any[];
+    const duplicate = duplicates?.[0];
+    if (duplicate?.id) {
+      if (duplicate.active !== false) {
+        ctx.throw(400, 'Исполнитель с таким именем уже есть в списке');
+        return;
+      }
+      const reactivated = (await strapi.entityService.update(HOUSEHOLD_EXECUTOR_UID as any, duplicate.id, {
+        data: { active: true },
+      } as any)) as any;
+      ctx.body = { data: formatHouseholdExecutorForClient(reactivated) };
+      return;
+    }
+
+    const executor = (await strapi.entityService.create(HOUSEHOLD_EXECUTOR_UID as any, {
+      data: {
+        name,
+        active: true,
+        sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
+      },
+    } as any)) as any;
+
+    ctx.body = { data: formatHouseholdExecutorForClient(executor) };
+  },
+
+  async updateHouseholdExecutor(ctx) {
+    const user = ctx.state.user;
+    if (!user) {
+      ctx.throw(401, 'Not authenticated');
+      return;
+    }
+
+    const userWithDept = (await strapi.entityService.findOne(
+      'plugin::users-permissions.user',
+      user.id,
+      { populate: ['department', 'role'] }
+    )) as any;
+    const { isSuperAdmin } = getUserFlags(userWithDept);
+    if (!userCanManageHouseholdExecutors(userWithDept, isSuperAdmin)) {
+      ctx.throw(403, 'Forbidden');
+      return;
+    }
+
+    const executorId = Number(ctx.params.executorId);
+    if (!Number.isFinite(executorId) || executorId <= 0) {
+      ctx.throw(400, 'Invalid executor id');
+      return;
+    }
+
+    const input = ctx.request.body?.data || ctx.request.body || {};
+    const data: any = {};
+    if (input.name !== undefined) {
+      const name = String(input.name || '').trim();
+      if (!name) {
+        ctx.throw(400, 'Executor name is required');
+        return;
+      }
+      const duplicates = (await strapi.entityService.findMany(HOUSEHOLD_EXECUTOR_UID as any, {
+        filters: { name: { $eqi: name }, id: { $ne: executorId } } as any,
+        limit: 1,
+      })) as any[];
+      if (duplicates?.[0]?.id) {
+        ctx.throw(400, 'Исполнитель с таким именем уже есть в списке');
+        return;
+      }
+      data.name = name;
+    }
+    if (input.sortOrder !== undefined) {
+      const sortOrder = Number(input.sortOrder);
+      data.sortOrder = Number.isFinite(sortOrder) ? sortOrder : 0;
+    }
+    if (input.active !== undefined) {
+      data.active = input.active !== false;
+    }
+
+    const executor = (await strapi.entityService.update(HOUSEHOLD_EXECUTOR_UID as any, executorId, {
+      data,
+    } as any)) as any;
+    ctx.body = { data: formatHouseholdExecutorForClient(executor) };
+  },
+
+  async deleteHouseholdExecutor(ctx) {
+    const user = ctx.state.user;
+    if (!user) {
+      ctx.throw(401, 'Not authenticated');
+      return;
+    }
+
+    const userWithDept = (await strapi.entityService.findOne(
+      'plugin::users-permissions.user',
+      user.id,
+      { populate: ['department', 'role'] }
+    )) as any;
+    const { isSuperAdmin } = getUserFlags(userWithDept);
+    if (!userCanManageHouseholdExecutors(userWithDept, isSuperAdmin)) {
+      ctx.throw(403, 'Forbidden');
+      return;
+    }
+
+    const executorId = Number(ctx.params.executorId);
+    if (!Number.isFinite(executorId) || executorId <= 0) {
+      ctx.throw(400, 'Invalid executor id');
+      return;
+    }
+
+    const executor = (await strapi.entityService.update(HOUSEHOLD_EXECUTOR_UID as any, executorId, {
+      data: { active: false },
+    } as any)) as any;
+    ctx.body = { data: formatHouseholdExecutorForClient(executor) };
+  },
+
+  async assignHouseholdExecutor(ctx) {
+    const user = ctx.state.user;
+    if (!user) {
+      ctx.throw(401, 'Not authenticated');
+      return;
+    }
+
+    const userWithDept = (await strapi.entityService.findOne(
+      'plugin::users-permissions.user',
+      user.id,
+      { populate: ['department', 'role'] }
+    )) as any;
+    const { isSuperAdmin } = getUserFlags(userWithDept);
+    if (!userCanManageHouseholdExecutors(userWithDept, isSuperAdmin)) {
+      ctx.throw(403, 'Forbidden');
+      return;
+    }
+
+    const ticketRow = await getTicketByDocumentId(strapi, ctx.params.id);
+    if (!ticketRow?.id) {
+      ctx.throw(404, 'Ticket not found');
+      return;
+    }
+
+    const ticketDepartmentKey = ticketRow?.targetDepartment?.key || ticketRow?.serviceGroup?.department?.key;
+    if (ticketDepartmentKey !== 'ENGINEERING') {
+      ctx.throw(400, 'Household executors are available only for Engineering tickets');
+      return;
+    }
+
+    if (!userCanManageTicket(userWithDept, ticketRow, isSuperAdmin)) {
+      ctx.throw(403, 'Forbidden');
+      return;
+    }
+
+    const input = ctx.request.body?.data || ctx.request.body || {};
+    const rawExecutorId = input.householdExecutorId !== undefined ? input.householdExecutorId : input.executorId;
+    const isUnassign =
+      rawExecutorId === undefined || rawExecutorId === null || rawExecutorId === '' || rawExecutorId === 0 || rawExecutorId === '0';
+    const executorId = Number(rawExecutorId);
+    if (!isUnassign && (!Number.isInteger(executorId) || executorId <= 0)) {
+      ctx.throw(400, 'Invalid executor id');
+      return;
+    }
+
+    if (!isUnassign) {
+      const executor = (await strapi.entityService.findOne(HOUSEHOLD_EXECUTOR_UID as any, executorId)) as any;
+      if (!executor?.id || executor.active === false) {
+        ctx.throw(400, 'Executor not found');
+        return;
+      }
+      await strapi.entityService.update('api::ticket.ticket', ticketRow.id, {
+        data: { householdExecutor: executor.id } as any,
+      });
+      // Conditional flip so a concurrent DONE/INVALID is never overwritten
+      await strapi.db.query(TICKET_UID).update({
+        where: { id: ticketRow.id, status: 'NEW' },
+        data: { status: 'IN_PROGRESS' },
+      });
+    } else {
+      await strapi.entityService.update('api::ticket.ticket', ticketRow.id, {
+        data: { householdExecutor: null } as any,
+      });
+      await strapi.db.query(TICKET_UID).update({
+        where: { id: ticketRow.id, status: 'IN_PROGRESS' },
+        data: { status: 'NEW' },
+      });
+    }
+
+    const ticket = (await strapi.entityService.findOne('api::ticket.ticket', ticketRow.id, {
+      populate: TICKET_POPULATE,
+    })) as any;
+    await publishTicketRealtime(strapi, ticket, 'tickets:household_executor_changed');
+    await createAuditEvent(strapi, {
+      action: 'ticket.assign_household_executor',
+      entityType: TICKET_UID,
+      entityId: ticket.id,
+      actor: Number(user.id),
+      oldData: {
+        householdExecutorId: ticketRow.householdExecutor?.id || null,
+        status: ticketRow.status || null,
+      },
+      newData: {
+        householdExecutorId: ticket.householdExecutor?.id || null,
+        status: ticket.status || null,
       },
     });
 

@@ -129,6 +129,11 @@ export default function HelpdeskPage() {
   };
 
   const getAssigneeName = (ticket: any) => {
+    const departmentKey = ticket.targetDepartment?.key || ticket.serviceGroup?.department?.key;
+    if (departmentKey === 'ENGINEERING') {
+      return ticket.householdExecutor?.name || '-';
+    }
+
     const assignees = Array.isArray(ticket.assignee)
       ? ticket.assignee
       : ticket.assignee

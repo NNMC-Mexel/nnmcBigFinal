@@ -82,6 +82,11 @@
     "transferReason": {
       "type": "text"
     },
+    "householdExecutor": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::household-executor.household-executor"
+    },
     "assignee": {
       "type": "relation",
       "relation": "manyToMany",

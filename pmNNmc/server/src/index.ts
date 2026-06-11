@@ -241,6 +241,7 @@ export default {
     await syncItTicketCategories(strapi);
     await syncMedicalEquipmentTicketCategories(strapi);
     await syncEngineeringTicketCategories(strapi);
+    await syncHouseholdExecutors(strapi);
     initNotificationRealtime(strapi);
 
     // Always ensure permissions are set correctly
@@ -290,7 +291,14 @@ async function setupPermissions(strapi: any) {
     // Analytics
     'api::analytics.analytics': ['summary'],
     // Helpdesk content types
-    'api::ticket.ticket': ['find', 'findOne', 'findFiltered', 'myRequests', 'create', 'update', 'delete', 'reassign', 'assignableUsers', 'submit', 'uploadAttachments', 'categories', 'publicSubmit', 'publicCategories'],
+    'api::ticket.ticket': [
+      'find', 'findOne', 'findFiltered', 'myRequests', 'create', 'update', 'delete',
+      'reassign', 'assignableUsers', 'submit', 'uploadAttachments', 'categories',
+      'publicSubmit', 'publicCategories', 'householdExecutors', 'createHouseholdExecutor',
+      'updateHouseholdExecutor', 'deleteHouseholdExecutor', 'assignHouseholdExecutor',
+    ],
+    // household-executor core routes intentionally not exposed:
+    // access goes through /tickets/household-executors with role checks
     'api::service-group.service-group': ['find', 'findOne'],
     'api::ticket-category.ticket-category': ['find', 'findOne'],
     // News
@@ -368,6 +376,20 @@ async function setupPermissions(strapi: any) {
     await ensurePermission(strapi, role.id, 'plugin::users-permissions.auth', 'callback');
     await ensurePermission(strapi, role.id, 'plugin::users-permissions.auth', 'changePassword');
     await ensurePermission(strapi, role.id, 'plugin::upload.content-api', 'upload');
+  }
+
+  // Revoke grants from earlier releases that are no longer on the allowlist
+  // (ensurePermission only adds, so stale permissions must be deleted explicitly)
+  const revokedActions = [
+    'api::household-executor.household-executor.find',
+    'api::household-executor.household-executor.findOne',
+  ];
+  for (const role of authRoles) {
+    for (const action of revokedActions) {
+      await strapi.db
+        .query('plugin::users-permissions.permission')
+        .deleteMany({ where: { role: role.id, action } });
+    }
   }
 
   console.log('  ✅ Permissions configured');
@@ -485,6 +507,13 @@ const ENGINEERING_TICKET_CATEGORIES = [
   { name_ru: 'Обход прачечной', name_kz: 'Обход прачечной', slug: 'eng-ventilation-laundry-round', order: 202 },
   { name_ru: 'Обход Микробиологии и Патоморфологии', name_kz: 'Обход Микробиологии и Патоморфологии', slug: 'eng-ventilation-microbiology-pathomorphology-round', order: 203 },
   { name_ru: 'Замена синтипона на приточных машинах', name_kz: 'Замена синтипона на приточных машинах', slug: 'eng-ventilation-sintepon-replacement', order: 204 },
+];
+
+const HOUSEHOLD_EXECUTORS = [
+  'Аппасов Нурлан Сержанович',
+  'Сагиндыков Берик Султанович',
+  'Рыков Виталий Алексеевич',
+  'Бошанов Ербол Жолтаевич',
 ];
 
 async function findUsersByUsernames(strapi: any, usernames: string[]) {
@@ -682,6 +711,31 @@ async function syncEngineeringTicketCategories(strapi: any) {
     strapi.log.info('[tickets] Engineering categories synced');
   } catch (error: any) {
     strapi.log.warn(`[tickets] Engineering categories sync failed: ${error?.message || error}`);
+  }
+}
+
+async function syncHouseholdExecutors(strapi: any) {
+  try {
+    for (const [index, name] of HOUSEHOLD_EXECUTORS.entries()) {
+      const existing = (await strapi.entityService.findMany('api::household-executor.household-executor' as any, {
+        filters: { name } as any,
+        limit: 1,
+      })) as any[];
+
+      if (existing?.[0]?.id) continue;
+
+      await strapi.entityService.create('api::household-executor.household-executor' as any, {
+        data: {
+          name,
+          active: true,
+          sortOrder: index + 1,
+        },
+      } as any);
+    }
+
+    strapi.log.info('[tickets] Household executors synced');
+  } catch (error: any) {
+    strapi.log.warn(`[tickets] Household executors sync failed: ${error?.message || error}`);
   }
 }
 

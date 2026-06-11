@@ -84,6 +84,46 @@ export default {
     },
     {
       method: 'GET',
+      path: '/tickets/household-executors',
+      handler: 'ticket.householdExecutors',
+      config: {
+        policies: [{ name: 'global::feature-access', config: { feature: 'helpdesk' } }],
+      },
+    },
+    {
+      method: 'POST',
+      path: '/tickets/household-executors',
+      handler: 'ticket.createHouseholdExecutor',
+      config: {
+        policies: [{ name: 'global::feature-access', config: { feature: 'helpdesk' } }],
+      },
+    },
+    {
+      method: 'PUT',
+      path: '/tickets/household-executors/:executorId',
+      handler: 'ticket.updateHouseholdExecutor',
+      config: {
+        policies: [{ name: 'global::feature-access', config: { feature: 'helpdesk' } }],
+      },
+    },
+    {
+      method: 'DELETE',
+      path: '/tickets/household-executors/:executorId',
+      handler: 'ticket.deleteHouseholdExecutor',
+      config: {
+        policies: [{ name: 'global::feature-access', config: { feature: 'helpdesk' } }],
+      },
+    },
+    {
+      method: 'PUT',
+      path: '/tickets/:id/household-executor',
+      handler: 'ticket.assignHouseholdExecutor',
+      config: {
+        policies: [{ name: 'global::feature-access', config: { feature: 'helpdesk' } }],
+      },
+    },
+    {
+      method: 'GET',
       path: '/tickets/assignable-users',
       handler: 'ticket.assignableUsers',
       config: {

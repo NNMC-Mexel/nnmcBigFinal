@@ -89,6 +89,14 @@ export interface AssignableUser {
   department?: Department | null;
 }
 
+export interface HouseholdExecutor {
+  id: number;
+  documentId?: string;
+  name: string;
+  active: boolean;
+  sortOrder?: number;
+}
+
 // Board Stage
 export interface BoardStage {
   id: number;
@@ -228,6 +236,7 @@ export interface Ticket {
   serviceGroup?: ServiceGroup;
   targetDepartment?: Department | null;
   transferReason?: string | null;
+  householdExecutor?: HouseholdExecutor | null;
   assignee?: User[];
   attachments?: MediaFile[];
   createdAt?: string;

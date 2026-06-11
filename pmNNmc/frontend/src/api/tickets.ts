@@ -1,5 +1,5 @@
 import client from './client';
-import type { Ticket, ServiceGroup, AssignableUser } from '../types';
+import type { Ticket, ServiceGroup, AssignableUser, HouseholdExecutor } from '../types';
 
 export interface TicketFilters {
   status?: string;
@@ -77,6 +77,7 @@ export const ticketsApi = {
         'populate[3]': 'targetDepartment',
         'populate[4]': 'assignee',
         'populate[5]': 'attachments',
+        'populate[6]': 'householdExecutor',
       },
     });
     return response.data.data;
@@ -99,6 +100,39 @@ export const ticketsApi = {
   getAssignableUsers: async (): Promise<AssignableUser[]> => {
     const response = await client.get('/tickets/assignable-users');
     return response.data.data || [];
+  },
+
+  getHouseholdExecutors: async (): Promise<HouseholdExecutor[]> => {
+    const response = await client.get('/tickets/household-executors');
+    return response.data.data || [];
+  },
+
+  createHouseholdExecutor: async (name: string): Promise<HouseholdExecutor> => {
+    const response = await client.post('/tickets/household-executors', { name });
+    return response.data.data;
+  },
+
+  updateHouseholdExecutor: async (
+    id: number,
+    data: Partial<Pick<HouseholdExecutor, 'name' | 'active' | 'sortOrder'>>
+  ): Promise<HouseholdExecutor> => {
+    const response = await client.put(`/tickets/household-executors/${id}`, data);
+    return response.data.data;
+  },
+
+  deleteHouseholdExecutor: async (id: number): Promise<HouseholdExecutor> => {
+    const response = await client.delete(`/tickets/household-executors/${id}`);
+    return response.data.data;
+  },
+
+  assignHouseholdExecutor: async (
+    documentId: string,
+    householdExecutorId: number | null
+  ): Promise<Ticket> => {
+    const response = await client.put(`/tickets/${documentId}/household-executor`, {
+      householdExecutorId,
+    });
+    return response.data.data;
   },
 
   getCategories: async (): Promise<ServiceGroup[]> => {

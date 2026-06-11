@@ -20,6 +20,7 @@ import type { ReassignTicketPayload } from '../../api/tickets';
 import type { Ticket } from '../../types';
 import TicketStatusBadge from '../../components/tickets/TicketStatusBadge';
 import ReassignModal from '../../components/tickets/ReassignModal';
+import HouseholdExecutorPanel from '../../components/tickets/HouseholdExecutorPanel';
 import Loader from '../../components/ui/Loader';
 import { getMediaUrl } from '../../utils/media';
 import { subscribeToNotificationRealtime } from '../../api/notificationRealtime';
@@ -107,13 +108,19 @@ export default function TicketDetailPage() {
         ['superadmin', 'super admin', 'admin', 'админ']
       )
   );
-  const canTransferDepartments = Boolean(isSuperAdmin || isKuat || isDepartmentHead || isHelpdeskAdmin);
-  const canEditTicket = Boolean(
+  const ticketDepartmentKey = ticket?.targetDepartment?.key || ticket?.serviceGroup?.department?.key;
+  const isEngineeringTicket = ticketDepartmentKey === 'ENGINEERING';
+  const canManageDepartmentTicket = Boolean(
     ticket &&
       (isSuperAdmin ||
         isKuat ||
-        isAssignedToMe ||
         (isInMyDepartmentQueue && (isDepartmentHead || isHelpdeskAdmin)))
+  );
+  const canTransferDepartments = Boolean(isSuperAdmin || isKuat || isDepartmentHead || isHelpdeskAdmin);
+  const canEditTicket = Boolean(
+    ticket &&
+      (canManageDepartmentTicket ||
+        (!isEngineeringTicket && isAssignedToMe))
   );
   const canReassignTicket = Boolean(ticket && (isSuperAdmin || isKuat || isAssignedToMe || isInMyDepartmentQueue));
   const hasChanges = Boolean(
@@ -341,7 +348,7 @@ export default function TicketDetailPage() {
               Сохраняется...
             </div>
           )}
-          {canReassignTicket && (
+          {canReassignTicket && !isEngineeringTicket && (
             <button
               onClick={() => setShowReassign(true)}
               className="flex w-full items-center justify-center gap-2 whitespace-nowrap px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors sm:w-auto"
@@ -534,47 +541,54 @@ export default function TicketDetailPage() {
             </div>
           </div>
 
-          {/* Assignee */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-sm font-semibold text-slate-800 mb-3">
-              {t('helpdesk.assignee', 'Исполнитель')}
-            </h3>
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-sm font-medium text-slate-600">
-                {assignees.length > 0
-                  ? assignees.length > 1
-                    ? assignees.length
-                    : (assignees[0].firstName?.[0] || assignees[0].username[0]).toUpperCase()
-                  : '?'}
+          {isEngineeringTicket ? (
+            <HouseholdExecutorPanel
+              ticket={ticket}
+              canManage={canEditTicket}
+              onTicketUpdated={() => id && fetchTicket(id)}
+            />
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <h3 className="text-sm font-semibold text-slate-800 mb-3">
+                {t('helpdesk.assignee', 'Исполнитель')}
+              </h3>
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-sm font-medium text-slate-600">
+                  {assignees.length > 0
+                    ? assignees.length > 1
+                      ? assignees.length
+                      : (assignees[0].firstName?.[0] || assignees[0].username[0]).toUpperCase()
+                    : '?'}
+                </div>
+                <div className="min-w-0">
+                  {assignees.length === 0 ? (
+                    <p className="text-sm font-medium text-slate-800">
+                      {t('helpdesk.notAssigned', 'Не назначен')}
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {assignees.map((a) => (
+                        <span
+                          key={a.id}
+                          className="inline-flex max-w-full items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700"
+                        >
+                          <span className="truncate">{getAssigneeName(a)}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="min-w-0">
-                {assignees.length === 0 ? (
-                  <p className="text-sm font-medium text-slate-800">
-                    {t('helpdesk.notAssigned', 'Не назначен')}
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {assignees.map((a) => (
-                      <span
-                        key={a.id}
-                        className="inline-flex max-w-full items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700"
-                      >
-                        <span className="truncate">{getAssigneeName(a)}</span>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {canReassignTicket && (
+                <button
+                  onClick={() => setShowReassign(true)}
+                  className="mt-3 w-full py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  {t('helpdesk.changeAssignee', 'Сменить исполнителя')}
+                </button>
+              )}
             </div>
-            {canReassignTicket && (
-              <button
-                onClick={() => setShowReassign(true)}
-                className="mt-3 w-full py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors"
-              >
-                {t('helpdesk.changeAssignee', 'Сменить исполнителя')}
-              </button>
-            )}
-          </div>
+          )}
 
           {/* Info */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
