@@ -140,7 +140,11 @@ function userCanTransferBetweenDepartments(user: any, isSuperAdmin = false): boo
 }
 
 function userCanManageHouseholdExecutors(user: any, isSuperAdmin = false): boolean {
-  if (isHelpdeskRoutingAdmin(user, isSuperAdmin)) return true;
+  // Deliberately narrower than isHelpdeskRoutingAdmin: the free-text "админ/admin"
+  // position match would grant executor management to unrelated staff
+  // (e.g. "Администратор регистратуры"), so only explicit signals count here.
+  if (isSuperAdmin || isKuatHelpdeskHead(user)) return true;
+  if (user?.canManageTickets === true) return true;
   return user?.department?.key === 'ENGINEERING' && userCanViewDepartmentQueue(user, isSuperAdmin);
 }
 
@@ -1536,6 +1540,23 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       return;
     }
 
+    const duplicates = (await strapi.entityService.findMany(HOUSEHOLD_EXECUTOR_UID as any, {
+      filters: { name: { $eqi: name } } as any,
+      limit: 1,
+    })) as any[];
+    const duplicate = duplicates?.[0];
+    if (duplicate?.id) {
+      if (duplicate.active !== false) {
+        ctx.throw(400, 'Исполнитель с таким именем уже есть в списке');
+        return;
+      }
+      const reactivated = (await strapi.entityService.update(HOUSEHOLD_EXECUTOR_UID as any, duplicate.id, {
+        data: { active: true },
+      } as any)) as any;
+      ctx.body = { data: formatHouseholdExecutorForClient(reactivated) };
+      return;
+    }
+
     const executor = (await strapi.entityService.create(HOUSEHOLD_EXECUTOR_UID as any, {
       data: {
         name,
@@ -1577,6 +1598,14 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       const name = String(input.name || '').trim();
       if (!name) {
         ctx.throw(400, 'Executor name is required');
+        return;
+      }
+      const duplicates = (await strapi.entityService.findMany(HOUSEHOLD_EXECUTOR_UID as any, {
+        filters: { name: { $eqi: name }, id: { $ne: executorId } } as any,
+        limit: 1,
+      })) as any[];
+      if (duplicates?.[0]?.id) {
+        ctx.throw(400, 'Исполнитель с таким именем уже есть в списке');
         return;
       }
       data.name = name;
@@ -1661,28 +1690,40 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     }
 
     const input = ctx.request.body?.data || ctx.request.body || {};
-    const executorId = Number(input.householdExecutorId || input.executorId || 0);
-    const updateData: any = {};
+    const rawExecutorId = input.householdExecutorId !== undefined ? input.householdExecutorId : input.executorId;
+    const isUnassign =
+      rawExecutorId === undefined || rawExecutorId === null || rawExecutorId === '' || rawExecutorId === 0 || rawExecutorId === '0';
+    const executorId = Number(rawExecutorId);
+    if (!isUnassign && (!Number.isInteger(executorId) || executorId <= 0)) {
+      ctx.throw(400, 'Invalid executor id');
+      return;
+    }
 
-    if (executorId > 0) {
+    if (!isUnassign) {
       const executor = (await strapi.entityService.findOne(HOUSEHOLD_EXECUTOR_UID as any, executorId)) as any;
       if (!executor?.id || executor.active === false) {
         ctx.throw(400, 'Executor not found');
         return;
       }
-      updateData.householdExecutor = executor.id;
-      if (ticketRow.status === 'NEW') {
-        updateData.status = 'IN_PROGRESS';
-      }
+      await strapi.entityService.update('api::ticket.ticket', ticketRow.id, {
+        data: { householdExecutor: executor.id } as any,
+      });
+      // Conditional flip so a concurrent DONE/INVALID is never overwritten
+      await strapi.db.query(TICKET_UID).update({
+        where: { id: ticketRow.id, status: 'NEW' },
+        data: { status: 'IN_PROGRESS' },
+      });
     } else {
-      updateData.householdExecutor = null;
-      if (ticketRow.status === 'IN_PROGRESS') {
-        updateData.status = 'NEW';
-      }
+      await strapi.entityService.update('api::ticket.ticket', ticketRow.id, {
+        data: { householdExecutor: null } as any,
+      });
+      await strapi.db.query(TICKET_UID).update({
+        where: { id: ticketRow.id, status: 'IN_PROGRESS' },
+        data: { status: 'NEW' },
+      });
     }
 
-    const ticket = (await strapi.entityService.update('api::ticket.ticket', ticketRow.id, {
-      data: updateData,
+    const ticket = (await strapi.entityService.findOne('api::ticket.ticket', ticketRow.id, {
       populate: TICKET_POPULATE,
     })) as any;
     await publishTicketRealtime(strapi, ticket, 'tickets:household_executor_changed');

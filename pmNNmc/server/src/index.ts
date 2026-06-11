@@ -297,7 +297,8 @@ async function setupPermissions(strapi: any) {
       'publicSubmit', 'publicCategories', 'householdExecutors', 'createHouseholdExecutor',
       'updateHouseholdExecutor', 'deleteHouseholdExecutor', 'assignHouseholdExecutor',
     ],
-    'api::household-executor.household-executor': ['find', 'findOne'],
+    // household-executor core routes intentionally not exposed:
+    // access goes through /tickets/household-executors with role checks
     'api::service-group.service-group': ['find', 'findOne'],
     'api::ticket-category.ticket-category': ['find', 'findOne'],
     // News
@@ -375,6 +376,20 @@ async function setupPermissions(strapi: any) {
     await ensurePermission(strapi, role.id, 'plugin::users-permissions.auth', 'callback');
     await ensurePermission(strapi, role.id, 'plugin::users-permissions.auth', 'changePassword');
     await ensurePermission(strapi, role.id, 'plugin::upload.content-api', 'upload');
+  }
+
+  // Revoke grants from earlier releases that are no longer on the allowlist
+  // (ensurePermission only adds, so stale permissions must be deleted explicitly)
+  const revokedActions = [
+    'api::household-executor.household-executor.find',
+    'api::household-executor.household-executor.findOne',
+  ];
+  for (const role of authRoles) {
+    for (const action of revokedActions) {
+      await strapi.db
+        .query('plugin::users-permissions.permission')
+        .deleteMany({ where: { role: role.id, action } });
+    }
   }
 
   console.log('  ✅ Permissions configured');

@@ -10,6 +10,11 @@ interface Props {
   onTicketUpdated: (ticket: Ticket) => void;
 }
 
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  const message = (error as any)?.response?.data?.error?.message;
+  return typeof message === 'string' && message.trim() ? message : fallback;
+}
+
 export default function HouseholdExecutorPanel({ ticket, canManage, onTicketUpdated }: Props) {
   const [executors, setExecutors] = useState<HouseholdExecutor[]>([]);
   const [newExecutorName, setNewExecutorName] = useState('');
@@ -69,8 +74,8 @@ export default function HouseholdExecutorPanel({ ticket, canManage, onTicketUpda
         executorId ? Number(executorId) : null
       );
       onTicketUpdated(updated);
-    } catch {
-      setError('Не удалось назначить исполнителя');
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Не удалось назначить исполнителя'));
     } finally {
       setSaving(false);
     }
@@ -87,8 +92,8 @@ export default function HouseholdExecutorPanel({ ticket, canManage, onTicketUpda
       setNewExecutorName('');
       const updated = await ticketsApi.assignHouseholdExecutor(ticket.documentId, created.id);
       onTicketUpdated(updated);
-    } catch {
-      setError('Не удалось добавить исполнителя');
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Не удалось добавить исполнителя'));
     } finally {
       setSaving(false);
     }
@@ -105,8 +110,8 @@ export default function HouseholdExecutorPanel({ ticket, canManage, onTicketUpda
     try {
       await ticketsApi.deleteHouseholdExecutor(executorId);
       setExecutors((items) => items.filter((item) => item.id !== executorId));
-    } catch {
-      setError('Не удалось удалить исполнителя');
+    } catch (error) {
+      setError(getApiErrorMessage(error, 'Не удалось удалить исполнителя'));
     } finally {
       setSaving(false);
     }
