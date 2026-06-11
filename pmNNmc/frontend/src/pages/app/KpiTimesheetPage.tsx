@@ -31,6 +31,10 @@ interface KpiUser {
   login: string;
   role: string;
   allowedDepartments: string[];
+  departmentKey?: string;
+  departmentName?: string;
+  isKpiResponsible?: boolean;
+  isSuperAdmin?: boolean;
 }
 
 export default function KpiTimesheetPage() {
@@ -77,7 +81,7 @@ export default function KpiTimesheetPage() {
     setLoginLoading(true);
     setLoginError('');
     try {
-      const data = await (apiLogin as (l: string, p: string) => Promise<{ login: string; role: string; allowedDepartments: string[]; token: string }>)(
+      const data = await (apiLogin as (l: string, p: string) => Promise<KpiUser & { token: string }>)(
         loginForm.login,
         loginForm.password
       );
@@ -85,6 +89,10 @@ export default function KpiTimesheetPage() {
         login: data.login,
         role: data.role,
         allowedDepartments: data.allowedDepartments || [],
+        departmentKey: data.departmentKey,
+        departmentName: data.departmentName,
+        isKpiResponsible: data.isKpiResponsible,
+        isSuperAdmin: data.isSuperAdmin,
       };
       localStorage.setItem(KPI_USER_KEY, JSON.stringify(user));
       setKpiUser(user);

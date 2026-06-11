@@ -116,7 +116,16 @@ export async function apiLogin(login, password) {
     localStorage.setItem("kpi_token", token);
   }
 
-  return { token, login: String(username || ""), role, allowedDepartments };
+  return {
+    token,
+    login: String(username || ""),
+    role,
+    allowedDepartments,
+    departmentKey: String(user.departmentKey || ""),
+    departmentName: String(user.departmentName || ""),
+    isKpiResponsible: user.isKpiResponsible === true,
+    isSuperAdmin: user.isSuperAdmin === true,
+  };
 }
 
 export async function apiMe() {
@@ -133,6 +142,10 @@ export async function apiMe() {
         ? String(data.role.name || data.type)
         : "user",
     allowedDepartments,
+    departmentKey: String(data.departmentKey || ""),
+    departmentName: String(data.departmentName || ""),
+    isKpiResponsible: data.isKpiResponsible === true,
+    isSuperAdmin: data.isSuperAdmin === true,
   };
 }
 

@@ -9,7 +9,7 @@
  * - API calls routed to kpiServer backend via kpiApi.js
  *
  * Props:
- *   user        — { login, role, allowedDepartments } from KpiTimesheetPage
+ *   user        — KPI user and department access from KpiTimesheetPage
  *   onKpiLogout — callback to clear kpi_token and return to login form
  */
 
@@ -513,6 +513,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   const [sentProtocolsLoading, setSentProtocolsLoading] = useState(false);
 
   const isAdmin =
+    user?.isSuperAdmin === true ||
     String(user?.role || "").toLowerCase().includes("admin") ||
     String(user?.login || "").toLowerCase().startsWith("admin");
 
@@ -782,21 +783,24 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   const allDepartments = useMemo(() => {
     const kpiDepts = kpiItems.map((x) => x.department || "").filter(Boolean);
     const pmDepts = pmDepartments.map((d) => d.name_ru || d.key || "").filter(Boolean);
-    const merged = Array.from(new Set([...kpiDepts, ...pmDepts]));
+    const explicitAllowed = Array.isArray(user?.allowedDepartments) ? user.allowedDepartments : [];
+    const ownDepartments = user?.isKpiResponsible
+      ? [user?.departmentName, user?.departmentKey]
+      : [];
+    const allowed = [...explicitAllowed, ...ownDepartments]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    const merged = Array.from(new Set([...kpiDepts, ...pmDepts, ...allowed]));
 
-    // Access control: user (KPI user) comes with role + allowedDepartments from server-kpi.
-    // Admin role OR empty allowedDepartments → full access. Otherwise restrict.
-    const roleLower = String(user?.role || "").toLowerCase();
-    const isAdmin = roleLower.includes("admin") || pmUser?.isSuperAdmin === true;
-    const allowed = Array.isArray(user?.allowedDepartments) ? user.allowedDepartments : [];
-    if (!isAdmin && allowed.length > 0) {
-      const allowedSet = new Set(allowed.map((x) => String(x || "").trim()).filter(Boolean));
-      return merged
-        .filter((name) => allowedSet.has(name))
-        .sort((a, b) => String(a).localeCompare(String(b), "ru"));
+    if (isAdmin) {
+      return merged.sort((a, b) => String(a).localeCompare(String(b), "ru"));
     }
-    return merged.sort((a, b) => String(a).localeCompare(String(b), "ru"));
-  }, [kpiItems, pmDepartments, user, pmUser]);
+
+    const allowedSet = new Set(allowed.map(normalizeDept));
+    return merged
+      .filter((name) => allowedSet.has(normalizeDept(name)))
+      .sort((a, b) => String(a).localeCompare(String(b), "ru"));
+  }, [kpiItems, pmDepartments, user, isAdmin]);
 
   useEffect(() => {
     if (!user || !allDepartments || allDepartments.length === 0) { setCalcDepartment(""); return; }
