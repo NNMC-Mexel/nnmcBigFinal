@@ -1,17 +1,18 @@
+import { randomUUID } from 'node:crypto';
+
+export function buildTemporaryTicketNumber() {
+  return `TMP-${Date.now()}-${randomUUID()}`;
+}
+
+export function buildTicketNumberFromId(id: number) {
+  return `HD-${String(id).padStart(4, '0')}`;
+}
+
 export default {
   async beforeCreate(event: any) {
     const strapi = (global as any).strapi;
 
-    // Generate ticket number based on last ticket ID (monotonically increasing)
-    const lastTickets = await strapi.db.query('api::ticket.ticket').findMany({
-      orderBy: { id: 'desc' },
-      limit: 1,
-      select: ['ticketNumber'],
-    });
-    const lastNum = lastTickets[0]?.ticketNumber
-      ? parseInt(lastTickets[0].ticketNumber.replace('HD-', ''), 10) || 0
-      : 0;
-    event.params.data.ticketNumber = `HD-${String(lastNum + 1).padStart(4, '0')}`;
+    event.params.data.ticketNumber = buildTemporaryTicketNumber();
 
     // Helper to extract one ID from various Strapi relation formats
     const extractRelationId = (relation: any): number | null => {
@@ -100,6 +101,23 @@ export default {
       } catch {
         // Auto-assign failed silently — ticket will be created without assignee
       }
+    }
+  },
+
+  async afterCreate(event: any) {
+    const strapi = (global as any).strapi;
+    const id = Number(event.result?.id);
+    if (!Number.isFinite(id) || id <= 0) return;
+
+    const ticketNumber = buildTicketNumberFromId(id);
+    try {
+      await strapi.db.query('api::ticket.ticket').update({
+        where: { id },
+        data: { ticketNumber },
+      });
+      event.result.ticketNumber = ticketNumber;
+    } catch (error: any) {
+      strapi.log.warn(`[tickets] Could not finalize ticket number for ${id}: ${error?.message || error}`);
     }
   },
 };

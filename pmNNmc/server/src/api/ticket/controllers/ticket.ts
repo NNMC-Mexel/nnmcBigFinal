@@ -34,6 +34,11 @@ const LEGACY_IT_CATEGORY_SLUG_BY_ID: Record<string, string> = {
   'skud-p': 'access-control-repair',
   Domen: 'domain-account',
 };
+const LEGACY_DEPARTMENT_KEY_BY_PORT: Record<string, string> = {
+  '8080': 'IT',
+  '8081': 'MEDICAL_EQUIPMENT',
+  '8082': 'ENGINEERING',
+};
 
 function extractRelationId(relation: any): number | null {
   if (!relation) return null;
@@ -316,7 +321,28 @@ async function getDefaultLegacyServiceGroup(strapi: any) {
   return byDepartment?.[0] || null;
 }
 
-async function findLegacyServiceGroup(strapi: any, body: any) {
+export function getLegacyDepartmentKeyFromHeaders(headers: any): string {
+  const rawOrigin = String(headers?.origin || headers?.Origin || '').trim();
+  const rawReferer = String(headers?.referer || headers?.Referer || '').trim();
+  const candidates = [rawOrigin, rawReferer].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      const url = new URL(candidate);
+      const departmentKey = LEGACY_DEPARTMENT_KEY_BY_PORT[url.port];
+      if (departmentKey) return departmentKey;
+    } catch {
+      const matchedPort = candidate.match(/:(8080|8081|8082)(?:\/|$)/)?.[1];
+      if (matchedPort && LEGACY_DEPARTMENT_KEY_BY_PORT[matchedPort]) {
+        return LEGACY_DEPARTMENT_KEY_BY_PORT[matchedPort];
+      }
+    }
+  }
+
+  return '';
+}
+
+async function findLegacyServiceGroup(strapi: any, body: any, headers?: any) {
   const serviceGroupId = Number(body.serviceGroupId);
   if (Number.isFinite(serviceGroupId) && serviceGroupId > 0) {
     const byId = await strapi.entityService.findOne('api::service-group.service-group', serviceGroupId, {
@@ -339,6 +365,16 @@ async function findLegacyServiceGroup(strapi: any, body: any) {
   if (departmentKey) {
     const byDepartment = (await strapi.entityService.findMany('api::service-group.service-group', {
       filters: { department: { key: departmentKey } } as any,
+      populate: ['department'],
+      limit: 1,
+    })) as any[];
+    if (byDepartment?.[0]?.id) return byDepartment[0];
+  }
+
+  const departmentKeyFromHeaders = getLegacyDepartmentKeyFromHeaders(headers);
+  if (departmentKeyFromHeaders) {
+    const byDepartment = (await strapi.entityService.findMany('api::service-group.service-group', {
+      filters: { department: { key: departmentKeyFromHeaders } } as any,
       populate: ['department'],
       limit: 1,
     })) as any[];
@@ -1136,7 +1172,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       return;
     }
 
-    let serviceGroup = await findLegacyServiceGroup(strapi, body);
+    let serviceGroup = await findLegacyServiceGroup(strapi, body, ctx.request?.headers);
     if (!serviceGroup) {
       ctx.throw(400, 'Служба не найдена');
       return;
