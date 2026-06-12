@@ -69,17 +69,18 @@ All `/timesheets` requests require header `X-Bridge-Token`.
 
 The bridge keeps a persistent local cache in `ONEC_BRIDGE_DATA_DIR`. Every day
 at `ONEC_BRIDGE_DAILY_SYNC_HOUR` in Windows local time it loads the complete
-conducted-timesheet lists for the previous and current calendar months. During
-the rest of the day those lists are served from disk and memory without calling
-1C again. `ONEC_BRIDGE_DAILY_LIST_LIMIT` controls the safety limit for each
-monthly snapshot.
+conducted-timesheet lists and employee/day details for the previous and current
+calendar months. The detail rows are loaded through one period query instead of
+opening every document separately. During the rest of the day both the list and
+selected timesheet details are served from disk and memory without calling 1C
+again. `ONEC_BRIDGE_DAILY_LIST_LIMIT` controls the safety limit for each monthly
+snapshot.
 
-Selected timesheet details are loaded on demand and then kept in the persistent
-cache. During the next daily sync, details that users previously selected are
-refreshed too. Cached data outside the previous and current calendar months is
-removed. Add `refresh=1` to bypass and replace the relevant cached list or
-detail. The KPI interface exposes this behavior through the `Обновить из 1С`
-button.
+If a requested document is not part of the two-month snapshot, its details are
+loaded on demand and then kept in the persistent cache. Cached data outside the
+previous and current calendar months is removed. Add `refresh=1` to bypass and
+replace the relevant cached list or detail. The KPI interface exposes this
+behavior through the `Обновить из 1С` button.
 
 If the bridge restarts after the configured daily sync hour and today's sync
 has not completed yet, it starts the two-month synchronization automatically.

@@ -1,6 +1,6 @@
 ﻿param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("list", "detail")]
+    [ValidateSet("list", "detail", "details-period")]
     [string]$Action,
 
     [Parameter(Mandatory = $true)]
@@ -163,6 +163,140 @@ if ($Action -eq "list") {
     }
 
     ConvertTo-Json -InputObject @($items) -Depth 8 -Compress
+    exit 0
+}
+
+if ($Action -eq "details-period") {
+    $dateFrom = [datetime]::Parse([string]$input.dateFrom, [Globalization.CultureInfo]::InvariantCulture)
+    $dateTo = [datetime]::Parse([string]$input.dateTo, [Globalization.CultureInfo]::InvariantCulture)
+    $fields = @(
+        "Данные.Ссылка.Дата",
+        "Данные.Ссылка.Номер",
+        "Данные.Ссылка.ПериодРегистрации",
+        "ПРЕДСТАВЛЕНИЕ(Данные.Ссылка.Организация)",
+        "ПРЕДСТАВЛЕНИЕ(Данные.Ссылка.Подразделение)",
+        "Данные.Ссылка.ДатаНачалаПериода",
+        "Данные.Ссылка.ДатаОкончанияПериода",
+        "Данные.Ссылка.Проведен",
+        "Данные.НомерСтроки",
+        "ПРЕДСТАВЛЕНИЕ(Данные.Сотрудник)",
+        "ПРЕДСТАВЛЕНИЕ(Данные.Должность)",
+        "ПРЕДСТАВЛЕНИЕ(Данные.КатегорияДолжности)"
+    )
+    for ($day = 1; $day -le 31; $day++) {
+        $fields += "Данные.Часов$day"
+        $fields += "ПРЕДСТАВЛЕНИЕ(Данные.ВидВремени$day)"
+    }
+
+    $detailsQuery = $base.NewObject("Query")
+    $detailsQuery.Text = @"
+ВЫБРАТЬ
+    $($fields -join ",`n    ")
+ИЗ
+    Документ.ТабельУчетаРабочегоВремени.ДанныеОВремени КАК Данные
+ГДЕ
+    Данные.Ссылка.Проведен = ИСТИНА
+    И Данные.Ссылка.ПериодРегистрации >= &ДатаНачала
+    И Данные.Ссылка.ПериодРегистрации < &ДатаОкончания
+УПОРЯДОЧИТЬ ПО
+    Данные.Ссылка.Дата УБЫВ,
+    Данные.Ссылка.Номер,
+    Данные.НомерСтроки
+"@
+    $detailsQuery.SetParameter("ДатаНачала", $dateFrom)
+    $detailsQuery.SetParameter("ДатаОкончания", $dateTo)
+    $detailSelection = $detailsQuery.Execute().Select()
+    $documents = [ordered]@{}
+
+    while ($detailSelection.Next()) {
+        $documentDate = $detailSelection.Get(0)
+        $number = [string]$detailSelection.Get(1)
+        $dateValue = Convert-OneCValue $documentDate
+        $documentKey = "$number`n$dateValue"
+        if (-not $documents.Contains($documentKey)) {
+            $documents[$documentKey] = [ordered]@{
+                identity = [ordered]@{
+                    number = $number
+                    date = $dateValue
+                }
+                timesheet = [ordered]@{
+                    date = $dateValue
+                    number = $number
+                    period = Convert-OneCValue $detailSelection.Get(2)
+                    organization = [string]$detailSelection.Get(3)
+                    department = [string]$detailSelection.Get(4)
+                    dateFrom = Convert-OneCValue $detailSelection.Get(5)
+                    dateTo = Convert-OneCValue $detailSelection.Get(6)
+                    conducted = [bool]$detailSelection.Get(7)
+                }
+                employees = [ordered]@{}
+            }
+        }
+
+        $fio = [string]$detailSelection.Get(9)
+        $position = [string]$detailSelection.Get(10)
+        $category = [string]$detailSelection.Get(11)
+        if ([string]::IsNullOrWhiteSpace($fio)) {
+            continue
+        }
+
+        $employeeKey = "$fio`n$position`n$category"
+        $employees = $documents[$documentKey].employees
+        if (-not $employees.Contains($employeeKey)) {
+            $employees[$employeeKey] = [ordered]@{
+                fio = $fio
+                position = $position
+                category = $category
+                candidates = @{}
+            }
+            for ($day = 1; $day -le 31; $day++) {
+                $employees[$employeeKey].candidates[[string]$day] = @()
+            }
+        }
+
+        for ($day = 1; $day -le 31; $day++) {
+            $offset = 12 + (($day - 1) * 2)
+            $rawHours = $detailSelection.Get($offset)
+            $hours = [decimal]0
+            if ($null -ne $rawHours) {
+                try {
+                    $hours = [decimal]$rawHours
+                } catch {
+                    $hours = [decimal]0
+                }
+            }
+            $employees[$employeeKey].candidates[[string]$day] += [ordered]@{
+                hours = $hours
+                timeType = [string]$detailSelection.Get($offset + 1)
+            }
+        }
+    }
+
+    $results = @()
+    foreach ($document in $documents.GetEnumerator()) {
+        $employeeItems = @()
+        foreach ($employee in $document.Value.employees.GetEnumerator()) {
+            $days = [ordered]@{}
+            for ($day = 1; $day -le 31; $day++) {
+                $days[[string]$day] = Pick-DayValue $employee.Value.candidates[[string]$day]
+            }
+            $employeeItems += [ordered]@{
+                fio = $employee.Value.fio
+                position = $employee.Value.position
+                category = $employee.Value.category
+                days = $days
+            }
+        }
+        $results += [ordered]@{
+            identity = $document.Value.identity
+            item = [ordered]@{
+                timesheet = $document.Value.timesheet
+                employees = $employeeItems
+            }
+        }
+    }
+
+    ConvertTo-Json -InputObject @($results) -Depth 12 -Compress
     exit 0
 }
 

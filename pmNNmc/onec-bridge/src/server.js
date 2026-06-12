@@ -16,6 +16,7 @@ const host = process.env.ONEC_BRIDGE_HOST || "127.0.0.1";
 const port = parseInt(process.env.ONEC_BRIDGE_PORT || "12110", 10);
 const token = String(process.env.ONEC_BRIDGE_TOKEN || "").trim();
 const timeoutMs = parseInt(process.env.ONEC_BRIDGE_TIMEOUT_MS || "120000", 10);
+const dailyTimeoutMs = parseInt(process.env.ONEC_BRIDGE_DAILY_TIMEOUT_MS || "600000", 10);
 const listLimit = Math.max(1, Math.min(parseInt(process.env.ONEC_BRIDGE_LIST_LIMIT || "500", 10), 2000));
 const dailyListLimit = Math.max(
   listLimit,
@@ -109,7 +110,7 @@ function deleteCachePrefix(prefix) {
 
 function cacheSnapshot() {
   return {
-    version: 1,
+    version: 2,
     syncState,
     entries: Object.fromEntries(cache.entries()),
   };
@@ -128,12 +129,15 @@ function persistCache() {
 function loadCache() {
   try {
     const stored = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+    const storedVersion = Number(stored?.version || 1);
     for (const [key, entry] of Object.entries(stored?.entries || {})) {
       if (entry && Object.prototype.hasOwnProperty.call(entry, "value")) {
         cache.set(key, entry);
       }
     }
-    syncState.lastDailySyncAt = String(stored?.syncState?.lastDailySyncAt || "");
+    syncState.lastDailySyncAt = storedVersion >= 2
+      ? String(stored?.syncState?.lastDailySyncAt || "")
+      : "";
     syncState.lastError = String(stored?.syncState?.lastError || "");
   } catch (error) {
     if (error?.code !== "ENOENT") {
@@ -196,10 +200,11 @@ function invokeOneC(action, input) {
 
     let stdout = "";
     let stderr = "";
+    const actionTimeoutMs = action === "details-period" ? dailyTimeoutMs : timeoutMs;
     const timer = setTimeout(() => {
       child.kill();
       reject(new Error("1C request timed out"));
-    }, timeoutMs);
+    }, actionTimeoutMs);
 
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
@@ -271,8 +276,9 @@ async function runDailySync(reason = "schedule") {
   try {
     const activeSnapshotKeys = new Set();
     const activeDetailKeys = new Set();
+    const months = automaticMonths();
 
-    for (const { year, month } of automaticMonths()) {
+    for (const { year, month } of months) {
       const items = await enqueueOneC("list", {
         year,
         month,
@@ -289,30 +295,39 @@ async function runDailySync(reason = "schedule") {
       deleteCachePrefix(`list:${year}:${month}:`);
     }
 
-    const cachedDetailKeys = [];
+    const firstMonth = months[0];
+    const lastMonth = months[months.length - 1];
+    const dateFrom = new Date(firstMonth.year, firstMonth.month - 1, 1);
+    const dateTo = new Date(lastMonth.year, lastMonth.month, 1);
+    const detailResults = await enqueueOneC("details-period", {
+      dateFrom: `${dateFrom.getFullYear()}-${String(dateFrom.getMonth() + 1).padStart(2, "0")}-01`,
+      dateTo: `${dateTo.getFullYear()}-${String(dateTo.getMonth() + 1).padStart(2, "0")}-01`,
+    });
+    const loadedDetailKeys = new Set();
+    for (const result of Array.isArray(detailResults) ? detailResults : []) {
+      const identity = result?.identity;
+      if (!identity?.number || !identity?.date || !result?.item) continue;
+      const key = `detail:${toBase64Url(identity)}`;
+      if (!activeDetailKeys.has(key)) continue;
+      setCached(key, result.item, "daily-sync");
+      loadedDetailKeys.add(key);
+    }
+
     for (const key of cache.keys()) {
       if (key.startsWith("snapshot:") && !activeSnapshotKeys.has(key)) {
         cache.delete(key);
       } else if (key.startsWith("list:")) {
         cache.delete(key);
       } else if (key.startsWith("detail:")) {
-        if (activeDetailKeys.has(key)) cachedDetailKeys.push(key);
-        else cache.delete(key);
+        if (!loadedDetailKeys.has(key)) cache.delete(key);
       }
-    }
-
-    for (const key of cachedDetailKeys) {
-      const identity = fromBase64Url(key.slice("detail:".length));
-      const item = await enqueueOneC("detail", identity);
-      if (item) setCached(key, item, "daily-sync");
-      else cache.delete(key);
     }
 
     syncState.lastDailySyncAt = new Date().toISOString();
     await persistCache();
     console.log(
       `[onec-bridge] daily sync completed at ${syncState.lastDailySyncAt}; `
-      + `refreshed cached details: ${cachedDetailKeys.length}`
+      + `cached details: ${loadedDetailKeys.size}`
     );
   } catch (error) {
     syncState.lastError = error?.message || String(error);
