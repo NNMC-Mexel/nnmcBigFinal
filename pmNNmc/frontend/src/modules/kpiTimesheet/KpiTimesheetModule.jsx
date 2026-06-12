@@ -354,7 +354,7 @@ function AccessModal({ user, departments, onCancel, onSave }) {
 
 // ======================= Основной модуль =======================
 
-function OneCTimesheetModal({ target, items, loading, downloadingId, onCancel, onRefresh, onSelect }) {
+function OneCTimesheetModal({ target, items, cacheMeta, loading, downloadingId, onCancel, onRefresh, onSelect }) {
   if (!target) return null;
 
   const formatDate = (value, withTime = false) => {
@@ -375,6 +375,11 @@ function OneCTimesheetModal({ target, items, loading, downloadingId, onCancel, o
             <p className="modal-subtext">
               {target.department} · {String(target.month).padStart(2, "0")}.{target.year}
             </p>
+            {cacheMeta?.updatedAt && (
+              <p className="modal-subtext">
+                Последнее обновление из 1С: {formatDate(cacheMeta.updatedAt, true)}
+              </p>
+            )}
           </div>
           <div className="onec-modal-actions">
             <button
@@ -507,6 +512,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   // Read-only import from 1C
   const [oneCModalTarget, setOneCModalTarget] = useState(null);
   const [oneCItems, setOneCItems] = useState([]);
+  const [oneCCacheMeta, setOneCCacheMeta] = useState(null);
   const [oneCLoading, setOneCLoading] = useState(false);
   const [oneCDownloadingId, setOneCDownloadingId] = useState("");
 
@@ -877,10 +883,12 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       : { isPrev: false, department: calcDepartment, year: parseInt(year, 10), month: parseInt(month, 10) };
     setOneCModalTarget(target);
     setOneCItems([]);
+    setOneCCacheMeta(null);
     setOneCLoading(true);
     try {
-      const items = await apiOnecTimesheets(target);
-      setOneCItems(items);
+      const result = await apiOnecTimesheets(target);
+      setOneCItems(result.items);
+      setOneCCacheMeta(result.cache);
     } catch (err) {
       showToast(err instanceof Error ? err.message : String(err) || "Не удалось получить табели из 1С", "error");
       setOneCModalTarget(null);
@@ -893,8 +901,9 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     if (!oneCModalTarget) return;
     setOneCLoading(true);
     try {
-      const items = await apiOnecTimesheets({ ...oneCModalTarget, refresh: true });
-      setOneCItems(items);
+      const result = await apiOnecTimesheets({ ...oneCModalTarget, refresh: true });
+      setOneCItems(result.items);
+      setOneCCacheMeta(result.cache);
       setOneCModalTarget((current) => current ? { ...current, refreshed: true } : current);
       showToast("Список табелей обновлён из 1С");
     } catch (err) {
@@ -920,6 +929,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       else setTimesheetFile(file);
       setOneCModalTarget(null);
       setOneCItems([]);
+      setOneCCacheMeta(null);
       showToast(`Табель ${item.number} загружен из 1С`);
     } catch (err) {
       showToast(err instanceof Error ? err.message : String(err) || "Не удалось загрузить табель из 1С", "error");
@@ -2375,9 +2385,15 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       <OneCTimesheetModal
         target={oneCModalTarget}
         items={oneCItems}
+        cacheMeta={oneCCacheMeta}
         loading={oneCLoading}
         downloadingId={oneCDownloadingId}
-        onCancel={() => { if (!oneCDownloadingId) setOneCModalTarget(null); }}
+        onCancel={() => {
+          if (!oneCDownloadingId) {
+            setOneCModalTarget(null);
+            setOneCCacheMeta(null);
+          }
+        }}
         onRefresh={refreshOneCTimesheets}
         onSelect={selectOneCTimesheet}
       />

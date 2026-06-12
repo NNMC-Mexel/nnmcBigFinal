@@ -104,7 +104,7 @@ $connector = New-Object -ComObject V83.COMConnector
 $base = $connector.Connect($connectionString)
 
 if ($Action -eq "list") {
-    $limit = [Math]::Max(1, [Math]::Min([int]$input.limit, 2000))
+    $limit = [Math]::Max(1, [Math]::Min([int]$input.limit, 10000))
     $query = $base.NewObject("Query")
     $where = @("Табель.Проведен = ИСТИНА")
     $hasPeriod = [int]$input.year -gt 0 -and [int]$input.month -ge 1 -and [int]$input.month -le 12

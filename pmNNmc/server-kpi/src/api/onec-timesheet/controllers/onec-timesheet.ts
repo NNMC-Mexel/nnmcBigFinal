@@ -176,7 +176,7 @@ export default {
           conducted: true,
         }));
 
-      ctx.body = { items };
+      ctx.body = { items, cache: payload?.cache || null };
     } catch (error: any) {
       ctx.status = error?.status || 500;
       ctx.body = { error: error?.message || 'Не удалось получить табели из 1С' };

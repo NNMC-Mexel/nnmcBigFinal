@@ -329,7 +329,10 @@ export async function apiOnecTimesheets(params = {}) {
     headers: { ...getAuthHeader() },
   });
   const data = await handleResponse(res);
-  return data?.items || [];
+  return {
+    items: data?.items || [],
+    cache: data?.cache || null,
+  };
 }
 
 export async function apiOnecTimesheetFile(id, department, refresh = false) {
