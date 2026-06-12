@@ -324,6 +324,7 @@ export async function apiOnecTimesheets(params = {}) {
   if (params.department) query.set("department", params.department);
   if (params.year) query.set("year", String(params.year));
   if (params.month) query.set("month", String(params.month));
+  if (params.refresh) query.set("refresh", "1");
   const res = await fetch(`${STRAPI_BASE}/onec-timesheets?${query.toString()}`, {
     headers: { ...getAuthHeader() },
   });
@@ -331,9 +332,10 @@ export async function apiOnecTimesheets(params = {}) {
   return data?.items || [];
 }
 
-export async function apiOnecTimesheetFile(id, department) {
+export async function apiOnecTimesheetFile(id, department, refresh = false) {
   const query = new URLSearchParams();
   if (department) query.set("department", department);
+  if (refresh) query.set("refresh", "1");
   const res = await fetch(
     `${STRAPI_BASE}/onec-timesheets/${encodeURIComponent(id)}/download?${query.toString()}`,
     { headers: { ...getAuthHeader() } }

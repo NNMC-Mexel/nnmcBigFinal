@@ -107,12 +107,18 @@ if ($Action -eq "list") {
     $limit = [Math]::Max(1, [Math]::Min([int]$input.limit, 2000))
     $query = $base.NewObject("Query")
     $where = @("Табель.Проведен = ИСТИНА")
+    $hasPeriod = [int]$input.year -gt 0 -and [int]$input.month -ge 1 -and [int]$input.month -le 12
+    $department = [string]$input.department
 
-    if ([int]$input.year -gt 0 -and [int]$input.month -ge 1 -and [int]$input.month -le 12) {
+    if ($hasPeriod) {
         $dateFrom = [datetime]::new([int]$input.year, [int]$input.month, 1)
         $dateTo = $dateFrom.AddMonths(1)
         $where += "Табель.ПериодРегистрации >= &ДатаНачала"
         $where += "Табель.ПериодРегистрации < &ДатаОкончания"
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($department)) {
+        $where += "Табель.Подразделение.Наименование = &Подразделение"
     }
 
     $query.Text = @"
@@ -133,9 +139,12 @@ if ($Action -eq "list") {
     Табель.Дата УБЫВ
 "@
 
-    if ($where.Count -gt 1) {
+    if ($hasPeriod) {
         $query.SetParameter("ДатаНачала", $dateFrom)
         $query.SetParameter("ДатаОкончания", $dateTo)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($department)) {
+        $query.SetParameter("Подразделение", $department)
     }
 
     $selection = $query.Execute().Select()

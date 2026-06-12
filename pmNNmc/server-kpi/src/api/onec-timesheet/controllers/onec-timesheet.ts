@@ -24,6 +24,12 @@ function requestedDepartment(ctx: Context): string {
   return String((ctx.query as any)?.department || '').trim();
 }
 
+function requestedRefresh(ctx: Context): boolean {
+  return ['1', 'true', 'yes'].includes(
+    String((ctx.query as any)?.refresh || '').trim().toLowerCase()
+  );
+}
+
 function validateDepartmentAccess(ctx: Context, access: any, department: string) {
   if (!department) {
     ctx.throw(400, 'Укажите подразделение для загрузки табеля из 1С');
@@ -152,6 +158,8 @@ export default {
       const params = new URLSearchParams();
       if (year) params.set('year', String(year));
       if (month >= 1 && month <= 12) params.set('month', String(month));
+      params.set('department', department);
+      if (requestedRefresh(ctx)) params.set('refresh', '1');
 
       const payload = await bridgeGet(`/timesheets?${params.toString()}`);
       const items = (Array.isArray(payload?.items) ? payload.items : [])
@@ -181,7 +189,8 @@ export default {
       const id = encodeURIComponent(String(ctx.params.id || ''));
       if (!id) ctx.throw(400, 'Не указан табель 1С');
 
-      const payload = await bridgeGet(`/timesheets/${id}`);
+      const refreshQuery = requestedRefresh(ctx) ? '?refresh=1' : '';
+      const payload = await bridgeGet(`/timesheets/${id}${refreshQuery}`);
       const actualDepartment = String(payload?.timesheet?.department || '').trim();
       validateActualDepartmentAccess(ctx, access, actualDepartment);
 

@@ -354,7 +354,7 @@ function AccessModal({ user, departments, onCancel, onSave }) {
 
 // ======================= Основной модуль =======================
 
-function OneCTimesheetModal({ target, items, loading, downloadingId, onCancel, onSelect }) {
+function OneCTimesheetModal({ target, items, loading, downloadingId, onCancel, onRefresh, onSelect }) {
   if (!target) return null;
 
   const formatDate = (value, withTime = false) => {
@@ -376,7 +376,17 @@ function OneCTimesheetModal({ target, items, loading, downloadingId, onCancel, o
               {target.department} · {String(target.month).padStart(2, "0")}.{target.year}
             </p>
           </div>
-          <button type="button" className="btn btn-secondary btn-small" onClick={onCancel}>Закрыть</button>
+          <div className="onec-modal-actions">
+            <button
+              type="button"
+              className="btn btn-outline btn-small"
+              disabled={loading || Boolean(downloadingId)}
+              onClick={onRefresh}
+            >
+              {loading ? "Обновление..." : "Обновить из 1С"}
+            </button>
+            <button type="button" className="btn btn-secondary btn-small" onClick={onCancel}>Закрыть</button>
+          </div>
         </div>
 
         {loading ? (
@@ -879,11 +889,30 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     }
   };
 
+  const refreshOneCTimesheets = async () => {
+    if (!oneCModalTarget) return;
+    setOneCLoading(true);
+    try {
+      const items = await apiOnecTimesheets({ ...oneCModalTarget, refresh: true });
+      setOneCItems(items);
+      setOneCModalTarget((current) => current ? { ...current, refreshed: true } : current);
+      showToast("Список табелей обновлён из 1С");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : String(err) || "Не удалось обновить список табелей из 1С", "error");
+    } finally {
+      setOneCLoading(false);
+    }
+  };
+
   const selectOneCTimesheet = async (item) => {
     if (!oneCModalTarget || !item?.id) return;
     setOneCDownloadingId(item.id);
     try {
-      const { blob, filename } = await apiOnecTimesheetFile(item.id, oneCModalTarget.department);
+      const { blob, filename } = await apiOnecTimesheetFile(
+        item.id,
+        oneCModalTarget.department,
+        oneCModalTarget.refreshed === true
+      );
       const file = new File([blob], filename, {
         type: blob.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
@@ -2349,6 +2378,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         loading={oneCLoading}
         downloadingId={oneCDownloadingId}
         onCancel={() => { if (!oneCDownloadingId) setOneCModalTarget(null); }}
+        onRefresh={refreshOneCTimesheets}
         onSelect={selectOneCTimesheet}
       />
 

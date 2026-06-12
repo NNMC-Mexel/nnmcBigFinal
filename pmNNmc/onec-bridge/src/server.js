@@ -16,7 +16,11 @@ const port = parseInt(process.env.ONEC_BRIDGE_PORT || "12110", 10);
 const token = String(process.env.ONEC_BRIDGE_TOKEN || "").trim();
 const timeoutMs = parseInt(process.env.ONEC_BRIDGE_TIMEOUT_MS || "120000", 10);
 const listLimit = Math.max(1, Math.min(parseInt(process.env.ONEC_BRIDGE_LIST_LIMIT || "500", 10), 2000));
+const listCacheTtlMs = Math.max(0, parseInt(process.env.ONEC_BRIDGE_LIST_CACHE_TTL_MS || "1800000", 10));
+const detailCacheTtlMs = Math.max(0, parseInt(process.env.ONEC_BRIDGE_DETAIL_CACHE_TTL_MS || "86400000", 10));
 const scriptPath = path.resolve(__dirname, "../scripts/invoke-onec.ps1");
+const cache = new Map();
+const inFlight = new Map();
 
 function sendJson(res, status, payload) {
   const body = Buffer.from(JSON.stringify(payload));
@@ -58,6 +62,47 @@ function toBase64Url(value) {
 
 function fromBase64Url(value) {
   return JSON.parse(Buffer.from(String(value || ""), "base64url").toString("utf8"));
+}
+
+function normalizeCachePart(value) {
+  return String(value || "").trim().toLocaleLowerCase("ru-RU");
+}
+
+function shouldRefresh(value) {
+  return ["1", "true", "yes"].includes(String(value || "").trim().toLowerCase());
+}
+
+function getCached(key) {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+async function cachedInvoke(key, ttlMs, refresh, loader) {
+  if (!refresh) {
+    const cached = getCached(key);
+    if (cached !== null) return { value: cached, hit: true };
+  }
+
+  if (inFlight.has(key)) {
+    return { value: await inFlight.get(key), hit: false };
+  }
+
+  const request = Promise.resolve().then(loader);
+  inFlight.set(key, request);
+  try {
+    const value = await request;
+    if (ttlMs > 0 && value !== null && value !== undefined) {
+      cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+    }
+    return { value, hit: false };
+  } finally {
+    inFlight.delete(key);
+  }
 }
 
 function invokeOneC(action, input) {
@@ -137,27 +182,40 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/timesheets") {
       const year = parseInt(url.searchParams.get("year") || "0", 10);
       const month = parseInt(url.searchParams.get("month") || "0", 10);
-      const items = await invokeOneC("list", {
-        year: Number.isFinite(year) ? year : 0,
-        month: Number.isFinite(month) ? month : 0,
-        limit: listLimit,
-      });
+      const department = String(url.searchParams.get("department") || "").trim();
+      const refresh = shouldRefresh(url.searchParams.get("refresh"));
+      const normalizedYear = Number.isFinite(year) ? year : 0;
+      const normalizedMonth = Number.isFinite(month) ? month : 0;
+      const cacheKey = `list:${normalizedYear}:${normalizedMonth}:${normalizeCachePart(department)}`;
+      const { value: items, hit } = await cachedInvoke(cacheKey, listCacheTtlMs, refresh, () =>
+        invokeOneC("list", {
+          year: normalizedYear,
+          month: normalizedMonth,
+          department,
+          limit: listLimit,
+        })
+      );
       const result = (Array.isArray(items) ? items : []).map((item) => ({
         ...item,
         id: toBase64Url({ number: item.number, date: item.date }),
       }));
-      sendJson(res, 200, { items: result });
+      sendJson(res, 200, { items: result, cache: { hit, ttlMs: listCacheTtlMs } });
       return;
     }
 
     const detailMatch = req.method === "GET" && url.pathname.match(/^\/timesheets\/([^/]+)$/);
     if (detailMatch) {
-      const identity = fromBase64Url(decodeURIComponent(detailMatch[1]));
+      const encodedId = decodeURIComponent(detailMatch[1]);
+      const identity = fromBase64Url(encodedId);
       if (!identity?.number || !identity?.date) {
         sendJson(res, 400, { error: "Invalid timesheet id" });
         return;
       }
-      const item = await invokeOneC("detail", identity);
+      const refresh = shouldRefresh(url.searchParams.get("refresh"));
+      const cacheKey = `detail:${encodedId}`;
+      const { value: item } = await cachedInvoke(cacheKey, detailCacheTtlMs, refresh, () =>
+        invokeOneC("detail", identity)
+      );
       if (!item) {
         sendJson(res, 404, { error: "Timesheet not found" });
         return;

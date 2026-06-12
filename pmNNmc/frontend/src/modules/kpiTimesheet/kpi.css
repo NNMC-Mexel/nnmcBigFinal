@@ -711,6 +711,14 @@
   z-index: 1;
 }
 
+.kpi-wrapper .onec-modal-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .kpi-wrapper .modal-title {
   margin: 0 0 8px;
   font-size: 22px;

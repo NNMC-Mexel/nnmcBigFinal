@@ -52,14 +52,21 @@ Verify it locally:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:12110/health
-Invoke-RestMethod "http://127.0.0.1:12110/timesheets?year=2026&month=5" `
+$department = [Uri]::EscapeDataString("Администрация (клиника)")
+Invoke-RestMethod "http://127.0.0.1:12110/timesheets?year=2026&month=5&department=$department" `
   -Headers @{ "X-Bridge-Token" = $env:ONEC_BRIDGE_TOKEN }
 ```
 
 ## API
 
 - `GET /health`
-- `GET /timesheets?year=2026&month=5`
+- `GET /timesheets?year=2026&month=5&department=...`
+- `GET /timesheets?year=2026&month=5&department=...&refresh=1`
 - `GET /timesheets/:id`
+- `GET /timesheets/:id?refresh=1`
 
 All `/timesheets` requests require header `X-Bridge-Token`.
+
+The list is cached in memory for 30 minutes and conducted timesheet details for
+24 hours. Add `refresh=1` to bypass the relevant cache. Pass `department` when
+requesting the list so 1C filters documents before returning them.
