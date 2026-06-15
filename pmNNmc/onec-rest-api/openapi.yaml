@@ -1,0 +1,87 @@
+openapi: 3.0.3
+info:
+  title: NNMC 1C Integration API
+  version: 1.0.0
+paths:
+  /hs/nnmc/v1/employees:
+    get:
+      summary: Employees present in a conducted timesheet
+      security:
+        - basicAuth: []
+      parameters:
+        - in: query
+          name: department
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: year
+          schema:
+            type: integer
+            minimum: 2000
+            maximum: 2100
+        - in: query
+          name: month
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5000
+            default: 1000
+      responses:
+        "200":
+          description: Employee list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, meta]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Employee"
+                  meta:
+                    type: object
+        "400":
+          description: Invalid request
+        "401":
+          description: 1C authentication failed
+        "500":
+          description: Internal 1C error
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+  schemas:
+    Employee:
+      type: object
+      required: [id, fio, department, active]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fio:
+          type: string
+        departmentId:
+          type: string
+        department:
+          type: string
+        positionId:
+          type: string
+        position:
+          type: string
+        categoryId:
+          type: string
+        category:
+          type: string
+        organization:
+          type: string
+        active:
+          type: boolean
