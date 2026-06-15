@@ -9,6 +9,19 @@ This directory contains the server-side code for a direct REST integration with
 GET /hs/nnmc/v1/employees?department=ОЦМК-2&year=2026&month=6&limit=1000
 ```
 
+## Timesheet endpoints
+
+```http
+GET /hs/nnmc/v1/timesheets?department=ОЦМК-2&year=2026&month=6
+GET /hs/nnmc/v1/timesheet?id=<1C document UUID>
+```
+
+Add URL templates `/v1/timesheets` and `/v1/timesheet` to the same HTTP service.
+Add GET methods with handlers `TimesheetsGET` and `TimesheetGET`, then append
+[TimesheetHttpServiceHandlers.bsl](./TimesheetHttpServiceHandlers.bsl) to the
+existing HTTP service module. These endpoints let `server-kpi` load timesheets
+directly from 1C without `onec-bridge`.
+
 The endpoint reads employees from conducted
 `ТабельУчетаРабочегоВремени.ДанныеОВремени` rows. This source is already
 confirmed in the NNMC configuration and is appropriate for employees who

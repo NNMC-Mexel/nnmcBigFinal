@@ -54,6 +54,92 @@ paths:
           description: 1C authentication failed
         "500":
           description: Internal 1C error
+  /hs/nnmc/v1/timesheets:
+    get:
+      summary: Conducted timesheets for a department and month
+      security:
+        - basicAuth: []
+      parameters:
+        - in: query
+          name: department
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: year
+          schema:
+            type: integer
+            minimum: 2000
+            maximum: 2100
+        - in: query
+          name: month
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2000
+            default: 500
+      responses:
+        "200":
+          description: Timesheet list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, meta]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Timesheet"
+                  meta:
+                    type: object
+        "400":
+          description: Invalid request
+        "401":
+          description: 1C authentication failed
+        "500":
+          description: Internal 1C error
+  /hs/nnmc/v1/timesheet:
+    get:
+      summary: A conducted timesheet with employee day values
+      security:
+        - basicAuth: []
+      parameters:
+        - in: query
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Timesheet details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [timesheet, employees]
+                properties:
+                  timesheet:
+                    $ref: "#/components/schemas/Timesheet"
+                  employees:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TimesheetEmployee"
+        "400":
+          description: Invalid request
+        "401":
+          description: 1C authentication failed
+        "404":
+          description: Timesheet not found
+        "500":
+          description: Internal 1C error
 components:
   securitySchemes:
     basicAuth:
@@ -85,3 +171,48 @@ components:
           type: string
         active:
           type: boolean
+    Timesheet:
+      type: object
+      required: [id, date, number, period, department, dateFrom, dateTo, conducted]
+      properties:
+        id:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date-time
+        number:
+          type: string
+        period:
+          type: string
+          format: date-time
+        organization:
+          type: string
+        department:
+          type: string
+        dateFrom:
+          type: string
+          format: date-time
+        dateTo:
+          type: string
+          format: date-time
+        conducted:
+          type: boolean
+    TimesheetEmployee:
+      type: object
+      required: [fio, position, category, days]
+      properties:
+        fio:
+          type: string
+        position:
+          type: string
+        category:
+          type: string
+        days:
+          type: array
+          minItems: 31
+          maxItems: 31
+          items:
+            oneOf:
+              - type: number
+              - type: string

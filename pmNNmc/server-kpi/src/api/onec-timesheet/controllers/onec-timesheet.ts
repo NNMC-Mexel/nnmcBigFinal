@@ -2,8 +2,6 @@ import type { Context } from 'koa';
 import ExcelJS from 'exceljs';
 import { getUserAccess } from '../../../utils/access';
 
-const BRIDGE_TIMEOUT_MS = 120_000;
-
 function normalizeDepartment(value: any): string {
   const compact = String(value || '')
     .trim()
@@ -22,12 +20,6 @@ function departmentsMatch(left: any, right: any): boolean {
 
 function requestedDepartment(ctx: Context): string {
   return String((ctx.query as any)?.department || '').trim();
-}
-
-function requestedRefresh(ctx: Context): boolean {
-  return ['1', 'true', 'yes'].includes(
-    String((ctx.query as any)?.refresh || '').trim().toLowerCase()
-  );
 }
 
 function validateDepartmentAccess(ctx: Context, access: any, department: string) {
@@ -50,27 +42,33 @@ function validateActualDepartmentAccess(ctx: Context, access: any, department: s
   }
 }
 
-function bridgeConfig() {
-  const baseUrl = String(process.env.ONEC_BRIDGE_URL || '').trim().replace(/\/+$/, '');
-  const token = String(process.env.ONEC_BRIDGE_TOKEN || '').trim();
-  if (!baseUrl || !token) {
-    const error: any = new Error('Интеграция с 1С не настроена');
+function oneCConfig() {
+  const baseUrl = String(process.env.ONEC_API_URL || '').trim().replace(/\/+$/, '');
+  const username = String(process.env.ONEC_API_USER || '').trim();
+  const password = String(process.env.ONEC_API_PASSWORD || '');
+  const timeoutMs = Math.max(
+    1000,
+    Math.min(parseInt(process.env.ONEC_API_TIMESHEET_TIMEOUT_MS || '120000', 10), 300000)
+  );
+  if (!baseUrl || !username || !password) {
+    const error: any = new Error('Прямой REST API 1С не настроен');
     error.status = 503;
     throw error;
   }
-  return { baseUrl, token };
+  return { baseUrl, username, password, timeoutMs };
 }
 
-async function bridgeGet(path: string): Promise<any> {
-  const { baseUrl, token } = bridgeConfig();
+async function oneCGet(path: string): Promise<any> {
+  const { baseUrl, username, password, timeoutMs } = oneCConfig();
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), BRIDGE_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const authorization = Buffer.from(`${username}:${password}`, 'utf8').toString('base64');
 
   try {
     const response = await fetch(`${baseUrl}${path}`, {
       signal: controller.signal,
       headers: {
-        'X-Bridge-Token': token,
+        Authorization: `Basic ${authorization}`,
         Accept: 'application/json',
       },
     });
@@ -79,10 +77,14 @@ async function bridgeGet(path: string): Promise<any> {
     try {
       payload = text ? JSON.parse(text) : null;
     } catch {
-      payload = null;
+      const error: any = new Error('1С вернула некорректный JSON');
+      error.status = 502;
+      throw error;
     }
     if (!response.ok) {
-      const error: any = new Error(payload?.error || `Ошибка моста 1С: HTTP ${response.status}`);
+      const error: any = new Error(
+        payload?.error?.message || payload?.error || `REST API 1С: HTTP ${response.status}`
+      );
       error.status = response.status >= 500 ? 502 : response.status;
       throw error;
     }
@@ -135,7 +137,9 @@ async function buildTimesheetWorkbook(payload: any): Promise<Buffer> {
       category: String(employee?.category || '').trim(),
     };
     for (let day = 1; day <= 31; day++) {
-      row[`day${day}`] = employee?.days?.[String(day)] ?? '';
+      row[`day${day}`] = Array.isArray(employee?.days)
+        ? employee.days[day - 1] ?? ''
+        : employee?.days?.[String(day)] ?? '';
     }
     if (row.fio) worksheet.addRow(row);
   }
@@ -159,9 +163,8 @@ export default {
       if (year) params.set('year', String(year));
       if (month >= 1 && month <= 12) params.set('month', String(month));
       params.set('department', department);
-      if (requestedRefresh(ctx)) params.set('refresh', '1');
-
-      const payload = await bridgeGet(`/timesheets?${params.toString()}`);
+      params.set('limit', '500');
+      const payload = await oneCGet(`/v1/timesheets?${params.toString()}`);
       const items = (Array.isArray(payload?.items) ? payload.items : [])
         .filter((item: any) => item?.conducted === true && departmentsMatch(item?.department, department))
         .map((item: any) => ({
@@ -176,7 +179,14 @@ export default {
           conducted: true,
         }));
 
-      ctx.body = { items, cache: payload?.cache || null };
+      ctx.body = {
+        items,
+        cache: {
+          hit: false,
+          source: 'onec-rest',
+          updatedAt: new Date().toISOString(),
+        },
+      };
     } catch (error: any) {
       ctx.status = error?.status || 500;
       ctx.body = { error: error?.message || 'Не удалось получить табели из 1С' };
@@ -186,11 +196,11 @@ export default {
   async download(ctx: Context) {
     try {
       const access = await getUserAccess(ctx);
-      const id = encodeURIComponent(String(ctx.params.id || ''));
+      const id = String(ctx.params.id || '').trim();
       if (!id) ctx.throw(400, 'Не указан табель 1С');
 
-      const refreshQuery = requestedRefresh(ctx) ? '?refresh=1' : '';
-      const payload = await bridgeGet(`/timesheets/${id}${refreshQuery}`);
+      const params = new URLSearchParams({ id });
+      const payload = await oneCGet(`/v1/timesheet?${params.toString()}`);
       const actualDepartment = String(payload?.timesheet?.department || '').trim();
       validateActualDepartmentAccess(ctx, access, actualDepartment);
 
