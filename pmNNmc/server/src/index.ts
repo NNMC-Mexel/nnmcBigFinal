@@ -283,7 +283,15 @@ async function setupPermissions(strapi: any) {
     'api::task.task': ['find', 'findOne', 'create', 'update', 'delete'],
     'api::department.department': ['find', 'findOne'],
     'api::board-stage.board-stage': ['find', 'findOne'],
-    'api::meeting.meeting': ['find', 'findOne', 'create', 'update', 'delete'],
+    // Meeting notes (project sub-resource). The content-type is `meeting-note`;
+    // a stale `api::meeting.meeting` key here granted nothing and left the
+    // feature returning 403 on a fresh database.
+    'api::meeting-note.meeting-note': ['find', 'findOne', 'create', 'update', 'delete'],
+    // Protocols module — custom routes (fine-grained checks live in the controller)
+    'api::protocol.protocol': [
+      'find', 'findOne', 'findMany', 'create', 'update', 'delete',
+      'publish', 'usersByDepartment',
+    ],
     'api::activity-log.activity-log': ['find', 'findOne'],
     'api::audit-event.audit-event': ['find', 'findOne'],
     'api::document.document': ['find', 'findOne', 'create', 'update', 'delete'],
