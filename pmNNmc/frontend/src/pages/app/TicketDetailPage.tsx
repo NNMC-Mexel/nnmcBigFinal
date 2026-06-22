@@ -55,7 +55,7 @@ export default function TicketDetailPage() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language === 'kz' ? 'kz' : 'ru';
   const currentUser = useAuthStore((state) => state.user);
-  const { isSuperAdmin } = useUserRole();
+  const { isSuperAdmin, canManageTickets } = useUserRole();
 
   const {
     selectedTicket,
@@ -103,6 +103,7 @@ export default function TicketDetailPage() {
   );
   const isHelpdeskAdmin = Boolean(
     currentUser?.canManageTickets === true ||
+      canManageTickets ||
       hasAnyPermissionToken(
         [currentUser?.role?.name, currentUser?.role?.type, currentUser?.role?.description],
         ['superadmin', 'super admin', 'admin', 'админ']
