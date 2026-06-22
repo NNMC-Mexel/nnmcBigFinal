@@ -576,6 +576,8 @@ async function syncItTicketCategories(strapi: any) {
         slug: item.slug,
         order: item.order,
         serviceGroup: itGroup.id,
+      };
+      const defaultAssigneeData = {
         defaultAssignee: {
           set: assigneeIds.map((id: number) => ({ id })),
         },
@@ -589,7 +591,9 @@ async function syncItTicketCategories(strapi: any) {
       if (existing?.[0]?.id) {
         await strapi.entityService.update('api::ticket-category.ticket-category', existing[0].id, { data });
       } else {
-        await strapi.entityService.create('api::ticket-category.ticket-category', { data });
+        await strapi.entityService.create('api::ticket-category.ticket-category', {
+          data: { ...data, ...defaultAssigneeData },
+        });
       }
     }
 
