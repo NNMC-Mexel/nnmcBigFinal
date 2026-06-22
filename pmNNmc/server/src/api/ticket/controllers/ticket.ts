@@ -365,6 +365,19 @@ export function getLegacyDepartmentKeyFromHeaders(headers: any): string {
   return '';
 }
 
+export function buildTicketSearchFilter(search: string) {
+  return {
+    $or: [
+      { requesterName: { $containsi: search } },
+      { ticketNumber: { $containsi: search } },
+      { requesterDepartment: { $containsi: search } },
+      { category: { name_ru: { $containsi: search } } },
+      { category: { name_kz: { $containsi: search } } },
+      { category: { slug: { $containsi: search } } },
+    ],
+  };
+}
+
 async function findLegacyServiceGroup(strapi: any, body: any, headers?: any) {
   const serviceGroupId = Number(body.serviceGroupId);
   if (Number.isFinite(serviceGroupId) && serviceGroupId > 0) {
@@ -755,13 +768,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     }
 
     if (search) {
-      andFilters.push({
-        $or: [
-          { requesterName: { $containsi: search } },
-          { ticketNumber: { $containsi: search } },
-          { requesterDepartment: { $containsi: search } },
-        ],
-      });
+      andFilters.push(buildTicketSearchFilter(search));
     }
 
     if (categoryId) {

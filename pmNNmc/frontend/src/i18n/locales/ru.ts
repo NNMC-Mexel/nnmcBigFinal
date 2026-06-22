@@ -351,7 +351,7 @@ export default {
     filterInProgress: 'В работе',
     filterDone: 'Выполнено',
     filterInvalid: 'Некорректные',
-    searchPlaceholder: 'Поиск по ФИО, номеру, отделу...',
+    searchPlaceholder: 'Поиск по ФИО, номеру, отделу, категории...',
     myTickets: 'Мои заявки',
     allTickets: 'Все заявки',
     allAssignees: 'Все исполнители',
