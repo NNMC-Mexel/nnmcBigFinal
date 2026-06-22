@@ -81,7 +81,7 @@ export default function TicketFilters({
             type="text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={t('helpdesk.searchPlaceholder', 'Поиск по ФИО, номеру, отделу...')}
+            placeholder={t('helpdesk.searchPlaceholder', 'Поиск по ФИО, номеру, отделу, категории...')}
             className="w-full pl-10 pr-8 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
           />
           {search && (
