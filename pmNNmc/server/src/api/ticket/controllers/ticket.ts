@@ -125,9 +125,10 @@ function isDepartmentHead(user: any): boolean {
   ]);
 }
 
-function isHelpdeskRoutingAdmin(user: any, isSuperAdmin = false): boolean {
+export function isHelpdeskRoutingAdmin(user: any, isSuperAdmin = false): boolean {
   if (isSuperAdmin || isKuatHelpdeskHead(user)) return true;
   if (user?.canManageTickets === true) return true;
+  if (user?.department?.canManageTickets === true) return true;
   return userHasAnyToken(user, ['superadmin', 'super admin', 'admin', 'админ']);
 }
 
@@ -139,7 +140,7 @@ function userCanTransferBetweenDepartments(user: any, isSuperAdmin = false): boo
   return userCanViewDepartmentQueue(user, isSuperAdmin);
 }
 
-function userCanManageHouseholdExecutors(user: any, isSuperAdmin = false): boolean {
+export function userCanManageHouseholdExecutors(user: any, isSuperAdmin = false): boolean {
   // Deliberately narrower than isHelpdeskRoutingAdmin: the free-text "админ/admin"
   // position match would grant executor management to unrelated staff
   // (e.g. "Администратор регистратуры"), so only explicit signals count here.
