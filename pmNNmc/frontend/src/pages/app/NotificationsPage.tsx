@@ -7,6 +7,7 @@ import { subscribeToNotificationRealtime } from '../../api/notificationRealtime'
 export default function NotificationsPage() {
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [markingAll, setMarkingAll] = useState(false);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const navigate = useNavigate();
 
@@ -45,10 +46,19 @@ export default function NotificationsPage() {
   };
 
   const handleMarkAll = async () => {
+    if (markingAll) return;
+    setMarkingAll(true);
     try {
       await notificationsApi.markAllRead();
-      setItems((prev) => prev.map((x) => ({ ...x, isRead: true })));
-    } catch {}
+      setItems((prev) =>
+        unreadOnly ? [] : prev.map((x) => ({ ...x, isRead: true }))
+      );
+      await load();
+    } catch {
+      await load();
+    } finally {
+      setMarkingAll(false);
+    }
   };
 
   const unreadCount = items.filter((x) => !x.isRead).length;
@@ -63,6 +73,7 @@ export default function NotificationsPage() {
         {unreadCount > 0 && (
           <button
             onClick={handleMarkAll}
+            disabled={markingAll}
             className="px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 rounded-lg flex items-center gap-2"
           >
             <CheckCheck className="w-4 h-4" />

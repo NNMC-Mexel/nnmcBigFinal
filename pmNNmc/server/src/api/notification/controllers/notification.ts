@@ -86,13 +86,22 @@ export default {
     const user = (ctx.state as any).user;
     if (!user) return ctx.unauthorized('Необходима авторизация');
 
-    await strapi.db.query('api::notification.notification').updateMany({
-      where: { recipient: user.id, isRead: false },
-      data: { isRead: true },
+    const unreadItems = await strapi.entityService.findMany('api::notification.notification', {
+      filters: { recipient: user.id, isRead: false },
+      fields: ['id'],
+      pagination: { pageSize: 1000 },
     });
-    await publishNotificationState(strapi, user.id);
+    const ids = (unreadItems || []).map((item: any) => item.id).filter(Boolean);
 
-    ctx.body = { ok: true };
+    if (ids.length > 0) {
+      await strapi.db.query('api::notification.notification').updateMany({
+        where: { id: { $in: ids }, isRead: false },
+        data: { isRead: true },
+      });
+      await publishNotificationState(strapi, user.id);
+    }
+
+    ctx.body = { ok: true, updated: ids.length };
   },
 
   // POST /api/notifications/read-by-link
@@ -121,7 +130,7 @@ export default {
 
     if (ids.length > 0) {
       await strapi.db.query('api::notification.notification').updateMany({
-        where: { id: { $in: ids }, recipient: user.id, isRead: false },
+        where: { id: { $in: ids }, isRead: false },
         data: { isRead: true },
       });
     }
