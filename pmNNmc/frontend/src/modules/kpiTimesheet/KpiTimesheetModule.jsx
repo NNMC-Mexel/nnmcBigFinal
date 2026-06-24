@@ -1029,13 +1029,18 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       return;
     }
 
-    const positiveResults = calcResults.filter((row) => Number(row?.kpiFinal || 0) > 0);
-    const total = positiveResults.reduce((sum, row) => sum + Math.ceil(Number(row?.kpiFinal || 0)), 0);
+    const roundedResults = calcResults
+      .map((row) => ({
+        fio: row.fio || "",
+        kpiFinal: Math.round(Number(row?.kpiFinal || 0)),
+      }))
+      .filter((row) => row.fio && row.kpiFinal > 0);
+    const total = roundedResults.reduce((sum, row) => sum + row.kpiFinal, 0);
     const confirmed = window.confirm(
       `Создать в 1С непроведённый документ «Разовое начисление»?\n\n` +
       `Отдел: ${calcDepartment}\n` +
       `Период: ${String(month).padStart(2, "0")}.${year}\n` +
-      `Сотрудников: ${positiveResults.length}\n` +
+      `Сотрудников: ${roundedResults.length}\n` +
       `Итого KPI: ${total.toLocaleString("ru-RU")}`
     );
     if (!confirmed) return;
@@ -1046,10 +1051,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         year: parseInt(year, 10),
         month: parseInt(month, 10),
         department: calcDepartment,
-        results: positiveResults.map((row) => ({
-          fio: row.fio || "",
-          kpiFinal: Number(row.kpiFinal || 0),
-        })),
+        results: roundedResults,
       });
       showToast(
         `Документ 1С №${result?.number || "без номера"} создан. Статус: не проведён`

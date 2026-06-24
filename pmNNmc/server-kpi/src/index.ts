@@ -308,6 +308,7 @@ async function ensureAuthenticatedPermissions(strapi: any) {
     'api::onec-employee.onec-employee.list',
     'api::onec-timesheet.onec-timesheet.list',
     'api::onec-timesheet.onec-timesheet.download',
+    'api::onec-kpi-accrual.onec-kpi-accrual.create',
   ];
 
   for (const action of actions) {

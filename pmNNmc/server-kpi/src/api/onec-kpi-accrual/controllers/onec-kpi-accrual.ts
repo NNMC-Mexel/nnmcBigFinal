@@ -101,7 +101,7 @@ export default {
       const employees = rawResults
         .map((item: any) => ({
           fio: String(item?.fio || '').trim(),
-          amount: Math.ceil(Number(item?.kpiFinal ?? item?.amount ?? 0)),
+          amount: Math.round(Number(item?.kpiFinal ?? item?.amount ?? 0)),
         }))
         .filter((item: any) => item.fio && Number.isFinite(item.amount) && item.amount > 0);
 
