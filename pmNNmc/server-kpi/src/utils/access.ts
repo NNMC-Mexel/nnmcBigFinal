@@ -2,10 +2,9 @@ import type { Context } from 'koa';
 
 declare const strapi: any;
 
-export type UserAccess = {
+type UserAccess = {
   isAdmin: boolean;
   isSuperAdmin?: boolean;
-  isPrivilegedAdmin?: boolean;
   roleName: string;
   allowedDepartments: string[];
   userId?: number;
@@ -15,7 +14,6 @@ export type UserAccess = {
 };
 
 const ADMIN_ROLE_HINTS = ['admin', 'administrator', 'super admin', 'superadmin'];
-const ACCOUNTING_DEPARTMENT_KEYS = new Set(['ACCOUNTING']);
 
 function normalizeDepartments(input: any): string[] {
   if (!Array.isArray(input)) return [];
@@ -49,57 +47,52 @@ function isAdminLogin(user: any): boolean {
   );
 }
 
-function isAccountingAccess(access: UserAccess): boolean {
-  const departmentKey = String(access.departmentKey || '').trim().toUpperCase();
-  const departmentName = String(access.departmentName || '').trim().toLowerCase();
-  const roleName = String(access.roleName || '').trim().toLowerCase();
-
-  return (
-    ACCOUNTING_DEPARTMENT_KEYS.has(departmentKey) ||
-    departmentName.includes('бухгалтер') ||
-    roleName.includes('бухгалтер') ||
-    roleName.includes('accountant')
-  );
-}
-
-export function canSendKpiToOneC(access: UserAccess): boolean {
-  return access.isPrivilegedAdmin === true || isAccountingAccess(access);
-}
-
-export async function refreshCurrentUserAccessFromPm(ctx: Context): Promise<void> {
-  const user = (ctx.state as any)?.user;
-  const email = String(user?.email || '').trim().toLowerCase();
+export async function requireCorporateKpiOneCAccess(ctx: Context): Promise<void> {
+  const authorization = String(ctx.get('x-pm-authorization') || '').trim();
   const pmUrl = String(process.env.SERVER_PM_URL || '').trim().replace(/\/+$/, '');
-  const token = String(process.env.INTERNAL_SYNC_TOKEN || '').trim();
-  if (!user?.id || !email || !pmUrl || !token) return;
+  if (!authorization.toLowerCase().startsWith('bearer ')) {
+    ctx.throw(401, 'Не найдена активная сессия корпоративной системы');
+  }
+  if (!pmUrl) {
+    ctx.throw(503, 'Не настроен адрес основной корпоративной системы');
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const response = await fetch(`${pmUrl}/api/internal-sync/users`, {
+    const response = await fetch(`${pmUrl}/api/users/me?populate=department`, {
       signal: controller.signal,
-      headers: { 'X-Internal-Token': token },
+      headers: {
+        Authorization: authorization,
+        Accept: 'application/json',
+      },
     });
-    if (!response.ok) return;
+    if (response.status === 401 || response.status === 403) {
+      ctx.throw(401, 'Сессия корпоративной системы истекла');
+    }
+    if (!response.ok) {
+      ctx.throw(502, `Основная корпоративная система вернула HTTP ${response.status}`);
+    }
 
-    const users = await response.json();
-    if (!Array.isArray(users)) return;
-    const pmUser = users.find((item: any) => String(item?.email || '').trim().toLowerCase() === email);
-    if (!pmUser) return;
+    const pmUser: any = await response.json();
+    const departmentKey = String(pmUser?.department?.key || '').trim().toUpperCase();
+    const departmentName = String(
+      pmUser?.department?.name_ru || pmUser?.department?.name_kz || ''
+    ).trim().toLowerCase();
+    const isAllowed =
+      pmUser?.isSuperAdmin === true ||
+      departmentKey === 'ACCOUNTING' ||
+      departmentName.includes('бухгалтер');
 
-    const patch = {
-      isSuperAdmin: Boolean(pmUser?.isSuperAdmin),
-      isKpiResponsible: Boolean(pmUser?.isKpiResponsible),
-      departmentKey: String(pmUser?.department?.key || '').trim(),
-      departmentName: String(pmUser?.department?.name_ru || '').trim(),
-    };
-
-    await strapi.entityService.update('plugin::users-permissions.user', user.id, {
-      data: patch,
-    });
-    Object.assign(user, patch);
-  } catch {
-    // The last synchronized local access data remains the fallback.
+    if (!isAllowed) {
+      ctx.throw(403, 'Отправлять итоговый KPI в 1С могут только супер-администраторы и сотрудники бухгалтерии');
+    }
+  } catch (error: any) {
+    if (error?.status) throw error;
+    if (error?.name === 'AbortError') {
+      ctx.throw(504, 'Основная корпоративная система не ответила вовремя');
+    }
+    ctx.throw(502, 'Не удалось проверить права в основной корпоративной системе');
   } finally {
     clearTimeout(timer);
   }
@@ -174,18 +167,15 @@ export async function getUserAccess(ctx: Context): Promise<UserAccess> {
     pushUnique(normalized, departmentKey);
     pushUnique(normalized, departmentName);
   }
-  const isPrivilegedAdmin =
+  const isAdminAccess =
     isSuperAdmin ||
     isAdminRole(roleName) ||
-    isAdminLogin(user);
-  const isAdminAccess =
-    isPrivilegedAdmin ||
+    isAdminLogin(user) ||
     hasGlobalDepartmentAccess(departmentKey, departmentName);
 
   return {
     isAdmin: isAdminAccess,
     isSuperAdmin,
-    isPrivilegedAdmin,
     roleName,
     allowedDepartments: normalized,
     userId: user.id,

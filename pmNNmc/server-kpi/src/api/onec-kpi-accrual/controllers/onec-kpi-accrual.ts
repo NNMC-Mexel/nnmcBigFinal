@@ -1,10 +1,6 @@
 import type { Context } from 'koa';
 import { createHash } from 'crypto';
-import {
-  canSendKpiToOneC,
-  getUserAccess,
-  refreshCurrentUserAccessFromPm,
-} from '../../../utils/access';
+import { requireCorporateKpiOneCAccess } from '../../../utils/access';
 
 function normalizeDepartment(value: any): string {
   return String(value || '')
@@ -85,11 +81,7 @@ async function oneCPost(path: string, body: any): Promise<any> {
 export default {
   async create(ctx: Context) {
     try {
-      await refreshCurrentUserAccessFromPm(ctx);
-      const access = await getUserAccess(ctx);
-      if (!canSendKpiToOneC(access)) {
-        ctx.throw(403, 'Отправлять итоговый KPI в 1С могут только супер-администраторы и сотрудники бухгалтерии');
-      }
+      await requireCorporateKpiOneCAccess(ctx);
 
       const body: any = (ctx.request as any).body || {};
       const year = parseInt(String(body.year || ''), 10);

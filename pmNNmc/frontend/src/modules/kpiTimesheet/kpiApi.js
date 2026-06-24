@@ -360,9 +360,14 @@ export async function apiOnecTimesheetFile(id, department, refresh = false) {
 }
 
 export async function apiSendKpiAccrualToOneC(payload) {
+  const pmToken = localStorage.getItem("jwt") || sessionStorage.getItem("jwt");
   const res = await fetch(`${STRAPI_BASE}/onec-kpi-accruals`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeader(),
+      ...(pmToken ? { "X-PM-Authorization": `Bearer ${pmToken}` } : {}),
+    },
     body: JSON.stringify(payload),
   });
   return handleResponse(res);
