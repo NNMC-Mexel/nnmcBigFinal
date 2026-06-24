@@ -1,6 +1,10 @@
 import type { Context } from 'koa';
 import { createHash } from 'crypto';
-import { getUserAccess } from '../../../utils/access';
+import {
+  canSendKpiToOneC,
+  getUserAccess,
+  refreshCurrentUserAccessFromPm,
+} from '../../../utils/access';
 
 function normalizeDepartment(value: any): string {
   return String(value || '')
@@ -9,12 +13,6 @@ function normalizeDepartment(value: any): string {
     .replace(/[‐‑‒–—−]/g, '-')
     .replace(/[\s\-_]+/g, '')
     .replace(/^OCMK/, 'ОЦМК');
-}
-
-function departmentsMatch(left: any, right: any): boolean {
-  const a = normalizeDepartment(left);
-  const b = normalizeDepartment(right);
-  return Boolean(a && b && a === b);
 }
 
 function oneCConfig() {
@@ -87,9 +85,10 @@ async function oneCPost(path: string, body: any): Promise<any> {
 export default {
   async create(ctx: Context) {
     try {
+      await refreshCurrentUserAccessFromPm(ctx);
       const access = await getUserAccess(ctx);
-      if (!access.isAdmin && !access.isKpiResponsible) {
-        ctx.throw(403, 'Отправлять итоговый KPI в 1С может только ответственный за KPI');
+      if (!canSendKpiToOneC(access)) {
+        ctx.throw(403, 'Отправлять итоговый KPI в 1С могут только супер-администраторы и сотрудники бухгалтерии');
       }
 
       const body: any = (ctx.request as any).body || {};
@@ -107,13 +106,6 @@ export default {
       if (!department) {
         ctx.throw(400, 'Не указано подразделение');
       }
-      if (!access.isAdmin) {
-        const allowed = Array.isArray(access.allowedDepartments) ? access.allowedDepartments : [];
-        if (!allowed.some((item: string) => departmentsMatch(item, department))) {
-          ctx.throw(403, 'Нет доступа к указанному подразделению');
-        }
-      }
-
       const employees = rawResults
         .map((item: any) => ({
           fio: String(item?.fio || '').trim(),

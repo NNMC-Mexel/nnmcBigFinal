@@ -2,9 +2,10 @@ import type { Context } from 'koa';
 
 declare const strapi: any;
 
-type UserAccess = {
+export type UserAccess = {
   isAdmin: boolean;
   isSuperAdmin?: boolean;
+  isPrivilegedAdmin?: boolean;
   roleName: string;
   allowedDepartments: string[];
   userId?: number;
@@ -14,6 +15,7 @@ type UserAccess = {
 };
 
 const ADMIN_ROLE_HINTS = ['admin', 'administrator', 'super admin', 'superadmin'];
+const ACCOUNTING_DEPARTMENT_KEYS = new Set(['ACCOUNTING']);
 
 function normalizeDepartments(input: any): string[] {
   if (!Array.isArray(input)) return [];
@@ -45,6 +47,62 @@ function isAdminLogin(user: any): boolean {
     email.startsWith('admin@') ||
     email.includes('.admin@')
   );
+}
+
+function isAccountingAccess(access: UserAccess): boolean {
+  const departmentKey = String(access.departmentKey || '').trim().toUpperCase();
+  const departmentName = String(access.departmentName || '').trim().toLowerCase();
+  const roleName = String(access.roleName || '').trim().toLowerCase();
+
+  return (
+    ACCOUNTING_DEPARTMENT_KEYS.has(departmentKey) ||
+    departmentName.includes('бухгалтер') ||
+    roleName.includes('бухгалтер') ||
+    roleName.includes('accountant')
+  );
+}
+
+export function canSendKpiToOneC(access: UserAccess): boolean {
+  return access.isPrivilegedAdmin === true || isAccountingAccess(access);
+}
+
+export async function refreshCurrentUserAccessFromPm(ctx: Context): Promise<void> {
+  const user = (ctx.state as any)?.user;
+  const email = String(user?.email || '').trim().toLowerCase();
+  const pmUrl = String(process.env.SERVER_PM_URL || '').trim().replace(/\/+$/, '');
+  const token = String(process.env.INTERNAL_SYNC_TOKEN || '').trim();
+  if (!user?.id || !email || !pmUrl || !token) return;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(`${pmUrl}/api/internal-sync/users`, {
+      signal: controller.signal,
+      headers: { 'X-Internal-Token': token },
+    });
+    if (!response.ok) return;
+
+    const users = await response.json();
+    if (!Array.isArray(users)) return;
+    const pmUser = users.find((item: any) => String(item?.email || '').trim().toLowerCase() === email);
+    if (!pmUser) return;
+
+    const patch = {
+      isSuperAdmin: Boolean(pmUser?.isSuperAdmin),
+      isKpiResponsible: Boolean(pmUser?.isKpiResponsible),
+      departmentKey: String(pmUser?.department?.key || '').trim(),
+      departmentName: String(pmUser?.department?.name_ru || '').trim(),
+    };
+
+    await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+      data: patch,
+    });
+    Object.assign(user, patch);
+  } catch {
+    // The last synchronized local access data remains the fallback.
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function hasGlobalDepartmentAccess(departmentKey: string, departmentName = ''): boolean {
@@ -116,15 +174,18 @@ export async function getUserAccess(ctx: Context): Promise<UserAccess> {
     pushUnique(normalized, departmentKey);
     pushUnique(normalized, departmentName);
   }
-  const isAdminAccess =
+  const isPrivilegedAdmin =
     isSuperAdmin ||
     isAdminRole(roleName) ||
-    isAdminLogin(user) ||
+    isAdminLogin(user);
+  const isAdminAccess =
+    isPrivilegedAdmin ||
     hasGlobalDepartmentAccess(departmentKey, departmentName);
 
   return {
     isAdmin: isAdminAccess,
     isSuperAdmin,
+    isPrivilegedAdmin,
     roleName,
     allowedDepartments: normalized,
     userId: user.id,

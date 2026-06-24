@@ -534,6 +534,22 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
     user?.isSuperAdmin === true ||
     String(user?.role || "").toLowerCase().includes("admin") ||
     String(user?.login || "").toLowerCase().startsWith("admin");
+  const pmDepartmentKey = String(pmUser?.department?.key || "").trim().toUpperCase();
+  const pmDepartmentName = String(
+    pmUser?.department?.name_ru || pmUser?.department?.name_kz || ""
+  ).trim().toLowerCase();
+  const kpiDepartmentKey = String(user?.departmentKey || "").trim().toUpperCase();
+  const kpiDepartmentName = String(user?.departmentName || "").trim().toLowerCase();
+  const kpiRoleName = String(user?.role || "").trim().toLowerCase();
+  const canSendKpiToOneC =
+    pmUser?.isSuperAdmin === true ||
+    user?.isSuperAdmin === true ||
+    pmDepartmentKey === "ACCOUNTING" ||
+    kpiDepartmentKey === "ACCOUNTING" ||
+    pmDepartmentName.includes("бухгалтер") ||
+    kpiDepartmentName.includes("бухгалтер") ||
+    kpiRoleName.includes("бухгалтер") ||
+    kpiRoleName.includes("accountant");
 
   // Auto-calculate working days for 26-25 period
   const autoWorkdays = useMemo(() => calcWorkdaysForPeriod(year, month, holidays), [year, month, holidays]);
@@ -1632,7 +1648,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
               <button className="btn btn-outline" onClick={() => handleDownload("1c")}>Скачать для 1С</button>
               <button className="btn btn-outline" onClick={() => handleDownload("buh")}>Скачать для бухгалтерии</button>
               <button className="btn btn-outline" onClick={() => handleDownload("pdf")}>Скачать PDF</button>
-              {(isAdmin || user?.isKpiResponsible === true) && (
+              {canSendKpiToOneC && (
                 <button className="btn btn-primary" disabled={oneCSendingKpi} onClick={handleSendKpiToOneC}>
                   {oneCSendingKpi ? "Отправка в 1С..." : "Отправить KPI в 1С"}
                 </button>
@@ -1955,7 +1971,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                 <button className="btn btn-outline" onClick={() => handleDownload("excel")}>Скачать общий Excel</button>
                 <button className="btn btn-outline" onClick={() => handleDownload("buh")}>Скачать для бухгалтерии</button>
                 <button className="btn btn-outline" onClick={() => handleDownload("pdf")}>Скачать PDF</button>
-                {(isAdmin || user?.isKpiResponsible === true) && (
+                {canSendKpiToOneC && (
                   <button className="btn btn-primary" disabled={oneCSendingKpi} onClick={handleSendKpiToOneC}>
                     {oneCSendingKpi ? "Отправка в 1С..." : "Отправить KPI в 1С"}
                   </button>
