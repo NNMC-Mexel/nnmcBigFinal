@@ -3,6 +3,10 @@
 This directory contains the server-side code for a direct REST integration with
 1C. It does not use `onec-bridge` or COMConnector.
 
+`NNMCHttpServiceModule.bsl` is the complete generated module for HTTP service
+`NNMC`. When applying an update, replace the complete 1C module with this file.
+Run `node build-module.js` after changing any source handler file.
+
 ## Employee endpoint
 
 ```http
