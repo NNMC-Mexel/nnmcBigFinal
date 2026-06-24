@@ -3,7 +3,7 @@ const RELOAD_STORAGE_KEY = 'nnmc_chunk_reload_at';
 const RELOAD_COOLDOWN_MS = 60_000;
 
 const CHUNK_ERROR_PATTERN =
-  /ChunkLoadError|Loading chunk .* failed|Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i;
+  /ChunkLoadError|Loading chunk .* failed|dynamically imported module|Importing a module script failed|module script.*MIME type|expected a JavaScript-or-Wasm module script/i;
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return `${error.name}: ${error.message}`;

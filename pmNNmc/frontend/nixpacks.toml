@@ -11,4 +11,4 @@ cmds = ["npm ci"]
 cmds = ["npm run build"]
 
 [start]
-cmd = "npx serve dist -l tcp://0.0.0.0:13010 -s"
+cmd = "npm exec -- serve dist -l tcp://0.0.0.0:13010 -s"

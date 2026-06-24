@@ -19,6 +19,7 @@ export default class AppErrorBoundary extends React.Component<React.PropsWithChi
 
   render() {
     if (!this.state.error) return this.props.children;
+    const errorText = `${this.state.error.name}: ${this.state.error.message}`;
 
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -27,6 +28,12 @@ export default class AppErrorBoundary extends React.Component<React.PropsWithChi
           <p className="mt-2 text-sm text-slate-500">
             Возможно, приложение было обновлено. Перезагрузите интерфейс.
           </p>
+          <details className="mt-4 text-left">
+            <summary className="cursor-pointer text-xs text-slate-400">Техническая причина</summary>
+            <code className="mt-2 block break-all rounded-lg bg-slate-100 p-3 text-xs text-slate-600">
+              {errorText}
+            </code>
+          </details>
           <button
             type="button"
             onClick={forceFreshAppLoad}
