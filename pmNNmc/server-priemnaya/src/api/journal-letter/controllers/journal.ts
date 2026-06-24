@@ -71,6 +71,15 @@ const requireJournalUser = async (ctx: Context) => {
     return null;
   }
 
+  // Journal tokens are minted by `login` below with a `journal: true` claim.
+  // The JWT secret is shared across all NNMC Strapi servers, so without this
+  // marker any valid app token (from a colliding numeric user id in another
+  // database) would unlock the journal. Require the journal scope explicitly.
+  if (payload.journal !== true) {
+    ctx.forbidden('Journal access required');
+    return null;
+  }
+
   const user = await strapi.db.query(USER_UID).findOne({
     where: { id: payload.id },
     select: ['id', 'username', 'email', 'blocked', 'display_name'],
@@ -136,7 +145,7 @@ export default {
       return ctx.unauthorized('Invalid login or password');
     }
 
-    const token = await getJwtService().issue({ id: user.id });
+    const token = await getJwtService().issue({ id: user.id, journal: true });
 
     return ctx.send({
       token,

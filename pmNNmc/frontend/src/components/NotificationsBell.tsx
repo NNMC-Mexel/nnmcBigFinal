@@ -11,6 +11,7 @@ export default function NotificationsBell() {
   const [count, setCount] = useState(0);
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
   const navigate = useNavigate();
   const ref = useRef<HTMLDivElement>(null);
   const openRef = useRef(open);
@@ -95,11 +96,20 @@ export default function NotificationsBell() {
   };
 
   const handleMarkAll = async () => {
+    if (markingAll) return;
+    setMarkingAll(true);
     try {
       await notificationsApi.markAllRead();
       setItems((prev) => prev.map((x) => ({ ...x, isRead: true })));
       setCount(0);
-    } catch {}
+      await refreshList();
+      await refreshCount();
+    } catch {
+      await refreshList();
+      await refreshCount();
+    } finally {
+      setMarkingAll(false);
+    }
   };
 
   return (
@@ -124,6 +134,7 @@ export default function NotificationsBell() {
             {count > 0 && (
               <button
                 onClick={handleMarkAll}
+                disabled={markingAll}
                 className="text-xs text-primary-600 hover:underline flex items-center gap-1"
               >
                 <Check className="w-3 h-3" />

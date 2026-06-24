@@ -17,13 +17,12 @@ module.exports = {
 
     const existingActions = permissions.map((p) => p.action);
 
+    // Public role: read-only access to the room list only.
+    // Booking find/findOne/create/delete are NOT public — they expose/modify
+    // booking data (bookerName, department, cancelCode) and must require a token.
     const requiredPermissions = [
       'api::room.room.find',
       'api::room.room.findOne',
-      'api::booking.booking.find',
-      'api::booking.booking.findOne',
-      'api::booking.booking.create',
-      'api::booking.booking.delete',
     ];
 
     for (const action of requiredPermissions) {
@@ -36,6 +35,23 @@ module.exports = {
           },
         });
         strapi.log.info(`[bootstrap] Added public permission: ${action}`);
+      }
+    }
+
+    // Revoke any booking permissions previously granted to the public role
+    // (earlier releases exposed unauthenticated create/delete of bookings).
+    const publicBookingActions = [
+      'api::booking.booking.find',
+      'api::booking.booking.findOne',
+      'api::booking.booking.create',
+      'api::booking.booking.delete',
+    ];
+    for (const action of publicBookingActions) {
+      const removed = await strapi
+        .query('plugin::users-permissions.permission')
+        .deleteMany({ where: { role: publicRole.id, action } });
+      if (removed?.count) {
+        strapi.log.info(`[bootstrap] Revoked public permission: ${action}`);
       }
     }
 

@@ -39,6 +39,45 @@ async function resolveSurveyId(paramId: string | number, strapi: any): Promise<n
   } catch { return null; }
 }
 
+// Whether `user` may view results / manage a given survey.
+// Allowed: SuperAdmin, the survey author, or the owner/manager of its project.
+// Without this check any authenticated user could read every survey's
+// (non-anonymous) respondent data or toggle/duplicate arbitrary surveys.
+async function canManageSurvey(strapi: any, surveyNumericId: number, user: any): Promise<boolean> {
+  if (!user) return false;
+
+  const fullUser = await strapi.entityService.findOne(
+    'plugin::users-permissions.user',
+    user.id,
+    { fields: ['id', 'isSuperAdmin'] }
+  ) as any;
+  if (fullUser?.isSuperAdmin === true) return true;
+
+  const survey = await strapi.entityService.findOne(
+    'api::project-survey.project-survey',
+    surveyNumericId,
+    {
+      populate: {
+        createdBy: { fields: ['id'] },
+        project: { populate: { owner: { fields: ['id'] }, managers: { fields: ['id'] } } },
+      },
+    }
+  ) as any;
+  if (!survey) return false;
+
+  const uid = Number(user.id);
+  if (Number(survey.createdBy?.id) === uid) return true;
+
+  const project = survey.project;
+  if (project) {
+    if (Number(project.owner?.id) === uid) return true;
+    if (Array.isArray(project.managers) && project.managers.some((m: any) => Number(m?.id) === uid)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export default factories.createCoreController('api::project-survey.project-survey', ({ strapi }) => ({
   async create(ctx) {
     const user = ctx.state.user;
@@ -213,6 +252,10 @@ export default factories.createCoreController('api::project-survey.project-surve
     const numericId = await resolveSurveyId(paramId, strapi);
     if (!numericId) return ctx.notFound('Survey not found');
 
+    if (!(await canManageSurvey(strapi, numericId, user))) {
+      return ctx.forbidden('You do not have access to this survey');
+    }
+
     const survey = await strapi.entityService.findOne('api::project-survey.project-survey', numericId, {
       populate: ['questions', 'responses', 'project', 'createdBy'],
     }) as unknown as SurveyData | null;
@@ -330,6 +373,10 @@ export default factories.createCoreController('api::project-survey.project-surve
     const numericId = await resolveSurveyId(paramId, strapi);
     if (!numericId) return ctx.notFound('Survey not found');
 
+    if (!(await canManageSurvey(strapi, numericId, user))) {
+      return ctx.forbidden('You do not have access to this survey');
+    }
+
     const survey = await strapi.entityService.findOne('api::project-survey.project-survey', numericId);
 
     if (!survey) {
@@ -354,6 +401,10 @@ export default factories.createCoreController('api::project-survey.project-surve
 
     const numericId = await resolveSurveyId(paramId, strapi);
     if (!numericId) return ctx.notFound('Survey not found');
+
+    if (!(await canManageSurvey(strapi, numericId, user))) {
+      return ctx.forbidden('You do not have access to this survey');
+    }
 
     const survey = await strapi.entityService.findOne('api::project-survey.project-survey', numericId, {
       populate: ['questions', 'project'],

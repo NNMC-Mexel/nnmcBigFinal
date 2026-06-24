@@ -49,13 +49,23 @@ const hasAnyPermissionToken = (values: Array<string | undefined | null>, tokens:
   return tokens.some((token) => haystack.includes(token));
 };
 
+const normalizeWhatsAppPhone = (value?: string | null) => {
+  let digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('8')) {
+    digits = `7${digits.slice(1)}`;
+  } else if (digits.length === 10 && digits.startsWith('7')) {
+    digits = `7${digits}`;
+  }
+  return digits.length >= 10 && digits.length <= 15 ? digits : null;
+};
+
 export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const lang = i18n.language === 'kz' ? 'kz' : 'ru';
   const currentUser = useAuthStore((state) => state.user);
-  const { isSuperAdmin } = useUserRole();
+  const { isSuperAdmin, canManageTickets } = useUserRole();
 
   const {
     selectedTicket,
@@ -103,6 +113,7 @@ export default function TicketDetailPage() {
   );
   const isHelpdeskAdmin = Boolean(
     currentUser?.canManageTickets === true ||
+      canManageTickets ||
       hasAnyPermissionToken(
         [currentUser?.role?.name, currentUser?.role?.type, currentUser?.role?.description],
         ['superadmin', 'super admin', 'admin', 'админ']
@@ -288,6 +299,7 @@ export default function TicketDetailPage() {
     user?.firstName || user?.lastName
       ? `${user.lastName || ''} ${user.firstName || ''}`.trim()
       : user?.username || user?.email || '-';
+  const whatsappPhone = normalizeWhatsAppPhone(ticket.requesterPhone);
 
   const canViewUpdatedTicket = (updatedTicket: Ticket) => {
     const updatedAssignees = Array.isArray(updatedTicket.assignee) ? updatedTicket.assignee : [];
@@ -394,7 +406,19 @@ export default function TicketDetailPage() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs text-slate-500">{t('helpdesk.requesterPhone', 'Телефон')}</p>
-                  <p className="break-words text-sm font-medium text-slate-800">{ticket.requesterPhone || '-'}</p>
+                  {whatsappPhone ? (
+                    <a
+                      href={`https://wa.me/${whatsappPhone}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Написать в WhatsApp"
+                      className="break-words text-sm font-medium text-emerald-700 hover:text-emerald-800 hover:underline"
+                    >
+                      {ticket.requesterPhone}
+                    </a>
+                  ) : (
+                    <p className="break-words text-sm font-medium text-slate-800">{ticket.requesterPhone || '-'}</p>
+                  )}
                 </div>
               </div>
               <div className="flex min-w-0 items-start gap-3">

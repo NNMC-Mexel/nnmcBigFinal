@@ -346,7 +346,7 @@ export default {
     filterInProgress: 'Жұмыста',
     filterDone: 'Орындалды',
     filterInvalid: 'Дұрыс емес',
-    searchPlaceholder: 'АТЖ, нөмір, бөлім бойынша іздеу...',
+    searchPlaceholder: 'АТЖ, нөмір, бөлім, санат бойынша іздеу...',
     myTickets: 'Менің өтінімдерім',
     allTickets: 'Барлық өтінімдер',
     allAssignees: 'Барлық орындаушылар',
