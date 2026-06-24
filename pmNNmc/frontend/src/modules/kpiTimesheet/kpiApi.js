@@ -359,6 +359,15 @@ export async function apiOnecTimesheetFile(id, department, refresh = false) {
   };
 }
 
+export async function apiSendKpiAccrualToOneC(payload) {
+  const res = await fetch(`${STRAPI_BASE}/onec-kpi-accruals`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}
+
 // --- Department Templates ---
 
 export async function apiTemplateList() {

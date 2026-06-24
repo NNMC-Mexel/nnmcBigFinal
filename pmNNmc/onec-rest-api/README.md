@@ -22,6 +22,18 @@ Add GET methods with handlers `TimesheetsGET` and `TimesheetGET`, then append
 existing HTTP service module. These endpoints let `server-kpi` load timesheets
 directly from 1C without `onec-bridge`.
 
+## KPI accrual endpoint
+
+```http
+POST /hs/nnmc/v1/kpi-accruals
+Content-Type: application/json
+```
+
+Add URL template `/v1/kpi-accruals` and POST handler `KpiAccrualPOST`, then append
+[KpiAccrualHttpServiceHandler.bsl](./KpiAccrualHttpServiceHandler.bsl) to the
+HTTP service module. The handler validates all employees first and creates an
+unposted `РазовоеНачисление` document with accrual type `KPI`.
+
 The endpoint reads employees from conducted
 `ТабельУчетаРабочегоВремени.ДанныеОВремени` rows. This source is already
 confirmed in the NNMC configuration and is appropriate for employees who

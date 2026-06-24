@@ -49,6 +49,7 @@ import {
   apiPmDepartments,
   apiOnecTimesheets,
   apiOnecTimesheetFile,
+  apiSendKpiAccrualToOneC,
 } from "./kpiApi";
 import "./kpi.css";
 
@@ -515,6 +516,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   const [oneCCacheMeta, setOneCCacheMeta] = useState(null);
   const [oneCLoading, setOneCLoading] = useState(false);
   const [oneCDownloadingId, setOneCDownloadingId] = useState("");
+  const [oneCSendingKpi, setOneCSendingKpi] = useState(false);
 
   // Edit mode for Результаты tab
   const [editMode, setEditMode] = useState(false);
@@ -998,6 +1000,51 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       showToast(mode === "pdf" ? "Файл PDF сформирован и скачан" : "Файл Excel сформирован и скачан");
     } catch (err) {
       showToast(err instanceof Error ? err.message : String(err) || "Ошибка формирования файла", "error");
+    }
+  };
+
+  const handleSendKpiToOneC = async () => {
+    if (!calcDepartment) {
+      showToast("Выберите отдел", "error");
+      return;
+    }
+    if (!Array.isArray(calcResults) || calcResults.length === 0) {
+      showToast("Сначала выполните расчёт KPI", "error");
+      return;
+    }
+
+    const positiveResults = calcResults.filter((row) => Number(row?.kpiFinal || 0) > 0);
+    const total = positiveResults.reduce((sum, row) => sum + Math.ceil(Number(row?.kpiFinal || 0)), 0);
+    const confirmed = window.confirm(
+      `Создать в 1С непроведённый документ «Разовое начисление»?\n\n` +
+      `Отдел: ${calcDepartment}\n` +
+      `Период: ${String(month).padStart(2, "0")}.${year}\n` +
+      `Сотрудников: ${positiveResults.length}\n` +
+      `Итого KPI: ${total.toLocaleString("ru-RU")}`
+    );
+    if (!confirmed) return;
+
+    setOneCSendingKpi(true);
+    try {
+      const result = await apiSendKpiAccrualToOneC({
+        year: parseInt(year, 10),
+        month: parseInt(month, 10),
+        department: calcDepartment,
+        results: positiveResults.map((row) => ({
+          fio: row.fio || "",
+          kpiFinal: Number(row.kpiFinal || 0),
+        })),
+      });
+      showToast(
+        `Документ 1С №${result?.number || "без номера"} создан. Статус: не проведён`
+      );
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : String(err) || "Не удалось отправить KPI в 1С",
+        "error"
+      );
+    } finally {
+      setOneCSendingKpi(false);
     }
   };
 
@@ -1585,6 +1632,11 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
               <button className="btn btn-outline" onClick={() => handleDownload("1c")}>Скачать для 1С</button>
               <button className="btn btn-outline" onClick={() => handleDownload("buh")}>Скачать для бухгалтерии</button>
               <button className="btn btn-outline" onClick={() => handleDownload("pdf")}>Скачать PDF</button>
+              {(isAdmin || user?.isKpiResponsible === true) && (
+                <button className="btn btn-primary" disabled={oneCSendingKpi} onClick={handleSendKpiToOneC}>
+                  {oneCSendingKpi ? "Отправка в 1С..." : "Отправить KPI в 1С"}
+                </button>
+              )}
               <button className="btn btn-outline" onClick={handleSendToSignDoc}>Отправить на подпись</button>
               <button className="btn btn-outline" onClick={handleSignEds}>Подписать ЭЦП</button>
             </div>
@@ -1903,6 +1955,11 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                 <button className="btn btn-outline" onClick={() => handleDownload("excel")}>Скачать общий Excel</button>
                 <button className="btn btn-outline" onClick={() => handleDownload("buh")}>Скачать для бухгалтерии</button>
                 <button className="btn btn-outline" onClick={() => handleDownload("pdf")}>Скачать PDF</button>
+                {(isAdmin || user?.isKpiResponsible === true) && (
+                  <button className="btn btn-primary" disabled={oneCSendingKpi} onClick={handleSendKpiToOneC}>
+                    {oneCSendingKpi ? "Отправка в 1С..." : "Отправить KPI в 1С"}
+                  </button>
+                )}
                 <button className="btn btn-outline" onClick={handleSendToSignDoc}>Отправить на подпись</button>
                 <button className="btn btn-outline" onClick={handleSignEds}>Подписать ЭЦП</button>
               </div>
