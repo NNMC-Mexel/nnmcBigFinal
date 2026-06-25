@@ -1029,19 +1029,35 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       return;
     }
 
-    const roundedResults = calcResults
-      .map((row) => ({
-        fio: row.fio || "",
-        kpiFinal: Math.round(Number(row?.kpiFinal || 0)),
-      }))
-      .filter((row) => row.fio && row.kpiFinal > 0);
+    const preparedResults = calcResults.map((row, index) => {
+      const fio = String(row?.fio || "").trim();
+      const sourceAmount = Number(row?.kpiFinal || 0);
+      const kpiFinal = Math.round(sourceAmount);
+      let skipReason = "";
+      if (!fio) skipReason = "не указано ФИО";
+      else if (!Number.isFinite(sourceAmount)) skipReason = "некорректная сумма";
+      else if (kpiFinal <= 0) skipReason = `итог после округления: ${kpiFinal}`;
+      return { fio, kpiFinal, skipReason, rowNumber: index + 1 };
+    });
+    const roundedResults = preparedResults
+      .filter((row) => !row.skipReason)
+      .map(({ fio, kpiFinal }) => ({ fio, kpiFinal }));
+    const skippedResults = preparedResults.filter((row) => row.skipReason);
     const total = roundedResults.reduce((sum, row) => sum + row.kpiFinal, 0);
+    const skippedText = skippedResults.length > 0
+      ? `\n\nНе будут отправлены (${skippedResults.length}):\n${skippedResults
+          .slice(0, 10)
+          .map((row) => `${row.rowNumber}. ${row.fio || "Без ФИО"} — ${row.skipReason}`)
+          .join("\n")}${skippedResults.length > 10 ? `\n...ещё ${skippedResults.length - 10}` : ""}`
+      : "";
     const confirmed = window.confirm(
       `Создать в 1С непроведённый документ «Разовое начисление»?\n\n` +
       `Отдел: ${calcDepartment}\n` +
       `Период: ${String(month).padStart(2, "0")}.${year}\n` +
-      `Сотрудников: ${roundedResults.length}\n` +
-      `Итого KPI: ${total.toLocaleString("ru-RU")}`
+      `Строк в расчёте: ${calcResults.length}\n` +
+      `Будет отправлено: ${roundedResults.length}\n` +
+      `Итого KPI: ${total.toLocaleString("ru-RU")}` +
+      skippedText
     );
     if (!confirmed) return;
 
@@ -1054,7 +1070,8 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         results: roundedResults,
       });
       showToast(
-        `Документ 1С №${result?.number || "без номера"} создан. Статус: не проведён`
+        `Документ 1С №${result?.number || "без номера"} создан. ` +
+        `Строк: ${result?.employeeCount ?? roundedResults.length}. Статус: не проведён`
       );
     } catch (err) {
       showToast(
