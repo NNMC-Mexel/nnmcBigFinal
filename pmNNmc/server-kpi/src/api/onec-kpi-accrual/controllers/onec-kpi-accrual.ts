@@ -1,5 +1,7 @@
 import type { Context } from 'koa';
 import { createHash } from 'crypto';
+import { request as httpRequest } from 'http';
+import { request as httpsRequest } from 'https';
 import { requireCorporateKpiOneCAccess } from '../../../utils/access';
 
 function normalizeDepartment(value: any): string {
@@ -36,6 +38,8 @@ function oneCErrorMessage(payload: any, text: string, status: number): string {
   const candidates = [
     payload?.error?.message,
     payload?.error?.description,
+    payload?.['#exception']?.exception?.descr,
+    payload?.['#exception']?.exception?.description,
     payload?.message,
     payload?.description,
     typeof payload?.error === 'string' ? payload.error : '',
@@ -54,31 +58,71 @@ function oneCErrorMessage(payload: any, text: string, status: number): string {
   return `REST API 1С: HTTP ${status}`;
 }
 
+function requestOneC(
+  url: URL,
+  authorization: string,
+  body: Buffer,
+  timeoutMs: number
+): Promise<{ status: number; text: string }> {
+  const sendRequest = url.protocol === 'https:' ? httpsRequest : httpRequest;
+
+  return new Promise((resolve, reject) => {
+    const request = sendRequest(
+      url,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${authorization}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json; charset=utf-8',
+          'Content-Length': String(body.byteLength),
+          Connection: 'close',
+        },
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        response.on('end', () => {
+          resolve({
+            status: response.statusCode || 502,
+            text: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      }
+    );
+
+    request.setTimeout(timeoutMs, () => {
+      const timeoutError: any = new Error('Превышено время ожидания ответа 1С');
+      timeoutError.code = 'ONEC_TIMEOUT';
+      request.destroy(timeoutError);
+    });
+    request.on('error', reject);
+    request.end(body);
+  });
+}
+
 async function oneCPost(path: string, body: any): Promise<any> {
   const { baseUrl, username, password, timeoutMs } = oneCConfig();
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
   const authorization = Buffer.from(`${username}:${password}`, 'utf8').toString('base64');
+  const requestBody = Buffer.from(JSON.stringify(body), 'utf8');
 
   try {
-    const response = await fetch(`${baseUrl}${path}`, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        Authorization: `Basic ${authorization}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json; charset=utf-8',
-      },
-      body: JSON.stringify(body),
-    });
-    const text = await response.text();
+    const response = await requestOneC(
+      new URL(`${baseUrl}${path}`),
+      authorization,
+      requestBody,
+      timeoutMs
+    );
+    const text = response.text;
     let payload: any = null;
     try {
       payload = text ? JSON.parse(text) : null;
     } catch {
       payload = null;
     }
-    if (!response.ok) {
+    if (response.status < 200 || response.status >= 300) {
       const error: any = new Error(oneCErrorMessage(payload, text, response.status));
       error.status = response.status >= 500 ? 502 : response.status;
       throw error;
@@ -90,14 +134,12 @@ async function oneCPost(path: string, body: any): Promise<any> {
     }
     return payload;
   } catch (error: any) {
-    if (error?.name === 'AbortError') {
-      const timeoutError: any = new Error('Превышено время ожидания создания документа в 1С');
+    if (error?.code === 'ONEC_TIMEOUT') {
+      const timeoutError: any = new Error('Превышено время ожидания ответа 1С');
       timeoutError.status = 504;
       throw timeoutError;
     }
     throw error;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
