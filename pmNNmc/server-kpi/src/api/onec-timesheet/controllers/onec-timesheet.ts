@@ -1,5 +1,7 @@
 import type { Context } from 'koa';
 import ExcelJS from 'exceljs';
+import { request as httpRequest } from 'http';
+import { request as httpsRequest } from 'https';
 import { getUserAccess } from '../../../utils/access';
 
 function normalizeDepartment(value: any): string {
@@ -58,46 +60,104 @@ function oneCConfig() {
   return { baseUrl, username, password, timeoutMs };
 }
 
+function oneCErrorMessage(payload: any, text: string, status: number): string {
+  const candidates = [
+    payload?.error?.message,
+    payload?.error?.description,
+    payload?.['#exception']?.exception?.descr,
+    payload?.['#exception']?.exception?.description,
+    payload?.message,
+    payload?.description,
+    typeof payload?.error === 'string' ? payload.error : '',
+  ];
+  const structured = candidates.find((value) => typeof value === 'string' && value.trim());
+  if (structured) return String(structured).trim();
+
+  const plainText = String(text || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (plainText) return plainText.slice(0, 1000);
+
+  return `REST API 1С: HTTP ${status}`;
+}
+
+function requestOneC(
+  url: URL,
+  authorization: string,
+  timeoutMs: number
+): Promise<{ status: number; text: string }> {
+  const sendRequest = url.protocol === 'https:' ? httpsRequest : httpRequest;
+
+  return new Promise((resolve, reject) => {
+    const request = sendRequest(
+      url,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Basic ${authorization}`,
+          Accept: 'application/json',
+          Connection: 'close',
+        },
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        response.on('end', () => {
+          resolve({
+            status: response.statusCode || 502,
+            text: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      }
+    );
+
+    request.setTimeout(timeoutMs, () => {
+      const timeoutError: any = new Error('Превышено время ожидания ответа 1С');
+      timeoutError.code = 'ONEC_TIMEOUT';
+      request.destroy(timeoutError);
+    });
+    request.on('error', reject);
+    request.end();
+  });
+}
+
 async function oneCGet(path: string): Promise<any> {
   const { baseUrl, username, password, timeoutMs } = oneCConfig();
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
   const authorization = Buffer.from(`${username}:${password}`, 'utf8').toString('base64');
 
   try {
-    const response = await fetch(`${baseUrl}${path}`, {
-      signal: controller.signal,
-      headers: {
-        Authorization: `Basic ${authorization}`,
-        Accept: 'application/json',
-      },
-    });
-    const text = await response.text();
+    const response = await requestOneC(
+      new URL(`${baseUrl}${path}`),
+      authorization,
+      timeoutMs
+    );
+    const text = response.text;
     let payload: any = null;
     try {
       payload = text ? JSON.parse(text) : null;
     } catch {
-      const error: any = new Error('1С вернула некорректный JSON');
+      const error: any = new Error(oneCErrorMessage(null, text, response.status));
       error.status = 502;
       throw error;
     }
-    if (!response.ok) {
-      const error: any = new Error(
-        payload?.error?.message || payload?.error || `REST API 1С: HTTP ${response.status}`
-      );
+    if (response.status < 200 || response.status >= 300) {
+      const error: any = new Error(oneCErrorMessage(payload, text, response.status));
       error.status = response.status >= 500 ? 502 : response.status;
       throw error;
     }
     return payload;
   } catch (error: any) {
-    if (error?.name === 'AbortError') {
+    if (error?.code === 'ONEC_TIMEOUT') {
       const timeoutError: any = new Error('Превышено время ожидания ответа от 1С');
       timeoutError.status = 504;
       throw timeoutError;
     }
     throw error;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
