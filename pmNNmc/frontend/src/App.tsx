@@ -31,6 +31,7 @@ const ActivityLogPage = lazy(() => import('./pages/app/ActivityLogPage'));
 const ProfilePage = lazy(() => import('./pages/app/ProfilePage'));
 const NotificationsPage = lazy(() => import('./pages/app/NotificationsPage'));
 const AdminPanelPage = lazy(() => import('./pages/app/AdminPanelPage'));
+const EmployeeDirectoryPage = lazy(() => import('./pages/app/EmployeeDirectoryPage'));
 const HelpdeskPage = lazy(() => import('./pages/app/HelpdeskPage'));
 const MyRequestsPage = lazy(() => import('./pages/app/MyRequestsPage'));
 const TicketDetailPage = lazy(() => import('./pages/app/TicketDetailPage'));
@@ -174,6 +175,7 @@ function App() {
     canAccessConf,
     canAccessJournal,
     canAccessSigndoc,
+    canViewEmployeeDirectory,
   } = useUserRole();
 
   useEffect(() => {
@@ -264,6 +266,12 @@ function App() {
           path="admin"
           element={
             <SuperAdminRoute>{withSuspense(<AdminPanelPage />)}</SuperAdminRoute>
+          }
+        />
+        <Route
+          path="employees"
+          element={
+            <FeatureRoute allow={canViewEmployeeDirectory}>{withSuspense(<EmployeeDirectoryPage />)}</FeatureRoute>
           }
         />
         <Route

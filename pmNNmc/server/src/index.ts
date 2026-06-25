@@ -1,5 +1,6 @@
 import seedData from '../scripts/seed';
 import { initNotificationRealtime } from './utils/notification-realtime';
+import { startEmployeeSyncScheduler } from './api/employee-card/services/employee-sync';
 
 const PROTOCOL_USER_PASSWORD = process.env.NNMC_PROTOCOL_USER_PASSWORD || 'Aa123123!';
 const PROTOCOL_USER_SEED_VERSION = 'radiology-kpi-protocol-2026-04-30';
@@ -251,6 +252,7 @@ export default {
     await migrateDepartmentPermissions(strapi);
 
     await seedKpiProtocolUsers(strapi);
+    startEmployeeSyncScheduler(strapi);
   },
 };
 
@@ -323,6 +325,9 @@ async function setupPermissions(strapi: any) {
       'getDepartments', 'createDepartment', 'updateDepartment', 'deleteDepartment',
       'updateDepartmentPermissions', 'getHelpdeskRouting', 'updateHelpdeskRouting',
     ],
+    // Employee directory synchronized from 1C. Fine-grained HR/Accounting checks
+    // are enforced by the custom controller.
+    'api::employee-card.employee-card': ['find', 'findOne', 'sync', 'syncStatus'],
     // In-app notifications (own only — see controller for row-level filter)
     'api::notification.notification': ['mine', 'unreadCount', 'markRead', 'markAllRead', 'markReadByLink'],
     // Feedback widget → Telegram (any authenticated user may send a suggestion)

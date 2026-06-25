@@ -178,6 +178,10 @@ export const useUserRole = () => {
   const canManageProjectAssignments = deptFlag(dept?.canManageProjectAssignments);
   const canManageTickets = deptFlag(dept?.canManageTickets);
   const canViewActivityLog = deptFlag(dept?.canViewActivityLog);
+  const canViewEmployeeDirectory =
+    isSuperAdmin || departmentKey === 'HR' || departmentKey === 'ACCOUNTING';
+  const canSyncEmployeeDirectory =
+    isSuperAdmin || departmentKey === 'HR';
 
   // Composite
   const canViewKpi = canViewKpiIt || canViewKpiMedical || canViewKpiEngineering;
@@ -244,6 +248,8 @@ export const useUserRole = () => {
     canManageProjectAssignments,
     canManageTickets,
     canViewActivityLog,
+    canViewEmployeeDirectory,
+    canSyncEmployeeDirectory,
     // Project capabilities
     canEditProject,
     canAssignResponsible,

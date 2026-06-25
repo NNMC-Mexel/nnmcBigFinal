@@ -23,6 +23,7 @@ import {
     Building2,
     Briefcase,
     ClipboardList,
+    Users,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuthStore, useUserRole } from "../store/authStore";
@@ -53,6 +54,7 @@ export default function AppLayout() {
         canAccessSigndoc,
         canManageNews,
         canViewActivityLog,
+        canViewEmployeeDirectory,
         departmentKey,
     } = useUserRole();
 
@@ -199,6 +201,11 @@ export default function AppLayout() {
     const navItems = [...projectNavItems, ...helpdeskNavItems];
 
     const adminNavItems = [
+        ...(canViewEmployeeDirectory ? [{
+            to: "/app/employees",
+            icon: Users,
+            label: "Справочник сотрудников",
+        }] : []),
         ...(canManageNews ? [{
             to: "/app/news-admin",
             icon: Settings2,
