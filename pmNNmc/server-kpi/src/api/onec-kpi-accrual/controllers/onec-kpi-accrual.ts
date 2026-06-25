@@ -32,6 +32,28 @@ function oneCConfig() {
   return { baseUrl, username, password, organization, accrual, timeoutMs };
 }
 
+function oneCErrorMessage(payload: any, text: string, status: number): string {
+  const candidates = [
+    payload?.error?.message,
+    payload?.error?.description,
+    payload?.message,
+    payload?.description,
+    typeof payload?.error === 'string' ? payload.error : '',
+  ];
+  const structured = candidates.find((value) => typeof value === 'string' && value.trim());
+  if (structured) return String(structured).trim();
+
+  const plainText = String(text || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (plainText) return plainText.slice(0, 1000);
+
+  return `REST API 1С: HTTP ${status}`;
+}
+
 async function oneCPost(path: string, body: any): Promise<any> {
   const { baseUrl, username, password, timeoutMs } = oneCConfig();
   const controller = new AbortController();
@@ -54,15 +76,16 @@ async function oneCPost(path: string, body: any): Promise<any> {
     try {
       payload = text ? JSON.parse(text) : null;
     } catch {
-      const error: any = new Error('1С вернула некорректный JSON');
-      error.status = 502;
-      throw error;
+      payload = null;
     }
     if (!response.ok) {
-      const error: any = new Error(
-        payload?.error?.message || payload?.error || `REST API 1С: HTTP ${response.status}`
-      );
+      const error: any = new Error(oneCErrorMessage(payload, text, response.status));
       error.status = response.status >= 500 ? 502 : response.status;
+      throw error;
+    }
+    if (!payload) {
+      const error: any = new Error('1С вернула некорректный JSON');
+      error.status = 502;
       throw error;
     }
     return payload;
