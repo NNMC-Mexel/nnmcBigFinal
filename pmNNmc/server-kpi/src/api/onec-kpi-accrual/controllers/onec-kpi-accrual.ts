@@ -193,7 +193,7 @@ export default {
         accrual,
         employees,
       });
-      if (validation?.valid !== true) {
+      if (Number(validation?.matchedCount || 0) <= 0) {
         requestError(400, validationErrorMessage(validation));
       }
 

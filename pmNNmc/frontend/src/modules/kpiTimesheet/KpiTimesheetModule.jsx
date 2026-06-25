@@ -1048,7 +1048,6 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       showToast("Нет сотрудников с положительным итогом KPI для отправки", "error");
       return;
     }
-    const total = roundedResults.reduce((sum, row) => sum + row.kpiFinal, 0);
     const skippedText = skippedResults.length > 0
       ? `\n\nНе будут отправлены (${skippedResults.length}):\n${skippedResults
           .slice(0, 10)
@@ -1065,41 +1064,55 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
         results: roundedResults,
       };
       const validation = await apiValidateKpiAccrualWithOneC(requestPayload);
+      const matched = (Array.isArray(validation?.items) ? validation.items : [])
+        .filter((item) => item?.matched === true);
       const rejected = (Array.isArray(validation?.items) ? validation.items : [])
         .filter((item) => item?.matched !== true);
-      if (validation?.valid !== true || rejected.length > 0) {
+      if (matched.length === 0) {
         const details = rejected
           .slice(0, 20)
           .map((item, index) => `${index + 1}. ${item?.fio || "Без ФИО"} — ${item?.message || item?.status || "не сопоставлен"}`)
           .join("\n");
-        window.alert(
-          `Отправка в 1С остановлена.\n\n` +
-          `Сопоставлено активных сотрудников: ${validation?.matchedCount || 0}\n` +
-          `Не прошли сверку: ${validation?.rejectedCount ?? rejected.length}\n\n` +
-          `${details || "1С не подтвердила список сотрудников."}` +
-          `${rejected.length > 20 ? `\n...ещё ${rejected.length - 20}` : ""}`
-        );
+        window.alert(`Документ не создан: ни один сотрудник не прошёл сверку с 1С.\n\n${details}`);
         return;
       }
 
+      const matchedTotal = matched.reduce((sum, item) => sum + Number(item?.amount || 0), 0);
+      const rejectedText = rejected.length > 0
+        ? `\n\nНе попадут в начисление, но будут записаны в комментарии документа (${rejected.length}):\n${rejected
+            .slice(0, 20)
+            .map((item, index) => `${index + 1}. ${item?.fio || "Без ФИО"} — ${item?.message || item?.status || "не сопоставлен"}`)
+            .join("\n")}${rejected.length > 20 ? `\n...ещё ${rejected.length - 20}` : ""}`
+        : "";
       const confirmed = window.confirm(
-        `Сверка с 1С выполнена успешно.\n\n` +
+        `Сверка с 1С выполнена.\n\n` +
         `Создать непроведённый документ «Разовое начисление»?\n\n` +
         `Отдел: ${calcDepartment}\n` +
         `Период: ${String(month).padStart(2, "0")}.${year}\n` +
         `Строк в расчёте: ${calcResults.length}\n` +
-        `Сопоставлено с активными карточками 1С: ${validation?.matchedCount ?? roundedResults.length}\n` +
-        `Будет отправлено: ${roundedResults.length}\n` +
-        `Итого KPI: ${total.toLocaleString("ru-RU")}` +
-        skippedText
+        `Попадут в начисление: ${matched.length}\n` +
+        `Не попадут в начисление: ${rejected.length}\n` +
+        `Итого KPI в документе: ${matchedTotal.toLocaleString("ru-RU")}` +
+        skippedText +
+        rejectedText
       );
       if (!confirmed) return;
 
       const result = await apiSendKpiAccrualToOneC(requestPayload);
-      showToast(
-        `Документ 1С №${result?.number || "без номера"} создан. ` +
-        `Строк: ${result?.employeeCount ?? roundedResults.length}. Статус: не проведён`
-      );
+      const finalRejected = (Array.isArray(result?.items) ? result.items : [])
+        .filter((item) => item?.matched !== true);
+      showToast(`Документ 1С №${result?.number || "без номера"} создан. Строк: ${result?.employeeCount ?? matched.length}.`);
+      if (finalRejected.length > 0) {
+        window.alert(
+          `Документ 1С №${result?.number || "без номера"} создан и не проведён.\n\n` +
+          `В начисление включено: ${result?.employeeCount ?? matched.length}\n` +
+          `Пропущено: ${result?.rejectedCount ?? finalRejected.length}\n\n` +
+          `Предупреждения также записаны в комментарий документа 1С:\n${finalRejected
+            .slice(0, 20)
+            .map((item, index) => `${index + 1}. ${item?.fio || "Без ФИО"} — ${item?.message || item?.status || "не сопоставлен"}`)
+            .join("\n")}${finalRejected.length > 20 ? `\n...ещё ${finalRejected.length - 20}` : ""}`
+        );
+      }
     } catch (err) {
       showToast(
         err instanceof Error ? err.message : String(err) || "Не удалось отправить KPI в 1С",
