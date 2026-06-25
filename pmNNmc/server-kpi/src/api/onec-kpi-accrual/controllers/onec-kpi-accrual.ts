@@ -101,41 +101,102 @@ async function oneCPost(path: string, body: any): Promise<any> {
   }
 }
 
+function requestError(status: number, message: string): never {
+  const error: any = new Error(message);
+  error.status = status;
+  throw error;
+}
+
+function parseKpiRequest(body: any) {
+  const year = parseInt(String(body?.year || ''), 10);
+  const month = parseInt(String(body?.month || ''), 10);
+  const department = String(body?.department || '').trim();
+  const rawResults = Array.isArray(body?.results) ? body.results : [];
+
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    requestError(400, 'Некорректный год');
+  }
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    requestError(400, 'Некорректный месяц');
+  }
+  if (!department) {
+    requestError(400, 'Не указано подразделение');
+  }
+
+  const employees = rawResults
+    .map((item: any) => ({
+      fio: String(item?.fio || '').trim(),
+      amount: Math.round(Number(item?.kpiFinal ?? item?.amount ?? 0)),
+    }))
+    .filter((item: any) => item.fio && Number.isFinite(item.amount) && item.amount > 0);
+
+  if (employees.length === 0) {
+    requestError(400, 'Нет положительных сумм KPI для отправки');
+  }
+  if (employees.length > 2000) {
+    requestError(400, 'Слишком много сотрудников в одном документе');
+  }
+
+  return { year, month, department, employees };
+}
+
+function validationErrorMessage(payload: any): string {
+  const rejected = (Array.isArray(payload?.items) ? payload.items : [])
+    .filter((item: any) => item?.matched !== true);
+  if (rejected.length === 0) {
+    return 'Сверка сотрудников с 1С не пройдена';
+  }
+  const details = rejected
+    .slice(0, 10)
+    .map((item: any) => `${String(item?.fio || 'Без ФИО')}: ${String(item?.message || item?.status || 'не сопоставлен')}`)
+    .join('; ');
+  const suffix = rejected.length > 10 ? `; ещё ${rejected.length - 10}` : '';
+  return `Сверка сотрудников с 1С не пройдена. ${details}${suffix}`;
+}
+
 export default {
+  async validate(ctx: Context) {
+    try {
+      await requireCorporateKpiOneCAccess(ctx);
+      const { year, month, department, employees } = parseKpiRequest((ctx.request as any).body || {});
+      const { organization, accrual } = oneCConfig();
+
+      ctx.body = await oneCPost('/v1/kpi-accruals', {
+        validateOnly: true,
+        year,
+        month,
+        organization,
+        department,
+        accrual,
+        employees,
+      });
+    } catch (error: any) {
+      ctx.status = error?.status || 500;
+      ctx.body = { error: error?.message || 'Не удалось сверить сотрудников с 1С' };
+    }
+  },
+
   async create(ctx: Context) {
     try {
       await requireCorporateKpiOneCAccess(ctx);
 
       const body: any = (ctx.request as any).body || {};
-      const year = parseInt(String(body.year || ''), 10);
-      const month = parseInt(String(body.month || ''), 10);
-      const department = String(body.department || '').trim();
-      const rawResults = Array.isArray(body.results) ? body.results : [];
-
-      if (!Number.isInteger(year) || year < 2000 || year > 2100) {
-        ctx.throw(400, 'Некорректный год');
-      }
-      if (!Number.isInteger(month) || month < 1 || month > 12) {
-        ctx.throw(400, 'Некорректный месяц');
-      }
-      if (!department) {
-        ctx.throw(400, 'Не указано подразделение');
-      }
-      const employees = rawResults
-        .map((item: any) => ({
-          fio: String(item?.fio || '').trim(),
-          amount: Math.round(Number(item?.kpiFinal ?? item?.amount ?? 0)),
-        }))
-        .filter((item: any) => item.fio && Number.isFinite(item.amount) && item.amount > 0);
-
-      if (employees.length === 0) {
-        ctx.throw(400, 'Нет положительных сумм KPI для отправки');
-      }
-      if (employees.length > 2000) {
-        ctx.throw(400, 'Слишком много сотрудников в одном документе');
-      }
+      const { year, month, department, employees } = parseKpiRequest(body);
 
       const { organization, accrual } = oneCConfig();
+      const validation = await oneCPost('/v1/kpi-accruals', {
+        validateOnly: true,
+        year,
+        month,
+        organization,
+        department,
+        accrual,
+        employees,
+      });
+      if (validation?.valid !== true) {
+        requestError(400, validationErrorMessage(validation));
+      }
+
       const currentUser = (ctx.state as any)?.user;
       const submittedBy = String(currentUser?.username || currentUser?.email || 'unknown');
       const departmentHash = createHash('sha256')

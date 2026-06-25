@@ -49,6 +49,7 @@ import {
   apiPmDepartments,
   apiOnecTimesheets,
   apiOnecTimesheetFile,
+  apiValidateKpiAccrualWithOneC,
   apiSendKpiAccrualToOneC,
 } from "./kpiApi";
 import "./kpi.css";
@@ -1043,6 +1044,10 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
       .filter((row) => !row.skipReason)
       .map(({ fio, kpiFinal }) => ({ fio, kpiFinal }));
     const skippedResults = preparedResults.filter((row) => row.skipReason);
+    if (roundedResults.length === 0) {
+      showToast("Нет сотрудников с положительным итогом KPI для отправки", "error");
+      return;
+    }
     const total = roundedResults.reduce((sum, row) => sum + row.kpiFinal, 0);
     const skippedText = skippedResults.length > 0
       ? `\n\nНе будут отправлены (${skippedResults.length}):\n${skippedResults
@@ -1050,25 +1055,47 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
           .map((row) => `${row.rowNumber}. ${row.fio || "Без ФИО"} — ${row.skipReason}`)
           .join("\n")}${skippedResults.length > 10 ? `\n...ещё ${skippedResults.length - 10}` : ""}`
       : "";
-    const confirmed = window.confirm(
-      `Создать в 1С непроведённый документ «Разовое начисление»?\n\n` +
-      `Отдел: ${calcDepartment}\n` +
-      `Период: ${String(month).padStart(2, "0")}.${year}\n` +
-      `Строк в расчёте: ${calcResults.length}\n` +
-      `Будет отправлено: ${roundedResults.length}\n` +
-      `Итого KPI: ${total.toLocaleString("ru-RU")}` +
-      skippedText
-    );
-    if (!confirmed) return;
 
     setOneCSendingKpi(true);
     try {
-      const result = await apiSendKpiAccrualToOneC({
+      const requestPayload = {
         year: parseInt(year, 10),
         month: parseInt(month, 10),
         department: calcDepartment,
         results: roundedResults,
-      });
+      };
+      const validation = await apiValidateKpiAccrualWithOneC(requestPayload);
+      const rejected = (Array.isArray(validation?.items) ? validation.items : [])
+        .filter((item) => item?.matched !== true);
+      if (validation?.valid !== true || rejected.length > 0) {
+        const details = rejected
+          .slice(0, 20)
+          .map((item, index) => `${index + 1}. ${item?.fio || "Без ФИО"} — ${item?.message || item?.status || "не сопоставлен"}`)
+          .join("\n");
+        window.alert(
+          `Отправка в 1С остановлена.\n\n` +
+          `Сопоставлено активных сотрудников: ${validation?.matchedCount || 0}\n` +
+          `Не прошли сверку: ${validation?.rejectedCount ?? rejected.length}\n\n` +
+          `${details || "1С не подтвердила список сотрудников."}` +
+          `${rejected.length > 20 ? `\n...ещё ${rejected.length - 20}` : ""}`
+        );
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `Сверка с 1С выполнена успешно.\n\n` +
+        `Создать непроведённый документ «Разовое начисление»?\n\n` +
+        `Отдел: ${calcDepartment}\n` +
+        `Период: ${String(month).padStart(2, "0")}.${year}\n` +
+        `Строк в расчёте: ${calcResults.length}\n` +
+        `Сопоставлено с активными карточками 1С: ${validation?.matchedCount ?? roundedResults.length}\n` +
+        `Будет отправлено: ${roundedResults.length}\n` +
+        `Итого KPI: ${total.toLocaleString("ru-RU")}` +
+        skippedText
+      );
+      if (!confirmed) return;
+
+      const result = await apiSendKpiAccrualToOneC(requestPayload);
       showToast(
         `Документ 1С №${result?.number || "без номера"} создан. ` +
         `Строк: ${result?.employeeCount ?? roundedResults.length}. Статус: не проведён`
