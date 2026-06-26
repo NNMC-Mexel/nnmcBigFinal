@@ -1220,15 +1220,11 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       body.legacyCategoryId,
       legacyCategoryName
     );
-    const comment = legacyCategoryName
-      ? `${rawComment}\n\nКатегория старого HelpDesk: ${legacyCategoryName}`
-      : rawComment;
-
     const ticketData: any = {
       requesterName,
       requesterPhone,
       requesterDepartment,
-      comment,
+      comment: rawComment,
       serviceGroup: serviceGroupId,
       targetDepartment: serviceGroup.department?.id || null,
       status: 'NEW',

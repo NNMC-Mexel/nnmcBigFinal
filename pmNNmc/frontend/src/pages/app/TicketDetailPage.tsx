@@ -59,6 +59,14 @@ const normalizeWhatsAppPhone = (value?: string | null) => {
   return digits.length >= 10 && digits.length <= 15 ? digits : null;
 };
 
+const cleanLegacyHelpdeskComment = (value?: string | null) =>
+  String(value || '')
+    .split(/\r?\n/)
+    .filter((line) => !line.trim().match(/^Категория старого HelpDesk:/i))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
 export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -300,6 +308,7 @@ export default function TicketDetailPage() {
       ? `${user.lastName || ''} ${user.firstName || ''}`.trim()
       : user?.username || user?.email || '-';
   const whatsappPhone = normalizeWhatsAppPhone(ticket.requesterPhone);
+  const displayComment = cleanLegacyHelpdeskComment(ticket.comment);
 
   const canViewUpdatedTicket = (updatedTicket: Ticket) => {
     const updatedAssignees = Array.isArray(updatedTicket.assignee) ? updatedTicket.assignee : [];
@@ -448,7 +457,7 @@ export default function TicketDetailPage() {
               {t('helpdesk.comment', 'Описание проблемы')}
             </h2>
             <div className="whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
-              {ticket.comment}
+              {displayComment || '-'}
             </div>
           </div>
 
