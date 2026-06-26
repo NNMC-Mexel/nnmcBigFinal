@@ -268,8 +268,9 @@ function App() {
             <SuperAdminRoute>{withSuspense(<AdminPanelPage />)}</SuperAdminRoute>
           }
         />
+        <Route path="employees" element={<Navigate to="/app/bpm/employees" replace />} />
         <Route
-          path="employees"
+          path="bpm/employees"
           element={
             <FeatureRoute allow={canViewEmployeeDirectory}>{withSuspense(<EmployeeDirectoryPage />)}</FeatureRoute>
           }

@@ -113,6 +113,10 @@ function oneCConfig() {
   return { baseUrl, username, password, pageSize, timeoutMs };
 }
 
+function shouldDeactivateMissingCards(): boolean {
+  return String(process.env.EMPLOYEE_SYNC_DEACTIVATE_MISSING || 'false').toLowerCase() === 'true';
+}
+
 async function fetchOneCPage(page: number): Promise<OneCPage> {
   const config = oneCConfig();
   const url = new URL(`${config.baseUrl}/v1/employee-cards`);
@@ -285,18 +289,20 @@ async function performSync(strapi: any, options: SyncOptions) {
       stats.updated += 1;
     }
 
-    for (const existing of existingCards) {
-      const iin = cleanString(existing.iin);
-      if (!iin || seenIins.has(iin) || existing.active === false) continue;
-      await strapi.db.query(CARD_UID).update({
-        where: { id: existing.id },
-        data: {
-          active: false,
-          deactivatedAt: now,
-          lastSyncedAt: now,
-        },
-      });
-      stats.deactivated += 1;
+    if (shouldDeactivateMissingCards()) {
+      for (const existing of existingCards) {
+        const iin = cleanString(existing.iin);
+        if (!iin || seenIins.has(iin) || existing.active === false) continue;
+        await strapi.db.query(CARD_UID).update({
+          where: { id: existing.id },
+          data: {
+            active: false,
+            deactivatedAt: now,
+            lastSyncedAt: now,
+          },
+        });
+        stats.deactivated += 1;
+      }
     }
 
     await updateSyncLog(strapi, log.id, {

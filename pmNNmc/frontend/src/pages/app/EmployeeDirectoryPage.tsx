@@ -154,7 +154,8 @@ export default function EmployeeDirectoryPage() {
     <div className="space-y-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Справочник сотрудников</h1>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-teal-600">BPM</p>
+          <h1 className="text-2xl font-bold text-slate-900">Сотрудники</h1>
           <p className="mt-1 text-sm text-slate-500">
             Одна карточка на ИИН. Табельные номера и места работы загружаются из 1С.
           </p>

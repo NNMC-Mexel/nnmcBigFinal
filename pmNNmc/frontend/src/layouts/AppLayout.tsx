@@ -200,12 +200,15 @@ export default function AppLayout() {
 
     const navItems = [...projectNavItems, ...helpdeskNavItems];
 
-    const adminNavItems = [
+    const bpmNavItems = [
         ...(canViewEmployeeDirectory ? [{
-            to: "/app/employees",
+            to: "/app/bpm/employees",
             icon: Users,
-            label: "Справочник сотрудников",
+            label: "Сотрудники",
         }] : []),
+    ];
+
+    const adminNavItems = [
         ...(canManageNews ? [{
             to: "/app/news-admin",
             icon: Settings2,
@@ -316,6 +319,33 @@ export default function AppLayout() {
                                 )}
                             </NavLink>
                         ))}
+
+                        {/* BPM */}
+                        {bpmNavItems.length > 0 && (
+                            <>
+                                <div className='pt-4 pb-2'>
+                                    <p className='px-3 text-xs font-medium text-slate-400 uppercase'>
+                                        BPM
+                                    </p>
+                                </div>
+                                {bpmNavItems.map((item) => (
+                                    <NavLink
+                                        key={item.to}
+                                        to={item.to}
+                                        className={({ isActive }) =>
+                                            `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                                                isActive
+                                                    ? "bg-teal-50 text-teal-700 font-medium"
+                                                    : "text-slate-600 hover:bg-slate-50"
+                                            }`
+                                        }
+                                        onClick={() => setSidebarOpen(false)}>
+                                        <item.icon className='w-5 h-5' />
+                                        {item.label}
+                                    </NavLink>
+                                ))}
+                            </>
+                        )}
 
                         {/* Services — visible based on department flags */}
                         {(canAccessConf || canAccessJournal || canAccessSigndoc) && (

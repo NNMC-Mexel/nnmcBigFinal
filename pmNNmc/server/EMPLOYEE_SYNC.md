@@ -10,6 +10,7 @@ ONEC_API_TIMEOUT_MS=120000
 ONEC_EMPLOYEE_PAGE_SIZE=200
 EMPLOYEE_SYNC_ENABLED=true
 EMPLOYEE_SYNC_HOUR_UTC=2
+EMPLOYEE_SYNC_DEACTIVATE_MISSING=false
 ```
 
 `EMPLOYEE_SYNC_HOUR_UTC=2` means 07:00 in Kazakhstan (UTC+5).
@@ -20,7 +21,8 @@ The scheduled synchronization:
 - stores one card per IIN;
 - keeps all workplaces and personnel numbers in the card;
 - updates only changed cards;
-- marks missing cards inactive without deleting history;
+- does not delete employee cards;
+- does not mark missing cards inactive unless `EMPLOYEE_SYNC_DEACTIVATE_MISSING=true`;
 - does not create Keycloak accounts automatically.
 
 SuperAdmin and HR can also start a manual synchronization from the employee
