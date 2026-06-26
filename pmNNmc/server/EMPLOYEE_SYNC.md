@@ -11,6 +11,8 @@ ONEC_EMPLOYEE_PAGE_SIZE=200
 EMPLOYEE_SYNC_ENABLED=true
 EMPLOYEE_SYNC_HOUR_UTC=2
 EMPLOYEE_SYNC_DEACTIVATE_MISSING=false
+EMPLOYEE_SYNC_KEYCLOAK_ENABLED=true
+EMPLOYEE_KEYCLOAK_EMAIL_DOMAIN=employees.nnmc.kz
 ```
 
 `EMPLOYEE_SYNC_HOUR_UTC=2` means 07:00 in Kazakhstan (UTC+5).
@@ -23,7 +25,10 @@ The scheduled synchronization:
 - updates only changed cards;
 - does not delete employee cards;
 - does not mark missing cards inactive unless `EMPLOYEE_SYNC_DEACTIVATE_MISSING=true`;
-- does not create Keycloak accounts automatically.
+- creates or links Keycloak accounts when `EMPLOYEE_SYNC_KEYCLOAK_ENABLED=true`;
+- uses IIN as the Keycloak login;
+- uses a temporary initial password for new accounts: `IIN + first latin initial of first name + first latin initial of last name`;
+- does not reset passwords for existing Keycloak accounts.
 
 SuperAdmin and HR can also start a manual synchronization from the employee
 directory page. Accounting has read access but cannot start synchronization.

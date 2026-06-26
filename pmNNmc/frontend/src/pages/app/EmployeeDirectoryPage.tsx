@@ -166,6 +166,10 @@ export default function EmployeeDirectoryPage() {
         `Обновлено: ${result.stats.updated || 0}\n` +
         `Без изменений: ${result.stats.unchanged || 0}\n` +
         `Деактивировано: ${result.stats.deactivated || 0}\n` +
+        `Подразделений: ${result.stats.departmentCount || 0}\n` +
+        `Keycloak создано: ${result.stats.keycloakCreated || 0}\n` +
+        `Keycloak привязано/обновлено: ${result.stats.keycloakLinked || 0}\n` +
+        `Keycloak ошибок: ${result.stats.keycloakErrors || 0}\n` +
         `Проблем: ${result.issues?.length || 0}` +
         (issueLines ? `\n\nПервые проблемы:\n${issueLines}` : '')
       );
