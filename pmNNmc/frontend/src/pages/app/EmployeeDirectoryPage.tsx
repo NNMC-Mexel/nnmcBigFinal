@@ -46,6 +46,15 @@ function syncStatusLabel(status?: string): string {
   return 'Ещё не запускалась';
 }
 
+function issueText(issue: Record<string, unknown>, index: number): string {
+  const message = String(issue.message || issue.reason || '').trim();
+  const fio = String(issue.fio || issue.employee || issue.employeeName || '').trim();
+  const iin = String(issue.iin || '').trim();
+  const code = String(issue.code || '').trim();
+  const title = fio || (iin ? `ИИН ${iin}` : code || `Проблема ${index + 1}`);
+  return message ? `${index + 1}. ${title}: ${message}` : `${index + 1}. ${title}`;
+}
+
 export default function EmployeeDirectoryPage() {
   const { canSyncEmployeeDirectory } = useUserRole();
   const [cards, setCards] = useState<EmployeeCard[]>([]);
@@ -101,7 +110,8 @@ export default function EmployeeDirectoryPage() {
   }, [loadCards, loadStatus]);
 
   const latestStats = status?.latest?.stats || {};
-  const issueCount = status?.latest?.issues?.length || 0;
+  const latestIssues = status?.latest?.issues || [];
+  const issueCount = latestIssues.length;
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
 
@@ -135,13 +145,18 @@ export default function EmployeeDirectoryPage() {
     try {
       const result = await employeeCardsApi.sync();
       await Promise.all([loadCards(), loadStatus()]);
+      const issueLines = (result.issues || [])
+        .slice(0, 5)
+        .map(issueText)
+        .join('\n');
       window.alert(
         `Синхронизация завершена.\n` +
         `Создано: ${result.stats.created || 0}\n` +
         `Обновлено: ${result.stats.updated || 0}\n` +
         `Без изменений: ${result.stats.unchanged || 0}\n` +
         `Деактивировано: ${result.stats.deactivated || 0}\n` +
-        `Проблем: ${result.issues?.length || 0}`
+        `Проблем: ${result.issues?.length || 0}` +
+        (issueLines ? `\n\nПервые проблемы:\n${issueLines}` : '')
       );
     } catch (requestError: any) {
       setError(requestError?.response?.data?.error?.message || requestError?.message || 'Синхронизация не выполнена');
@@ -199,6 +214,26 @@ export default function EmployeeDirectoryPage() {
           </div>
         ))}
       </div>
+
+      {latestIssues.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm">
+          <div className="mb-2 flex items-center gap-2 font-semibold">
+            <AlertTriangle className="h-4 w-4" />
+            Проблемы последней синхронизации
+          </div>
+          <p className="mb-3 text-amber-800">
+            Эти записи не были загружены как полноценные карточки. Уже созданные сотрудники не удалялись.
+          </p>
+          <ol className="space-y-1">
+            {latestIssues.slice(0, 20).map((issue, index) => (
+              <li key={index}>{issueText(issue, index)}</li>
+            ))}
+          </ol>
+          {latestIssues.length > 20 && (
+            <p className="mt-2 text-amber-800">Показаны первые 20 из {latestIssues.length}.</p>
+          )}
+        </div>
+      )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <form onSubmit={submitSearch} className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_minmax(220px,320px)_180px_auto]">
