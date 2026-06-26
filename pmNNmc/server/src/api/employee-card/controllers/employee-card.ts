@@ -66,7 +66,7 @@ function workplaceMatchesDepartment(workplaces: any[], department: string): bool
   return workplaces.some((workplace) => {
     const name = normalizeDepartment(workplace?.department);
     const id = normalizeDepartment(workplace?.departmentId);
-    return name.includes(needle) || id === needle;
+    return name === needle || id === needle;
   });
 }
 
@@ -98,7 +98,49 @@ function sortWorkplaces(workplaces: any[]): any[] {
   });
 }
 
-function formatCard(card: any) {
+function preferredWorkplace(workplaces: any[], department = '') {
+  const relevantWorkplaces = department
+    ? workplaces.filter((workplace) => workplaceMatchesDepartment([workplace], department))
+    : workplaces;
+  return (
+    relevantWorkplaces.find((workplace) => workplace?.primary === true) ||
+    relevantWorkplaces[0] ||
+    workplaces.find((workplace) => workplace?.primary === true) ||
+    workplaces[0] ||
+    null
+  );
+}
+
+function buildDepartmentStats(cards: any[]) {
+  const byDepartment = new Map<string, { name: string; employeeIins: Set<string>; workplaceCount: number }>();
+  for (const card of cards) {
+    const iin = cleanString(card?.iin);
+    const workplaces = Array.isArray(card?.workplaces) ? card.workplaces : [];
+    const seenInCard = new Set<string>();
+    for (const workplace of workplaces) {
+      const name = cleanString(workplace?.department);
+      if (!name) continue;
+      const key = normalizeDepartment(name);
+      const stat = byDepartment.get(key) || { name, employeeIins: new Set<string>(), workplaceCount: 0 };
+      stat.workplaceCount += 1;
+      if (iin && !seenInCard.has(key)) {
+        stat.employeeIins.add(iin);
+        seenInCard.add(key);
+      }
+      byDepartment.set(key, stat);
+    }
+  }
+
+  return Array.from(byDepartment.values())
+    .map((stat) => ({
+      name: stat.name,
+      employeeCount: stat.employeeIins.size,
+      workplaceCount: stat.workplaceCount,
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name, 'ru'));
+}
+
+function formatCard(card: any, department = '') {
   const workplaces = sortWorkplaces(Array.isArray(card.workplaces) ? card.workplaces : []);
   return {
     id: card.id,
@@ -114,7 +156,7 @@ function formatCard(card: any) {
     nationality: card.nationality,
     active: card.active,
     workplaces,
-    primaryWorkplace: workplaces.find((workplace) => workplace?.primary === true) || workplaces[0] || null,
+    primaryWorkplace: preferredWorkplace(workplaces, department),
     sourceActualAt: card.sourceActualAt,
     lastSyncedAt: card.lastSyncedAt,
     keycloakStatus: card.keycloakStatus || 'not_created',
@@ -137,23 +179,18 @@ export default {
     const cards = await strapi.db.query(CARD_UID).findMany({
       orderBy: [{ fio: 'asc' }],
     });
-    const departments = Array.from(
-      new Set<string>(
-        cards.flatMap((card: any) =>
-          (Array.isArray(card.workplaces) ? card.workplaces : [])
-            .map((workplace: any) => cleanString(workplace?.department))
-            .filter(Boolean)
-        )
-      )
-    ).sort((left, right) => left.localeCompare(right, 'ru'));
+    const activeFilteredCards = active === null
+      ? cards
+      : cards.filter((card: any) => card.active === active);
+    const departmentStats = buildDepartmentStats(activeFilteredCards);
+    const departments = departmentStats.map((item) => item.name);
 
-    const filtered = cards.filter((card: any) => {
-      if (active !== null && card.active !== active) return false;
+    const filtered = activeFilteredCards.filter((card: any) => {
       const workplaces = Array.isArray(card.workplaces) ? card.workplaces : [];
       return cardMatchesSearch(card, search) && workplaceMatchesDepartment(workplaces, department);
     });
     const start = (page - 1) * pageSize;
-    const items = filtered.slice(start, start + pageSize).map(formatCard);
+    const items = filtered.slice(start, start + pageSize).map((card: any) => formatCard(card, department));
 
     ctx.body = {
       items,
@@ -164,6 +201,8 @@ export default {
         total: filtered.length,
         totalPages: Math.ceil(filtered.length / pageSize),
         departments,
+        departmentStats,
+        departmentCount: departmentStats.length,
         canSync: canSyncDirectory(currentUser),
       },
     };

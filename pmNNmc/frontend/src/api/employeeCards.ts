@@ -49,6 +49,12 @@ export interface EmployeeCardsResponse {
     total: number;
     totalPages: number;
     departments: string[];
+    departmentStats?: Array<{
+      name: string;
+      employeeCount: number;
+      workplaceCount: number;
+    }>;
+    departmentCount?: number;
     canSync: boolean;
   };
 }
@@ -85,6 +91,11 @@ export const employeeCardsApi = {
   syncStatus: async (): Promise<EmployeeSyncStatus> => {
     const response = await client.get('/employee-cards/sync-status');
     return response.data;
+  },
+
+  get: async (id: number | string): Promise<EmployeeCard> => {
+    const response = await client.get(`/employee-cards/${id}`);
+    return response.data.data;
   },
 
   sync: async (): Promise<{

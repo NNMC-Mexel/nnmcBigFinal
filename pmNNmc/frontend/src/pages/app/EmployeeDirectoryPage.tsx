@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
   Briefcase,
@@ -59,6 +60,7 @@ export default function EmployeeDirectoryPage() {
   const { canSyncEmployeeDirectory } = useUserRole();
   const [cards, setCards] = useState<EmployeeCard[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
+  const [departmentStats, setDepartmentStats] = useState<Array<{ name: string; employeeCount: number; workplaceCount: number }>>([]);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [department, setDepartment] = useState('');
@@ -85,6 +87,7 @@ export default function EmployeeDirectoryPage() {
       });
       setCards(response.items);
       setDepartments(response.meta.departments || []);
+      setDepartmentStats(response.meta.departmentStats || []);
       setTotal(response.meta.total);
       setTotalPages(response.meta.totalPages);
     } catch (requestError: any) {
@@ -113,6 +116,7 @@ export default function EmployeeDirectoryPage() {
   const latestIssues = status?.latest?.issues || [];
   const issueCount = latestIssues.length;
   const syncedCardCount = Number(latestStats.received || 0);
+  const departmentCount = departmentStats.length;
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
 
@@ -120,6 +124,7 @@ export default function EmployeeDirectoryPage() {
     () => [
       { label: 'Карточек из 1С', value: syncedCardCount || total, icon: Users },
       { label: 'Найдено по фильтру', value: total, icon: Search },
+      { label: 'Подразделений', value: departmentCount, icon: Building2 },
       {
         label: 'Мест работы из 1С',
         value: Number(latestStats.workplaceCount || 0),
@@ -131,8 +136,12 @@ export default function EmployeeDirectoryPage() {
         icon: AlertTriangle,
       },
     ],
-    [issueCount, latestStats.workplaceCount, syncedCardCount, total]
+    [departmentCount, issueCount, latestStats.workplaceCount, syncedCardCount, total]
   );
+
+  const departmentCountByName = useMemo(() => {
+    return new Map(departmentStats.map((item) => [item.name, item]));
+  }, [departmentStats]);
 
   const submitSearch = (event: React.FormEvent) => {
     event.preventDefault();
@@ -201,7 +210,7 @@ export default function EmployeeDirectoryPage() {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {summary.map((item) => (
           <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-3">
@@ -258,7 +267,12 @@ export default function EmployeeDirectoryPage() {
           >
             <option value="">Все подразделения</option>
             {departments.map((name) => (
-              <option key={name} value={name}>{name}</option>
+              <option key={name} value={name}>
+                {name}
+                {departmentCountByName.has(name)
+                  ? ` (${departmentCountByName.get(name)?.employeeCount || 0} сотр. / ${departmentCountByName.get(name)?.workplaceCount || 0} мест)`
+                  : ''}
+              </option>
             ))}
           </select>
           <select
@@ -315,7 +329,12 @@ export default function EmployeeDirectoryPage() {
                   <Fragment key={card.id}>
                     <tr className="align-top hover:bg-slate-50">
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900">{card.fio}</div>
+                        <Link
+                          to={`/app/bpm/employees/${card.id}`}
+                          className="font-semibold text-slate-900 hover:text-teal-700 hover:underline"
+                        >
+                          {card.fio}
+                        </Link>
                         <div className="mt-1 text-xs text-slate-500">
                           {card.birthDate ? `Дата рождения: ${formatDate(card.birthDate)}` : ''}
                           {card.gender ? ` · ${card.gender}` : ''}
