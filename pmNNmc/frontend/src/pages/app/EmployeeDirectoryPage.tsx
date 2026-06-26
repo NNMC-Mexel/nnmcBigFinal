@@ -112,14 +112,16 @@ export default function EmployeeDirectoryPage() {
   const latestStats = status?.latest?.stats || {};
   const latestIssues = status?.latest?.issues || [];
   const issueCount = latestIssues.length;
+  const syncedCardCount = Number(latestStats.received || 0);
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
 
   const summary = useMemo(
     () => [
-      { label: 'Карточек', value: total, icon: Users },
+      { label: 'Карточек из 1С', value: syncedCardCount || total, icon: Users },
+      { label: 'Найдено по фильтру', value: total, icon: Search },
       {
-        label: 'Мест работы',
+        label: 'Мест работы из 1С',
         value: Number(latestStats.workplaceCount || 0),
         icon: Briefcase,
       },
@@ -129,7 +131,7 @@ export default function EmployeeDirectoryPage() {
         icon: AlertTriangle,
       },
     ],
-    [issueCount, latestStats.workplaceCount, total]
+    [issueCount, latestStats.workplaceCount, syncedCardCount, total]
   );
 
   const submitSearch = (event: React.FormEvent) => {
@@ -199,7 +201,7 @@ export default function EmployeeDirectoryPage() {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {summary.map((item) => (
           <div key={item.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-3">
