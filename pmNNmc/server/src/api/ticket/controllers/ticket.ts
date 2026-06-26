@@ -369,8 +369,11 @@ export function buildTicketSearchFilter(search: string) {
   return {
     $or: [
       { requesterName: { $containsi: search } },
+      { requesterPhone: { $containsi: search } },
       { ticketNumber: { $containsi: search } },
       { requesterDepartment: { $containsi: search } },
+      { comment: { $containsi: search } },
+      { staffComment: { $containsi: search } },
       { category: { name_ru: { $containsi: search } } },
       { category: { name_kz: { $containsi: search } } },
       { category: { slug: { $containsi: search } } },

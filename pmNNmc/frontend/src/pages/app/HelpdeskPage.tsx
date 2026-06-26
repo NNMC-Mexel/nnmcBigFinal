@@ -33,11 +33,13 @@ export default function HelpdeskPage() {
 
   const doFetch = useCallback(
     (status: string, search: string, assigneeId?: number, myOnly?: boolean, page = 1) => {
+      const hasSearch = search.trim().length > 0;
+      const effectiveMyOnly = hasSearch ? false : myOnly;
       const f: any = {};
       if (status !== 'ALL') f.status = status;
       if (search) f.search = search;
-      if (!myOnly && assigneeId) f.assigneeId = assigneeId;
-      f.myTickets = myOnly;
+      if (!effectiveMyOnly && assigneeId) f.assigneeId = assigneeId;
+      f.myTickets = effectiveMyOnly;
       f.page = page;
       f.pageSize = PAGE_SIZE;
       setFilters(f);
@@ -153,6 +155,9 @@ export default function HelpdeskPage() {
       ? `${user.lastName || ''} ${user.firstName || ''}`.trim()
       : user?.username || user?.email || '-';
 
+  const getClosureCategory = (ticket: any) =>
+    ticket.status === 'DONE' ? ticket.complexity || '-' : '-';
+
   return (
     <div className="w-full max-w-full min-w-0 space-y-5 sm:space-y-6">
       {/* Header */}
@@ -249,6 +254,12 @@ export default function HelpdeskPage() {
                         {getCategoryName(ticket)}
                       </span>
                     </div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Tag className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                      <span className="truncate">
+                        Категория закрытия: {getClosureCategory(ticket)}
+                      </span>
+                    </div>
                     <div className="grid grid-cols-1 gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500 min-[420px]:grid-cols-2">
                       <div className="flex min-w-0 items-center gap-2">
                         <UserRound className="h-4 w-4 flex-shrink-0 text-slate-400" />
@@ -290,6 +301,9 @@ export default function HelpdeskPage() {
                         {t('helpdesk.status', 'Статус')}
                       </th>
                       <th className="text-left px-4 py-3 font-medium text-slate-600">
+                        Кат. закрытия
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">
                         {t('helpdesk.assignee', 'Исполнитель')}
                       </th>
                       <th className="text-left px-4 py-3 font-medium text-slate-600">
@@ -315,6 +329,9 @@ export default function HelpdeskPage() {
                         <td className="px-4 py-3 text-slate-600">{getCategoryName(ticket)}</td>
                         <td className="px-4 py-3">
                           <TicketStatusBadge status={ticket.status} />
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {getClosureCategory(ticket)}
                         </td>
                         <td className="px-4 py-3 text-slate-600">{getAssigneeName(ticket)}</td>
                         <td className="px-4 py-3 text-slate-600">
