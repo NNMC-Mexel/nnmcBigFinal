@@ -471,7 +471,7 @@ export default function DocumentList({ type = "my" }) {
                     {filteredDocuments.length}
                 </div>
 
-                <div className='flex items-center gap-1'>
+                <div className='flex flex-wrap items-center justify-center gap-1'>
                     <button
                         onClick={() => goToPage(currentPage - 1)}
                         disabled={currentPage === 1}
@@ -774,7 +774,7 @@ export default function DocumentList({ type = "my" }) {
                             </div>
 
                             {subdivisions.length > 0 && (
-                                <div ref={subdivisionDropdownRef} className='relative min-w-[320px]'>
+                                <div ref={subdivisionDropdownRef} className='relative w-full sm:w-auto sm:min-w-[320px]'>
                                     <label className='block text-sm font-medium text-gray-700 mb-1'>
                                         Подразделение
                                     </label>
@@ -794,7 +794,7 @@ export default function DocumentList({ type = "my" }) {
                                         className='w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent'
                                     />
                                     {subdivisionDropdownOpen && (
-                                        <div className='absolute z-50 mt-1 min-w-full w-max max-w-lg bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto'>
+                                        <div className='absolute z-50 mt-1 min-w-full w-max max-w-[calc(100vw-2rem)] sm:max-w-lg bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto'>
                                             <div
                                                 className='px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50 text-gray-500'
                                                 onMouseDown={() => {
@@ -1045,7 +1045,7 @@ export default function DocumentList({ type = "my" }) {
                                                         )}
                                                     </h3>
 
-                                                    <div className='flex items-center gap-4 text-sm text-gray-600 mb-2'>
+                                                    <div className='flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600 mb-2'>
                                                         <span>
                                                             Создан:{" "}
                                                             {new Date(

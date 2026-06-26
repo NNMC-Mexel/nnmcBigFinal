@@ -133,6 +133,11 @@
     "isKpiResponsible": {
       "type": "boolean",
       "default": false
+    },
+    "sessionVersion": {
+      "type": "integer",
+      "default": 0,
+      "private": true
     }
   }
 }

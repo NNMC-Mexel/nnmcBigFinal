@@ -4,6 +4,7 @@ function safeUser(user: any) {
     password,
     resetPasswordToken,
     confirmationToken,
+    sessionVersion,
     ...rest
   } = user;
   return rest;
@@ -13,6 +14,54 @@ type KeycloakPasswordUpdateResult = {
   ok: boolean;
   message?: string;
 };
+
+function normalizedSessionVersion(value: any): number {
+  const version = Number(value);
+  return Number.isInteger(version) && version >= 0 ? version : 0;
+}
+
+async function bumpSessionVersion(strapi: any, userId: number): Promise<number> {
+  const user = await strapi.db.query('plugin::users-permissions.user').findOne({
+    where: { id: userId },
+    select: ['id', 'sessionVersion'],
+  });
+  const nextVersion = normalizedSessionVersion(user?.sessionVersion) + 1;
+
+  await strapi.db.query('plugin::users-permissions.user').update({
+    where: { id: userId },
+    data: { sessionVersion: nextVersion },
+  });
+
+  const sessionManager = strapi.sessionManager;
+  if (sessionManager?.hasOrigin?.('users-permissions')) {
+    await sessionManager('users-permissions').invalidateRefreshToken(String(userId));
+  }
+
+  return nextVersion;
+}
+
+async function issueCurrentSessionJwt(strapi: any, userId: number, sessionVersion?: number) {
+  let version = sessionVersion;
+  if (version === undefined) {
+    const user = await strapi.db.query('plugin::users-permissions.user').findOne({
+      where: { id: userId },
+      select: ['id', 'sessionVersion'],
+    });
+    version = normalizedSessionVersion(user?.sessionVersion);
+  }
+
+  return strapi.plugin('users-permissions').service('jwt').issue({
+    id: userId,
+    sessionVersion: normalizedSessionVersion(version),
+  });
+}
+
+async function refreshResponseJwt(strapi: any, ctx: any, userId?: number) {
+  if (!ctx.body?.jwt) return;
+  const resolvedUserId = Number(userId || ctx.body?.user?.id);
+  if (!resolvedUserId) return;
+  ctx.body.jwt = await issueCurrentSessionJwt(strapi, resolvedUserId);
+}
 
 async function getKeycloakAdminToken(strapi: any): Promise<string | null> {
   const keycloakUrl = process.env.KEYCLOAK_URL;
@@ -134,6 +183,29 @@ async function setKeycloakPassword(strapi: any, user: any, password: string): Pr
   }
 }
 
+async function logoutKeycloakSessions(strapi: any, user: any) {
+  const token = await getKeycloakAdminToken(strapi);
+  if (!token) return;
+  const keycloakUser = await findKeycloakUser(strapi, token, user);
+  if (!keycloakUser?.id) return;
+
+  const keycloakUrl = process.env.KEYCLOAK_URL;
+  const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
+  const res = await fetch(
+    `${keycloakUrl}/admin/realms/${keycloakRealm}/users/${keycloakUser.id}/logout`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text().catch(() => '');
+    strapi.log.warn(
+      `[keycloak-profile] session logout failed for ${user?.email || user?.username || user?.id}: HTTP ${res.status}${text ? ` ${text.slice(0, 300)}` : ''}`
+    );
+  }
+}
+
 async function verifyKeycloakPassword(strapi: any, user: any, password: string): Promise<boolean | null> {
   const keycloakUrl = process.env.KEYCLOAK_URL;
   const keycloakRealm = process.env.KEYCLOAK_REALM || 'nnmc';
@@ -170,6 +242,39 @@ async function verifyKeycloakPassword(strapi: any, user: any, password: string):
 }
 
 export default (plugin) => {
+  const originalJwtService = plugin.services.jwt;
+  plugin.services.jwt = (context) => {
+    const service = originalJwtService(context);
+    return {
+      ...service,
+      async verify(token: string) {
+        const payload = await service.verify(token);
+        const mode = context.strapi.config.get(
+          'plugin::users-permissions.jwtManagement',
+          'legacy-support'
+        );
+        if (mode === 'refresh') return payload;
+
+        const userId = Number(payload?.id);
+        if (!userId) throw new Error('Invalid token.');
+
+        const user = await context.strapi.db.query('plugin::users-permissions.user').findOne({
+          where: { id: userId },
+          select: ['id', 'sessionVersion'],
+        });
+        if (
+          !user ||
+          normalizedSessionVersion(payload?.sessionVersion) !==
+            normalizedSessionVersion(user.sessionVersion)
+        ) {
+          throw new Error('Invalid token.');
+        }
+
+        return payload;
+      },
+    };
+  };
+
   // Override bootstrap to patch Keycloak grant URLs to use HTTP instead of
   // grant's hardcoded https:// scheme (needed for internal HTTP-only deployments)
   const originalBootstrap = plugin.bootstrap;
@@ -276,11 +381,29 @@ export default (plugin) => {
           }
 
           await userService.edit(requestUser.id, { password });
-          ctx.body = { ok: true };
+          const sessionVersion = await bumpSessionVersion(strapi, Number(requestUser.id));
+          await logoutKeycloakSessions(strapi, fullUser).catch((error: any) => {
+            strapi.log.warn(`[keycloak-profile] session logout failed: ${error?.message || error}`);
+          });
+          ctx.body = {
+            ok: true,
+            jwt: await issueCurrentSessionJwt(strapi, Number(requestUser.id), sessionVersion),
+            user: safeUser(fullUser),
+          };
           return;
         }
 
         await original.changePassword(ctx);
+        const sessionVersion = await bumpSessionVersion(strapi, Number(requestUser.id));
+        ctx.body.jwt = await issueCurrentSessionJwt(strapi, Number(requestUser.id), sessionVersion);
+      },
+
+      async resetPassword(ctx) {
+        await original.resetPassword(ctx);
+        const userId = Number(ctx.body?.user?.id);
+        if (!userId) return;
+        const sessionVersion = await bumpSessionVersion(strapi, userId);
+        ctx.body.jwt = await issueCurrentSessionJwt(strapi, userId, sessionVersion);
       },
 
       async callback(ctx) {
@@ -316,35 +439,33 @@ export default (plugin) => {
         await original.callback(ctx);
 
         // Post-callback: assign Member role to new Keycloak users
-        if (ctx.params?.provider !== 'keycloak') return;
-
         const body = ctx.body as any;
         const userId = body?.user?.id;
-        if (!userId) return;
+        if (ctx.params?.provider === 'keycloak' && userId) {
+          const user = await strapi.entityService.findOne(
+            'plugin::users-permissions.user',
+            userId,
+            { populate: ['role'] }
+          );
 
-        const user = await strapi.entityService.findOne(
-          'plugin::users-permissions.user',
-          userId,
-          { populate: ['role'] }
-        );
+          const role = (user as any)?.role;
+          if (role?.type === 'authenticated') {
+            const memberRole = await strapi.db
+              .query('plugin::users-permissions.role')
+              .findOne({ where: { name: 'Member' } });
 
-        const role = (user as any)?.role;
-        if (!role || role.type !== 'authenticated') return;
-
-        const memberRole = await strapi.db
-          .query('plugin::users-permissions.role')
-          .findOne({ where: { name: 'Member' } });
-
-        if (!memberRole) {
-          strapi.log.warn('[keycloak] Member role not found — user keeps Authenticated role');
-          return;
+            if (!memberRole) {
+              strapi.log.warn('[keycloak] Member role not found — user keeps Authenticated role');
+            } else {
+              await strapi.entityService.update('plugin::users-permissions.user', userId, {
+                data: { role: memberRole.id },
+              });
+              strapi.log.info(`[keycloak] User ${userId} assigned Member role on first SSO login`);
+            }
+          }
         }
 
-        await strapi.entityService.update('plugin::users-permissions.user', userId, {
-          data: { role: memberRole.id },
-        });
-
-        strapi.log.info(`[keycloak] User ${userId} assigned Member role on first SSO login`);
+        await refreshResponseJwt(strapi, ctx, Number(userId));
       },
     };
   };

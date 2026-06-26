@@ -260,7 +260,7 @@ export default function AppLayout() {
                 }`}>
                 <div className='flex flex-col h-full'>
                     {/* Logo */}
-                    <div className='p-4 border-b border-slate-100'>
+                    <div className='p-4 pt-[calc(env(safe-area-inset-top)_+_1rem)] border-b border-slate-100'>
                         <div className='flex items-center gap-3'>
                             <img src="/logo.png" alt="ННМЦ" className="w-10 h-10 object-contain" />
                             <div>
@@ -534,7 +534,7 @@ export default function AppLayout() {
             {/* Main content */}
             <div className='flex-1 flex flex-col min-w-0 max-w-full'>
                 {/* Top bar */}
-                <header className='bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between lg:justify-end'>
+                <header className='bg-white border-b border-slate-200 px-4 py-3 pt-[calc(env(safe-area-inset-top)_+_0.75rem)] flex items-center justify-between lg:justify-end'>
                     <button
                         onClick={() => setSidebarOpen(true)}
                         className='lg:hidden p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-lg'>
@@ -552,7 +552,7 @@ export default function AppLayout() {
                 </header>
 
                 {/* Page content */}
-                <main className='flex-1 min-w-0 max-w-full overflow-y-auto overflow-x-hidden p-4 lg:p-6'>
+                <main className='flex-1 min-w-0 max-w-full overflow-y-auto overflow-x-hidden p-4 lg:p-6 pb-[calc(env(safe-area-inset-bottom)_+_1rem)]'>
                     <Outlet />
                 </main>
             </div>

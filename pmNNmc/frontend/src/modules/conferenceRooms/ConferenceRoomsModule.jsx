@@ -245,7 +245,7 @@ function BookingDashboard({ confUser, profileUser }) {
 
       {/* Calendar + sidebar */}
       <div className="flex flex-col xl:flex-row gap-4 sm:gap-6 min-w-0">
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-x-auto">
           <Calendar
             key={refreshKey}
             rooms={displayRooms}

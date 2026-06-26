@@ -19,6 +19,15 @@ body {
   min-height: 100vh;
 }
 
+/* Safe-area (notch / status bar / gesture bar) for the native app.
+   On desktop / Android-without-overlay these insets are 0, so no visual change. */
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pl-safe { padding-left: env(safe-area-inset-left); }
+.pr-safe { padding-right: env(safe-area-inset-right); }
+/* Add the inset ON TOP of existing padding (use on bars that already have padding). */
+.safe-top { padding-top: calc(env(safe-area-inset-top) + var(--safe-extra-top, 0px)); }
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

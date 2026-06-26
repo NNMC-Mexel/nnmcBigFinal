@@ -56,12 +56,21 @@ export default function ProfilePage() {
 
     setIsUpdatingPassword(true);
     try {
-      await client.post('/auth/change-password', {
+      const response = await client.post('/auth/change-password', {
         currentPassword: passwordData.currentPassword,
         password: passwordData.newPassword,
         passwordConfirmation: passwordData.confirmPassword,
       });
-      setPasswordSuccess('Пароль успешно изменён');
+      const nextToken = response.data?.jwt;
+      if (nextToken) {
+        if (sessionStorage.getItem('jwt') && !localStorage.getItem('jwt')) {
+          sessionStorage.setItem('jwt', nextToken);
+        } else {
+          localStorage.setItem('jwt', nextToken);
+        }
+        useAuthStore.setState({ token: nextToken });
+      }
+      setPasswordSuccess('Пароль изменён. На остальных устройствах выполнен выход из аккаунта.');
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setIsEditingPassword(false);
     } catch (error: any) {

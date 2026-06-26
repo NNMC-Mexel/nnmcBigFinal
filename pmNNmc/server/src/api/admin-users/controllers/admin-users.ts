@@ -303,6 +303,39 @@ async function setKeycloakTemporaryPassword(
   }
 }
 
+async function logoutKeycloakUserSessions(token: string, keycloakUser: any) {
+  const { url, realm } = getKeycloakConfig();
+  if (!url || !keycloakUser?.id) return;
+
+  const res = await fetch(`${url}/admin/realms/${realm}/users/${keycloakUser.id}/logout`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok && res.status !== 204) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Keycloak session logout failed (HTTP ${res.status})${text ? `: ${text}` : ''}`);
+  }
+}
+
+async function invalidateUserSessions(strapi: any, userId: number) {
+  const user = await strapi.db.query('plugin::users-permissions.user').findOne({
+    where: { id: userId },
+    select: ['id', 'sessionVersion'],
+  });
+  const currentVersion = Number(user?.sessionVersion);
+  const nextVersion = (Number.isInteger(currentVersion) && currentVersion >= 0 ? currentVersion : 0) + 1;
+
+  await strapi.db.query('plugin::users-permissions.user').update({
+    where: { id: userId },
+    data: { sessionVersion: nextVersion },
+  });
+
+  const sessionManager = strapi.sessionManager;
+  if (sessionManager?.hasOrigin?.('users-permissions')) {
+    await sessionManager('users-permissions').invalidateRefreshToken(String(userId));
+  }
+}
+
 export default {
   // ─── Users ────────────────────────────────────────────
 
@@ -509,6 +542,9 @@ export default {
         const keycloakUser = await findKeycloakUser(token, user);
         if (keycloakUser?.id) {
           await setKeycloakTemporaryPassword(strapi, token, keycloakUser, password, keycloakProfilePatch(user));
+          await logoutKeycloakUserSessions(token, keycloakUser).catch((error: any) => {
+            strapi.log.warn(`[keycloak-admin] Could not terminate sessions: ${error?.message || error}`);
+          });
           requiresPasswordUpdate = true;
         } else if (user.provider === 'keycloak') {
           ctx.throw(404, 'Keycloak user not found');
@@ -522,6 +558,7 @@ export default {
       await strapi.entityService.update('plugin::users-permissions.user', id, {
         data: { password },
       });
+      await invalidateUserSessions(strapi, Number(id));
 
       ctx.body = {
         message: 'Password reset to the standard initial password',
