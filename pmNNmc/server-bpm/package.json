@@ -8,7 +8,7 @@
     "console": "strapi console",
     "develop": "strapi develop",
     "dev": "strapi develop",
-    "start": "strapi start",
+    "start": "mkdir -p public/uploads && strapi start",
     "seed": "strapi console --eval \"require('./scripts/seed').default()\"",
     "strapi": "strapi",
     "test": "tsx --test tests/*.test.ts"
