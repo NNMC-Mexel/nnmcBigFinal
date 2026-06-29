@@ -1,4 +1,4 @@
-import client from './client';
+import bpmClient from './bpmClient';
 
 export interface EmployeeWorkplace {
   employeeId: string;
@@ -84,17 +84,17 @@ export const employeeCardsApi = {
     department?: string;
     active?: 'true' | 'false' | 'all';
   }): Promise<EmployeeCardsResponse> => {
-    const response = await client.get('/employee-cards', { params });
+    const response = await bpmClient.get('/employee-cards', { params });
     return response.data;
   },
 
   syncStatus: async (): Promise<EmployeeSyncStatus> => {
-    const response = await client.get('/employee-cards/sync-status');
+    const response = await bpmClient.get('/employee-cards/sync-status');
     return response.data;
   },
 
   get: async (id: number | string): Promise<EmployeeCard> => {
-    const response = await client.get(`/employee-cards/${id}`);
+    const response = await bpmClient.get(`/employee-cards/${id}`);
     return response.data.data;
   },
 
@@ -105,7 +105,7 @@ export const employeeCardsApi = {
     stats: Record<string, number>;
     issues: Array<Record<string, unknown>>;
   }> => {
-    const response = await client.post('/employee-cards/sync');
+    const response = await bpmClient.post('/employee-cards/sync');
     return response.data;
   },
 };

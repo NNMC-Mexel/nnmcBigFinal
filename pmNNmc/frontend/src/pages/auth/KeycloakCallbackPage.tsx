@@ -7,13 +7,20 @@ export default function KeycloakCallbackPage() {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
-  // Exchange Keycloak access_token with secondary backends (KPI, Conf, Journal)
+  // Exchange Keycloak access_token with secondary backends (KPI, Conf, Journal, BPM)
   function exchangeSecondaryTokens(accessToken: string) {
     const kpiApiBase = import.meta.env.VITE_KPI_API_BASE;
     const confApiUrl = import.meta.env.VITE_CONF_API_URL;
     const journalApiUrl = import.meta.env.VITE_JOURNAL_API_URL;
     const signdocApiBase = import.meta.env.VITE_SIGNDOC_API_BASE;
+    const bpmApiUrl = import.meta.env.VITE_BPM_API_URL;
     const encoded = encodeURIComponent(accessToken);
+    const authCallbackUrl = (baseUrl: string) => {
+      const cleanBase = String(baseUrl).replace(/\/+$/, '');
+      return cleanBase.endsWith('/api')
+        ? `${cleanBase}/auth/keycloak/callback?access_token=${encoded}`
+        : `${cleanBase}/api/auth/keycloak/callback?access_token=${encoded}`;
+    };
 
     const kpiPromise = kpiApiBase
       ? fetch(`${kpiApiBase}/auth/keycloak/callback?access_token=${encoded}`)
@@ -35,12 +42,18 @@ export default function KeycloakCallbackPage() {
           .then((res) => res.json())
           .catch(() => null)
       : Promise.resolve(null);
+    const bpmPromise = bpmApiUrl
+      ? fetch(authCallbackUrl(bpmApiUrl))
+          .then((res) => res.json())
+          .catch(() => null)
+      : Promise.resolve(null);
 
-    return Promise.all([kpiPromise, confPromise, journalPromise, signdocPromise]).then(
-      ([kpiData, confData, journalData, signdocData]) => {
+    return Promise.all([kpiPromise, confPromise, journalPromise, signdocPromise, bpmPromise]).then(
+      ([kpiData, confData, journalData, signdocData, bpmData]) => {
         if (kpiData?.jwt) localStorage.setItem('kpi_token', kpiData.jwt);
         if (confData?.jwt) localStorage.setItem('conf_token', confData.jwt);
         if (journalData?.jwt) localStorage.setItem('journal_token', journalData.jwt);
+        if (bpmData?.jwt) localStorage.setItem('bpm_token', bpmData.jwt);
         if (signdocData?.jwt) {
           localStorage.setItem('signdoc_token', signdocData.jwt);
           if (signdocData.user) localStorage.setItem('signdoc_user', JSON.stringify(signdocData.user));

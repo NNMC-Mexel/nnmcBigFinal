@@ -1,0 +1,63 @@
+{
+  "kind": "collectionType",
+  "collectionName": "employee_sync_logs",
+  "info": {
+    "singularName": "employee-sync-log",
+    "pluralName": "employee-sync-logs",
+    "displayName": "Employee Sync Log",
+    "description": "Employee synchronization runs from 1C"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "running",
+        "completed",
+        "failed"
+      ],
+      "required": true
+    },
+    "trigger": {
+      "type": "enumeration",
+      "enum": [
+        "manual",
+        "scheduled"
+      ],
+      "required": true
+    },
+    "triggeredBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "triggeredByName": {
+      "type": "string"
+    },
+    "startedAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "finishedAt": {
+      "type": "datetime"
+    },
+    "sourceActualAt": {
+      "type": "datetime"
+    },
+    "source": {
+      "type": "string"
+    },
+    "stats": {
+      "type": "json"
+    },
+    "issues": {
+      "type": "json"
+    },
+    "message": {
+      "type": "text"
+    }
+  }
+}

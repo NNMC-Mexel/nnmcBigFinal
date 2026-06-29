@@ -89,6 +89,8 @@ export const useAuthStore = create<AuthState>()(
         localStorage.removeItem('jwt');
         sessionStorage.removeItem('jwt');
         localStorage.removeItem('kpi_token');
+        localStorage.removeItem('bpm_token');
+        sessionStorage.removeItem('bpm_token');
         localStorage.removeItem('kpi_user_cache_v1');
         localStorage.removeItem('kpi_cache_v1');
         localStorage.removeItem('conf_token');

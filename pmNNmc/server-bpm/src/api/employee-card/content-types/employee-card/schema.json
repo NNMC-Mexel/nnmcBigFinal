@@ -1,0 +1,86 @@
+{
+  "kind": "collectionType",
+  "collectionName": "employee_cards",
+  "info": {
+    "singularName": "employee-card",
+    "pluralName": "employee-cards",
+    "displayName": "Employee Card",
+    "description": "Current employee cards synchronized from 1C"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "iin": {
+      "type": "string",
+      "required": true,
+      "unique": true,
+      "minLength": 12,
+      "maxLength": 12
+    },
+    "physicalPersonId": {
+      "type": "string"
+    },
+    "fio": {
+      "type": "string",
+      "required": true
+    },
+    "lastName": {
+      "type": "string"
+    },
+    "firstName": {
+      "type": "string"
+    },
+    "middleName": {
+      "type": "string"
+    },
+    "birthDate": {
+      "type": "date"
+    },
+    "gender": {
+      "type": "string"
+    },
+    "nationality": {
+      "type": "string"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    },
+    "workplaces": {
+      "type": "json",
+      "default": []
+    },
+    "sourceHash": {
+      "type": "string"
+    },
+    "sourceActualAt": {
+      "type": "datetime"
+    },
+    "lastSyncedAt": {
+      "type": "datetime"
+    },
+    "deactivatedAt": {
+      "type": "datetime"
+    },
+    "keycloakUserId": {
+      "type": "string"
+    },
+    "keycloakStatus": {
+      "type": "enumeration",
+      "enum": [
+        "not_created",
+        "created",
+        "disabled",
+        "error"
+      ],
+      "default": "not_created"
+    },
+    "user": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

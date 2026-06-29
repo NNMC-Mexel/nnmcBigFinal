@@ -1,0 +1,40 @@
+{
+  "kind": "collectionType",
+  "collectionName": "departments",
+  "info": {
+    "singularName": "department",
+    "pluralName": "departments",
+    "displayName": "Department",
+    "description": "Departments used for BPM user access"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "key": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "name_ru": {
+      "type": "string",
+      "required": true
+    },
+    "name_kz": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "text"
+    },
+    "canViewBpm": {
+      "type": "boolean",
+      "default": false
+    },
+    "canManageEmployees": {
+      "type": "boolean",
+      "default": false
+    }
+  }
+}
