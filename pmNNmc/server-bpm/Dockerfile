@@ -38,9 +38,9 @@ COPY --from=builder /app/config ./config
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/src ./src
 
-# Create directories for data persistence
-RUN mkdir -p .tmp public/uploads
-RUN chown -R strapi:nodejs .tmp public/uploads
+# Create directories Strapi needs to write to at runtime
+RUN mkdir -p .tmp public/uploads database/migrations
+RUN chown -R strapi:nodejs .tmp public/uploads database
 
 USER strapi
 
