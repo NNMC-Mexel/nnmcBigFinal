@@ -13,7 +13,6 @@ import DeepLinkHandler from './components/DeepLinkHandler';
 import { isKeycloakEnabled, startKeycloakLogin } from './utils/keycloakAuth';
 
 // Lazy auth pages (rarely visited)
-const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
 const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage'));
@@ -200,9 +199,7 @@ function App() {
         />
         <Route
           path="/register"
-          element={
-            <PublicRoute>{withSuspense(<RegisterPage />)}</PublicRoute>
-          }
+          element={<Navigate to="/login" replace />}
         />
         <Route path="/forgot-password" element={withSuspense(<ForgotPasswordPage />)} />
         <Route path="/reset-password" element={withSuspense(<ResetPasswordPage />)} />

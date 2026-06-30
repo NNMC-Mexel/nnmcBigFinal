@@ -6,7 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 import Card from '../../components/ui/Card';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
-import { startKeycloakLogin } from '../../utils/keycloakAuth';
+import { isKeycloakEnabled, startKeycloakLogin } from '../../utils/keycloakAuth';
 import { Capacitor } from '@capacitor/core';
 
 export default function LoginPage() {
@@ -27,10 +27,9 @@ export default function LoginPage() {
     }
   }, []);
 
-  // On native (Capacitor) the org uses Keycloak SSO only — skip the
-  // email/password form and open the Keycloak login immediately.
+  // In production the org uses Keycloak SSO only — skip local auth forms.
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
+    if (isKeycloakEnabled || Capacitor.isNativePlatform()) {
       startKeycloakLogin();
     }
   }, []);
@@ -54,9 +53,8 @@ export default function LoginPage() {
     }
   };
 
-  // Native: no email/password form — just a waiting screen while Keycloak opens,
-  // with a button to re-open if the user backed out.
-  if (Capacitor.isNativePlatform()) {
+  // Keycloak mode: no email/password/register forms, only SSO redirect.
+  if (isKeycloakEnabled || Capacitor.isNativePlatform()) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6">
         <img src="/logo.png" alt="ННМЦ" className="w-20 h-20 object-contain mb-6" />
@@ -151,26 +149,6 @@ export default function LoginPage() {
             Забыли пароль?
           </button>
         </form>
-
-        {import.meta.env.VITE_KEYCLOAK_ENABLED === 'true' && (
-          <>
-            <div className="flex items-center gap-3 my-4">
-              <div className="flex-1 h-px bg-slate-200" />
-              <span className="text-xs text-slate-400">или</span>
-              <div className="flex-1 h-px bg-slate-200" />
-            </div>
-            <button
-              type="button"
-              onClick={startKeycloakLogin}
-              className="flex items-center justify-center gap-2 w-full py-2 px-4 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 4.5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15zm0 2.5a5 5 0 1 0 0 10A5 5 0 0 0 12 7z"/>
-              </svg>
-              Войти через Keycloak
-            </button>
-          </>
-        )}
 
         <p className="mt-6 text-center text-sm text-slate-500">
           {t('auth.noAccount')}{' '}
