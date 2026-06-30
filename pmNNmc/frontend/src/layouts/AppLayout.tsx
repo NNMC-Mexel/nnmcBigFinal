@@ -24,6 +24,7 @@ import {
     Briefcase,
     ClipboardList,
     Users,
+    Workflow,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuthStore, useUserRole } from "../store/authStore";
@@ -202,9 +203,9 @@ export default function AppLayout() {
 
     const bpmNavItems = [
         ...(canViewEmployeeDirectory ? [{
-            to: "/app/bpm/employees",
-            icon: Users,
-            label: "Сотрудники",
+            to: "/app/bpm",
+            icon: Workflow,
+            label: "BPM",
         }] : []),
     ];
 
@@ -323,11 +324,6 @@ export default function AppLayout() {
                         {/* BPM */}
                         {bpmNavItems.length > 0 && (
                             <>
-                                <div className='pt-4 pb-2'>
-                                    <p className='px-3 text-xs font-medium text-slate-400 uppercase'>
-                                        BPM
-                                    </p>
-                                </div>
                                 {bpmNavItems.map((item) => (
                                     <NavLink
                                         key={item.to}

@@ -31,6 +31,7 @@ const ActivityLogPage = lazy(() => import('./pages/app/ActivityLogPage'));
 const ProfilePage = lazy(() => import('./pages/app/ProfilePage'));
 const NotificationsPage = lazy(() => import('./pages/app/NotificationsPage'));
 const AdminPanelPage = lazy(() => import('./pages/app/AdminPanelPage'));
+const BpmPage = lazy(() => import('./pages/app/BpmPage'));
 const EmployeeDirectoryPage = lazy(() => import('./pages/app/EmployeeDirectoryPage'));
 const EmployeeCardPage = lazy(() => import('./pages/app/EmployeeCardPage'));
 const HelpdeskPage = lazy(() => import('./pages/app/HelpdeskPage'));
@@ -270,6 +271,12 @@ function App() {
           }
         />
         <Route path="employees" element={<Navigate to="/app/bpm/employees" replace />} />
+        <Route
+          path="bpm"
+          element={
+            <FeatureRoute allow={canViewEmployeeDirectory}>{withSuspense(<BpmPage />)}</FeatureRoute>
+          }
+        />
         <Route
           path="bpm/employees"
           element={
