@@ -252,6 +252,56 @@ async function createKeycloakUser(token: string, profile: Record<string, any>, p
   return response.status;
 }
 
+async function listKeycloakUsers(token: string, first: number, max: number) {
+  const { url, realm } = keycloakConfig();
+  if (!url) return [];
+
+  const response = await fetch(
+    `${url}/admin/realms/${realm}/users?first=${first}&max=${max}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`Keycloak users list failed (HTTP ${response.status})${text ? `: ${text.slice(0, 300)}` : ''}`);
+  }
+
+  const users = await response.json() as any[];
+  return Array.isArray(users) ? users : [];
+}
+
+async function cleanupKeycloakEmployeeEmails(strapi: any, token: string) {
+  const pageSize = 100;
+  let first = 0;
+  let cleared = 0;
+
+  while (true) {
+    const users = await listKeycloakUsers(token, first, pageSize);
+    if (users.length === 0) break;
+
+    for (const user of users) {
+      const username = cleanString(user?.username);
+      const email = cleanString(user?.email);
+      if (!/^\d{12}$/.test(username) || !email) continue;
+
+      await updateKeycloakProfile(token, user, {
+        email: null,
+        emailVerified: false,
+      });
+      cleared += 1;
+    }
+
+    if (users.length < pageSize) break;
+    first += pageSize;
+  }
+
+  if (cleared > 0) {
+    strapi.log.info(`[employee-sync] Cleared email from ${cleared} Keycloak employee accounts`);
+  }
+
+  return cleared;
+}
+
 async function loadEmployeeRole(strapi: any) {
   const memberRole = await strapi.db.query(ROLE_UID).findOne({ where: { name: 'Member' } });
   if (memberRole) return memberRole;
@@ -666,6 +716,7 @@ async function performSync(strapi: any, options: SyncOptions) {
       keycloakDisabled: 0,
       keycloakSkipped: 0,
       keycloakErrors: 0,
+      keycloakEmailsCleared: 0,
     };
     const keycloakEnabled = shouldSyncKeycloak();
     let keycloakToken = keycloakEnabled ? await getKeycloakAdminToken(strapi) : null;
@@ -683,6 +734,16 @@ async function performSync(strapi: any, options: SyncOptions) {
         code: 'employee_role_not_found',
         message: 'Member or Authenticated role was not found; employee account sync skipped',
       });
+    }
+    if (keycloakToken) {
+      try {
+        stats.keycloakEmailsCleared = await cleanupKeycloakEmployeeEmails(strapi, keycloakToken);
+      } catch (error: any) {
+        issues.push({
+          code: 'keycloak_email_cleanup_failed',
+          message: error?.message || String(error),
+        });
+      }
     }
 
     for (const sourceItem of allItems) {
