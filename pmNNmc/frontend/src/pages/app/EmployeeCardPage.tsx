@@ -102,7 +102,7 @@ export default function EmployeeCardPage() {
           <p className="text-xs font-semibold uppercase tracking-wide text-teal-600">BPM · Карточка сотрудника</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900">{card.fio}</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Одна карточка по ИИН. Все табельные номера и рабочие места загружаются из 1С.
+            Карточка, табельные номера и рабочие места загружаются из 1С.
           </p>
         </div>
         <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
@@ -112,8 +112,7 @@ export default function EmployeeCardPage() {
         </span>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <InfoItem label="ИИН" value={card.iin} />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <InfoItem label="Дата рождения" value={formatDate(card.birthDate)} />
         <InfoItem label="Пол" value={card.gender} />
         <InfoItem label="Национальность" value={card.nationality} />

@@ -59,7 +59,11 @@ function primaryWorkplace(workplaces: any[]) {
   );
 }
 
-function buildEmployeeEmail(iin: string): string {
+function buildInternalEmployeeEmail(iin: string): string {
+  return `${iin}@bpm.local`;
+}
+
+function buildLegacyEmployeeEmail(iin: string): string {
   const domain = cleanString(process.env.EMPLOYEE_KEYCLOAK_EMAIL_DOMAIN || 'employees.nnmc.kz')
     .replace(/^@+/, '')
     .toLowerCase();
@@ -137,7 +141,7 @@ async function getKeycloakAdminToken(strapi: any): Promise<string | null> {
   return data?.access_token || null;
 }
 
-async function findKeycloakUser(token: string, username: string, email: string) {
+async function findKeycloakUser(token: string, username: string, email?: string | null) {
   const { url, realm } = keycloakConfig();
   if (!url) return null;
   const adminBase = `${url}/admin/realms/${realm}`;
@@ -174,25 +178,32 @@ async function updateKeycloakProfile(token: string, keycloakUser: any, patch: Re
       ? keycloakUser.requiredActions
       : [];
 
+  const payload: Record<string, any> = {
+    username: patch.username ?? keycloakUser.username,
+    firstName: patch.firstName ?? keycloakUser.firstName,
+    lastName: patch.lastName ?? keycloakUser.lastName,
+    enabled: patch.enabled ?? keycloakUser.enabled ?? true,
+    emailVerified: patch.email === null ? false : (patch.emailVerified ?? keycloakUser.emailVerified ?? true),
+    requiredActions,
+    attributes: {
+      ...(keycloakUser.attributes || {}),
+      ...(patch.attributes || {}),
+    },
+  };
+
+  if (Object.prototype.hasOwnProperty.call(patch, 'email')) {
+    payload.email = patch.email;
+  } else if (keycloakUser.email) {
+    payload.email = keycloakUser.email;
+  }
+
   const response = await fetch(`${url}/admin/realms/${realm}/users/${keycloakUser.id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      username: patch.username ?? keycloakUser.username,
-      email: patch.email ?? keycloakUser.email,
-      firstName: patch.firstName ?? keycloakUser.firstName,
-      lastName: patch.lastName ?? keycloakUser.lastName,
-      enabled: patch.enabled ?? keycloakUser.enabled ?? true,
-      emailVerified: patch.emailVerified ?? keycloakUser.emailVerified ?? true,
-      requiredActions,
-      attributes: {
-        ...(keycloakUser.attributes || {}),
-        ...(patch.attributes || {}),
-      },
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -205,27 +216,32 @@ async function createKeycloakUser(token: string, profile: Record<string, any>, p
   const { url, realm } = keycloakConfig();
   if (!url) throw new Error('KEYCLOAK_URL is not configured');
 
+  const payload: Record<string, any> = {
+    username: profile.username,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    enabled: profile.enabled,
+    requiredActions: [KEYCLOAK_PASSWORD_REQUIRED_ACTION],
+    credentials: [{
+      type: 'password',
+      value: password,
+      temporary: true,
+    }],
+    attributes: profile.attributes || {},
+  };
+
+  if (profile.email) {
+    payload.email = profile.email;
+    payload.emailVerified = true;
+  }
+
   const response = await fetch(`${url}/admin/realms/${realm}/users`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      username: profile.username,
-      email: profile.email,
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      enabled: profile.enabled,
-      emailVerified: true,
-      requiredActions: [KEYCLOAK_PASSWORD_REQUIRED_ACTION],
-      credentials: [{
-        type: 'password',
-        value: password,
-        temporary: true,
-      }],
-      attributes: profile.attributes || {},
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok && response.status !== 409) {
@@ -242,34 +258,87 @@ async function loadEmployeeRole(strapi: any) {
   return await strapi.db.query(ROLE_UID).findOne({ where: { type: 'authenticated' } });
 }
 
-async function loadDepartmentsByName(strapi: any) {
+function departmentKeyFromWorkplace(workplace: any, departmentName: string, usedKeys: Set<string>) {
+  const rawId = cleanString(workplace?.departmentId);
+  const baseFromId = rawId
+    ? `ONEC_${rawId}`
+    : transliterate(departmentName).toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+  const fallback = createHash('sha1').update(departmentName).digest('hex').slice(0, 8).toUpperCase();
+  const compactBase = (baseFromId || `DEP_${fallback}`)
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 52) || `DEP_${fallback}`;
+
+  let key = compactBase;
+  let index = 1;
+  while (usedKeys.has(key)) {
+    key = `${compactBase.slice(0, 46)}_${fallback}_${index}`;
+    index += 1;
+  }
+  return key;
+}
+
+async function ensureDepartmentsFromSource(strapi: any, sourceItems: any[]) {
   const departments = await strapi.db.query(DEPARTMENT_UID).findMany({
     select: ['id', 'key', 'name_ru', 'name_kz'],
   });
   const byName = new Map<string, any>();
+  const usedKeys = new Set<string>();
+
   for (const department of departments || []) {
+    const key = cleanString(department.key);
+    if (key) usedKeys.add(key);
     for (const value of [department.key, department.name_ru, department.name_kz]) {
-      const key = normalizeText(value);
-      if (key && !byName.has(key)) byName.set(key, department);
+      const nameKey = normalizeText(value);
+      if (nameKey && !byName.has(nameKey)) byName.set(nameKey, department);
     }
   }
-  return byName;
+
+  let created = 0;
+
+  for (const sourceItem of sourceItems) {
+    const workplaces = Array.isArray(sourceItem?.workplaces) ? sourceItem.workplaces : [];
+    for (const workplace of workplaces) {
+      const departmentName = cleanString(workplace?.department);
+      const nameKey = normalizeText(departmentName);
+      if (!departmentName || byName.has(nameKey)) continue;
+
+      const key = departmentKeyFromWorkplace(workplace, departmentName, usedKeys);
+      usedKeys.add(key);
+      const department = await strapi.entityService.create(DEPARTMENT_UID, {
+        data: {
+          key,
+          name_ru: departmentName,
+          name_kz: departmentName,
+          canViewBpm: false,
+          canManageEmployees: false,
+        } as any,
+      });
+
+      created += 1;
+      byName.set(nameKey, department);
+      byName.set(normalizeText(key), department);
+    }
+  }
+
+  return { byName, created };
 }
 
 function keycloakProfileFromCard(card: any) {
-  const { firstName, lastName } = namePartsFromCard(card);
+  const { firstName, lastName, middleName } = namePartsFromCard(card);
   const workplace = primaryWorkplace(Array.isArray(card.workplaces) ? card.workplaces : []);
   const username = cleanString(card.iin);
-  const email = buildEmployeeEmail(username);
+  const fio = cleanString(card.fio) || [lastName, firstName, middleName].filter(Boolean).join(' ');
 
   return {
     username,
-    email,
+    email: null,
     firstName,
     lastName,
     enabled: card.active !== false,
     attributes: {
-      iin: [username],
+      iin: [],
+      fullName: fio ? [fio] : [],
+      middleName: middleName ? [middleName] : [],
       employeeCardId: card.id ? [String(card.id)] : [],
       physicalPersonId: card.physicalPersonId ? [String(card.physicalPersonId)] : [],
       department: workplace?.department ? [String(workplace.department)] : [],
@@ -286,6 +355,8 @@ async function ensureStrapiEmployeeUser(
   password: string
 ) {
   const profile = keycloakProfileFromCard(card);
+  const internalEmail = buildInternalEmployeeEmail(profile.username);
+  const legacyEmail = buildLegacyEmployeeEmail(profile.username);
   const workplace = primaryWorkplace(Array.isArray(card.workplaces) ? card.workplaces : []);
   const department = departmentsByName.get(normalizeText(workplace?.department));
   const existingByUsername = await strapi.db.query(USER_UID).findOne({
@@ -293,13 +364,16 @@ async function ensureStrapiEmployeeUser(
     populate: ['department'],
   });
   const existing = existingByUsername || await strapi.db.query(USER_UID).findOne({
-    where: { email: profile.email },
+    where: { email: internalEmail },
+    populate: ['department'],
+  }) || await strapi.db.query(USER_UID).findOne({
+    where: { email: legacyEmail },
     populate: ['department'],
   });
 
   const baseData: Record<string, any> = {
     username: profile.username,
-    email: profile.email,
+    email: internalEmail,
     firstName: profile.firstName,
     lastName: profile.lastName,
     position: cleanString(workplace?.position),
@@ -573,6 +647,7 @@ async function performSync(strapi: any, options: SyncOptions) {
     const existingByIin = new Map<string, any>(
       existingCards.map((card: any) => [cleanString(card.iin), card])
     );
+    const departmentSync = await ensureDepartmentsFromSource(strapi, allItems);
     const seenIins = new Set<string>();
     const stats = {
       received: allItems.length,
@@ -583,6 +658,7 @@ async function performSync(strapi: any, options: SyncOptions) {
       skipped: 0,
       workplaceCount: 0,
       departmentCount: departmentNames.size,
+      departmentsCreated: departmentSync.created,
       usersCreated: 0,
       usersUpdated: 0,
       keycloakCreated: 0,
@@ -594,7 +670,7 @@ async function performSync(strapi: any, options: SyncOptions) {
     const keycloakEnabled = shouldSyncKeycloak();
     let keycloakToken = keycloakEnabled ? await getKeycloakAdminToken(strapi) : null;
     const employeeRole = keycloakToken ? await loadEmployeeRole(strapi) : null;
-    const departmentsByName = keycloakToken ? await loadDepartmentsByName(strapi) : new Map<string, any>();
+    const departmentsByName = departmentSync.byName;
     if (keycloakEnabled && !keycloakToken) {
       issues.push({
         code: 'keycloak_not_configured',

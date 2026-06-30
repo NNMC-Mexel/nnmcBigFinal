@@ -52,7 +52,7 @@ function issueText(issue: Record<string, unknown>, index: number): string {
   const fio = String(issue.fio || issue.employee || issue.employeeName || '').trim();
   const iin = String(issue.iin || '').trim();
   const code = String(issue.code || '').trim();
-  const title = fio || (iin ? `ИИН ${iin}` : code || `Проблема ${index + 1}`);
+  const title = fio || (iin ? `Сотрудник ${index + 1}` : code || `Проблема ${index + 1}`);
   return message ? `${index + 1}. ${title}: ${message}` : `${index + 1}. ${title}`;
 }
 
@@ -187,7 +187,7 @@ export default function EmployeeDirectoryPage() {
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-teal-600">BPM</p>
           <h1 className="text-2xl font-bold text-slate-900">Сотрудники</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Одна карточка на ИИН. Табельные номера и места работы загружаются из 1С.
+            Карточки, табельные номера и места работы загружаются из 1С.
           </p>
           <p className="mt-2 text-xs text-slate-500">
             Последняя синхронизация: {formatDate(status?.latest?.finishedAt || status?.latest?.startedAt)}
@@ -257,7 +257,7 @@ export default function EmployeeDirectoryPage() {
             <input
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="ФИО, ИИН или табельный номер"
+              placeholder="ФИО, отдел, должность или табельный номер"
               className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
             />
           </label>
@@ -306,7 +306,6 @@ export default function EmployeeDirectoryPage() {
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-3">Сотрудник</th>
-                <th className="px-4 py-3">ИИН</th>
                 <th className="px-4 py-3">Основное место работы</th>
                 <th className="px-4 py-3">Табельные номера</th>
                 <th className="px-4 py-3">Оклад</th>
@@ -316,13 +315,13 @@ export default function EmployeeDirectoryPage() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={5} className="px-4 py-12 text-center text-slate-500">
                     Загрузка сотрудников...
                   </td>
                 </tr>
               ) : cards.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={5} className="px-4 py-12 text-center text-slate-500">
                     Сотрудники не найдены
                   </td>
                 </tr>
@@ -344,7 +343,6 @@ export default function EmployeeDirectoryPage() {
                           {card.gender ? ` · ${card.gender}` : ''}
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-slate-700">{card.iin}</td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-800">{primary?.department || '—'}</div>
                         <div className="mt-1 text-xs text-slate-500">{primary?.position || 'Должность не указана'}</div>
@@ -368,7 +366,7 @@ export default function EmployeeDirectoryPage() {
                     </tr>
                     {expanded && (
                       <tr className="bg-slate-50/70">
-                        <td colSpan={6} className="px-4 py-4">
+                        <td colSpan={5} className="px-4 py-4">
                           <div className="grid gap-3 lg:grid-cols-2">
                             {card.workplaces.map((workplace, index) => (
                               <div

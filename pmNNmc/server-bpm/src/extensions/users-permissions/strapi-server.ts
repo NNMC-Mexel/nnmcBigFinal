@@ -557,6 +557,18 @@ export default (plugin) => {
           targetId,
           { fields: ['id', 'username', 'email', 'provider', 'firstName', 'lastName', 'position', 'avatarUrl', 'avatarFileId'] } as any
         );
+        const syncedEmployeeProfile =
+          (before as any)?.provider === 'keycloak' && /^\d{12}$/.test(String((before as any)?.username || ''));
+        if (syncedEmployeeProfile) {
+          const protectedFields = ['firstName', 'lastName', 'position'];
+          const attemptedProtectedUpdate = protectedFields.some((field) =>
+            Object.prototype.hasOwnProperty.call(body, field)
+          );
+          if (attemptedProtectedUpdate) {
+            return ctx.badRequest('ФИО и должность сотрудника синхронизируются из 1С и не редактируются вручную');
+          }
+        }
+
         const updated = await strapi.entityService.update(
           'plugin::users-permissions.user',
           targetId,
