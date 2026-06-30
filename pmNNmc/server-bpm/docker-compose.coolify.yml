@@ -1,0 +1,68 @@
+services:
+  server-bpm-db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    volumes:
+      - server-bpm-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  server-bpm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      server-bpm-db:
+        condition: service_healthy
+    ports:
+      - "12016:12016"
+    environment:
+      NODE_ENV: ${NODE_ENV}
+      HOST: ${HOST}
+      PORT: ${PORT}
+      PUBLIC_URL: ${PUBLIC_URL}
+      SERVER_URL: ${SERVER_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      CORS_EXTRA_ORIGINS: ${CORS_EXTRA_ORIGINS}
+      APP_KEYS: ${APP_KEYS}
+      API_TOKEN_SALT: ${API_TOKEN_SALT}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
+      TRANSFER_TOKEN_SALT: ${TRANSFER_TOKEN_SALT}
+      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_CLIENT: postgres
+      DATABASE_HOST: server-bpm-db
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_SCHEMA: ${DATABASE_SCHEMA}
+      DATABASE_SSL: "false"
+      KEYCLOAK_ENABLED: ${KEYCLOAK_ENABLED}
+      KEYCLOAK_URL: ${KEYCLOAK_URL}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      KEYCLOAK_ADMIN_CLIENT_ID: ${KEYCLOAK_ADMIN_CLIENT_ID}
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
+      ONEC_API_URL: ${ONEC_API_URL}
+      ONEC_API_USER: ${ONEC_API_USER}
+      ONEC_API_PASSWORD: ${ONEC_API_PASSWORD}
+      ONEC_API_TIMEOUT_MS: ${ONEC_API_TIMEOUT_MS}
+      ONEC_EMPLOYEE_PAGE_SIZE: ${ONEC_EMPLOYEE_PAGE_SIZE}
+      EMPLOYEE_SYNC_ENABLED: ${EMPLOYEE_SYNC_ENABLED}
+      EMPLOYEE_SYNC_HOUR_UTC: ${EMPLOYEE_SYNC_HOUR_UTC}
+      EMPLOYEE_SYNC_DEACTIVATE_MISSING: ${EMPLOYEE_SYNC_DEACTIVATE_MISSING}
+      EMPLOYEE_SYNC_KEYCLOAK_ENABLED: ${EMPLOYEE_SYNC_KEYCLOAK_ENABLED}
+      EMPLOYEE_KEYCLOAK_EMAIL_DOMAIN: ${EMPLOYEE_KEYCLOAK_EMAIL_DOMAIN}
+      BPM_SUPERADMIN_USERNAMES: ${BPM_SUPERADMIN_USERNAMES}
+
+volumes:
+  server-bpm-db-data:
