@@ -1,13 +1,17 @@
 services:
   server-bpm-db:
-    image: postgres:18-alpine
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DATABASE_NAME:-nnmc_bpm}
       POSTGRES_USER: ${DATABASE_USERNAME:-server_bpm}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
     volumes:
-      - server-bpm-db-data:/var/lib/postgresql/data
+      - server-bpm-db16-data:/var/lib/postgresql/data
+    networks:
+      bpm-internal:
+        aliases:
+          - server-bpm-db
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -22,6 +26,8 @@ services:
     restart: unless-stopped
     depends_on:
       - server-bpm-db
+    networks:
+      - bpm-internal
     ports:
       - "12016:12016"
     environment:
@@ -65,4 +71,7 @@ services:
       BPM_SUPERADMIN_USERNAMES: ${BPM_SUPERADMIN_USERNAMES}
 
 volumes:
-  server-bpm-db-data:
+  server-bpm-db16-data:
+
+networks:
+  bpm-internal:
