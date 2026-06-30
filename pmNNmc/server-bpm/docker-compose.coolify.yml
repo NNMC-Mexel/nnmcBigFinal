@@ -3,16 +3,17 @@ services:
     image: postgres:18-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DATABASE_NAME}
-      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_DB: ${DATABASE_NAME:-nnmc_bpm}
+      POSTGRES_USER: ${DATABASE_USERNAME:-server_bpm}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
     volumes:
       - server-bpm-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 30
+      start_period: 30s
 
   server-bpm:
     build:
@@ -20,8 +21,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
-      server-bpm-db:
-        condition: service_healthy
+      - server-bpm-db
     ports:
       - "12016:12016"
     environment:
@@ -40,8 +40,8 @@ services:
       DATABASE_CLIENT: postgres
       DATABASE_HOST: server-bpm-db
       DATABASE_PORT: 5432
-      DATABASE_NAME: ${DATABASE_NAME}
-      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_NAME: ${DATABASE_NAME:-nnmc_bpm}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-server_bpm}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       DATABASE_SCHEMA: ${DATABASE_SCHEMA}
       DATABASE_SSL: "false"
