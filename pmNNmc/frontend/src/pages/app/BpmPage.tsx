@@ -14,7 +14,6 @@ import {
   Folder,
   FolderOpen,
   GraduationCap,
-  Headphones,
   Settings2,
   Trash2,
   UserMinus,
@@ -32,18 +31,6 @@ type BpmNode = {
   to?: string;
   children?: BpmNode[];
 };
-
-const archiveYears = (id: string): BpmNode[] => [
-  {
-    id: `${id}-archive`,
-    title: 'Архив',
-    icon: Archive,
-    children: [
-      { id: `${id}-archive-2025`, title: '2025 год', icon: Folder },
-      { id: `${id}-archive-2026`, title: '2026 год', icon: Folder },
-    ],
-  },
-];
 
 const companyArchive = (id: string): BpmNode[] => [
   {
@@ -95,24 +82,6 @@ const bpmTree: BpmNode[] = [
     children: [
       { id: 'my-tasks-active', title: 'Активные', icon: Clock3, count: 2 },
       { id: 'my-tasks-done', title: 'Завершенные', icon: CheckCircle2 },
-    ],
-  },
-  {
-    id: 'it',
-    title: 'IT',
-    icon: Headphones,
-    children: [
-      {
-        id: 'it-helpdesk',
-        title: 'Система заявок',
-        icon: Headphones,
-        status: 'draft',
-        children: [
-          { id: 'it-helpdesk-new', title: 'Новые заявки', icon: FileText },
-          { id: 'it-helpdesk-work', title: 'В работе', icon: Clock3 },
-          ...archiveYears('it-helpdesk'),
-        ],
-      },
     ],
   },
   {
