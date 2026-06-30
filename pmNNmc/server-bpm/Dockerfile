@@ -17,6 +17,7 @@ COPY . .
 
 ENV NODE_ENV=production
 RUN npm run build
+RUN npm prune --omit=dev && npm cache clean --force
 
 # Production image
 FROM base AS runner
