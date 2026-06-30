@@ -237,7 +237,9 @@ export default function AppLayout() {
         if (user?.firstName || user?.lastName) {
             return `${user.firstName || ""} ${user.lastName || ""}`.trim();
         }
-        return user?.username || user?.email || "";
+        const email = user?.email || "";
+        if (email && !email.endsWith("@bpm.local")) return email;
+        return "Сотрудник";
     };
 
     const avatarUrl = getMediaUrl(user?.avatarUrl);

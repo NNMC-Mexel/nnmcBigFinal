@@ -1,6 +1,6 @@
 import { useRef, useState, FormEvent, ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { User, Mail, Building2, Shield, Camera, Lock, Save, Eye, EyeOff, Briefcase, Trash2 } from 'lucide-react';
+import { Mail, Building2, Shield, Camera, Lock, Save, Eye, EyeOff, Briefcase, Trash2 } from 'lucide-react';
 import { useAuthStore, useUserRole } from '../../store/authStore';
 import client from '../../api/client';
 import Card from '../../components/ui/Card';
@@ -162,8 +162,14 @@ export default function ProfilePage() {
     if (user?.firstName || user?.lastName) {
       return `${user.firstName || ''} ${user.lastName || ''}`.trim();
     }
-    return user?.username || '';
+    const email = user?.email || '';
+    if (email && !email.endsWith('@bpm.local')) return email;
+    return 'Сотрудник';
   };
+
+  const visibleEmail = user?.email && !user.email.endsWith('@bpm.local')
+    ? user.email
+    : 'Не указан';
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -272,7 +278,6 @@ export default function ProfilePage() {
                     Редактировать
                   </button>
                 </div>
-                <p className="text-slate-500 mb-3">@{user?.username}</p>
                 {user?.position && (
                   <p className="text-slate-600 mb-3 flex items-center gap-2">
                     <Briefcase className="w-4 h-4" />
@@ -308,16 +313,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <p className="text-sm text-slate-500">Email</p>
-              <p className="font-medium text-slate-800">{user?.email}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
-              <User className="w-5 h-5 text-slate-500" />
-            </div>
-            <div>
-              <p className="text-sm text-slate-500">Имя пользователя</p>
-              <p className="font-medium text-slate-800">{user?.username}</p>
+              <p className="font-medium text-slate-800">{visibleEmail}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
