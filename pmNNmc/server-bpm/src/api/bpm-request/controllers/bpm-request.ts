@@ -103,6 +103,7 @@ function buildVacationPayload(data: {
     source: 'NNMC BPM',
     requestNumber: data.requestNumber,
     employee: {
+      employeeId: data.workplace?.employeeId || null,
       iin: data.card?.iin || null,
       physicalPersonId: data.card?.physicalPersonId || null,
       fio: data.card?.fio || null,
@@ -314,7 +315,9 @@ export default {
     const item = await strapi.entityService.findOne(REQUEST_UID, ctx.params.id);
     if (!item) ctx.throw(404, 'BPM request not found');
 
-    const endpoint = cleanString(process.env.ONEC_VACATION_REQUEST_URL);
+    const baseOnecUrl = cleanString(process.env.ONEC_API_URL).replace(/\/+$/, '');
+    const endpoint = cleanString(process.env.ONEC_VACATION_REQUEST_URL) ||
+      (baseOnecUrl ? `${baseOnecUrl}/v1/vacation-requests` : '');
     if (!endpoint) {
       await strapi.entityService.update(REQUEST_UID, item.id, {
         data: {

@@ -196,6 +196,30 @@ paths:
           description: 1C reference or employee could not be resolved
         "500":
           description: Internal 1C error
+  /hs/nnmc/v1/vacation-requests:
+    post:
+      summary: Create an unposted vacation document from BPM
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VacationRequest"
+      responses:
+        "201":
+          description: Unposted vacation document created
+        "200":
+          description: Existing document returned for duplicate requestNumber
+        "400":
+          description: Invalid request
+        "401":
+          description: 1C authentication failed
+        "422":
+          description: 1C reference or employee could not be resolved
+        "500":
+          description: Internal 1C error
 components:
   securitySchemes:
     basicAuth:
@@ -272,3 +296,68 @@ components:
             oneOf:
               - type: number
               - type: string
+    VacationRequest:
+      type: object
+      required: [requestNumber, employee, vacation]
+      properties:
+        documentForm:
+          type: string
+          example: Документ.Отпуск.Форма.ФормаДокумента
+        source:
+          type: string
+          example: NNMC BPM
+        requestNumber:
+          type: string
+          example: BPM-2026-000001
+        employee:
+          type: object
+          required: [employeeId, fio, organization]
+          properties:
+            employeeId:
+              type: string
+              format: uuid
+            iin:
+              type: string
+            fio:
+              type: string
+            personnelNumber:
+              type: string
+            position:
+              type: string
+            departmentId:
+              type: string
+              format: uuid
+            department:
+              type: string
+            organizationId:
+              type: string
+              format: uuid
+            organization:
+              type: string
+        manager:
+          type: object
+          properties:
+            name:
+              type: string
+            position:
+              type: string
+            department:
+              type: string
+        vacation:
+          type: object
+          required: [type, startDate, endDate, calendarDays]
+          properties:
+            type:
+              type: string
+            startDate:
+              type: string
+              format: date
+            endDate:
+              type: string
+              format: date
+            calendarDays:
+              type: integer
+            replacementEmployeeName:
+              type: string
+            comment:
+              type: string

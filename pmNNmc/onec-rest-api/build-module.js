@@ -6,6 +6,7 @@ const sources = [
   'EmployeesHttpServiceModule.bsl',
   'TimesheetHttpServiceHandlers.bsl',
   'KpiAccrualHttpServiceHandler.bsl',
+  'VacationRequestHttpServiceHandler.bsl',
 ];
 const target = path.join(directory, 'NNMCHttpServiceModule.bsl');
 

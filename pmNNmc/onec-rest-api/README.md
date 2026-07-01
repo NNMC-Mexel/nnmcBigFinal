@@ -44,6 +44,70 @@ confirmed in the NNMC configuration and is appropriate for employees who
 participate in KPI timesheets. It returns stable 1C reference UUIDs instead of
 using FIO as an identifier.
 
+## BPM vacation request endpoint
+
+```http
+POST /hs/nnmc/v1/vacation-requests
+Content-Type: application/json
+```
+
+Add URL template `/v1/vacation-requests` and POST handler
+`VacationRequestPOST`, then replace the HTTP service module with the generated
+[`NNMCHttpServiceModule.bsl`](./NNMCHttpServiceModule.bsl).
+
+The endpoint accepts vacation requests from `server-bpm` and creates an
+unposted `Документ.Отпуск` draft. It fills the safest shared fields
+(`Дата`, `Месяц`, `Организация`, `Сотрудник`, vacation dates and day count)
+and stores the full BPM payload in `Комментарий` with marker `[NNMC-BPM]`.
+Duplicate requests are detected by `requestNumber`.
+
+`server-bpm` sends this endpoint automatically when `ONEC_API_URL` points to
+the HTTP service root:
+
+```env
+ONEC_API_URL=http://192.168.40.83/copy10062025-rest/hs/nnmc
+```
+
+You can override the exact URL if needed:
+
+```env
+ONEC_VACATION_REQUEST_URL=http://192.168.40.83/copy10062025-rest/hs/nnmc/v1/vacation-requests
+```
+
+Example payload:
+
+```json
+{
+  "documentForm": "Документ.Отпуск.Форма.ФормаДокумента",
+  "source": "NNMC BPM",
+  "requestNumber": "BPM-2026-000001",
+  "employee": {
+    "employeeId": "4d7f0bd1-...",
+    "iin": "000000000000",
+    "fio": "Иванов Иван Иванович",
+    "personnelNumber": "1234",
+    "position": "врач",
+    "departmentId": "2ff251b6-...",
+    "department": "ОЦМК-2",
+    "organizationId": "8f7f0bd1-...",
+    "organization": "АО Национальный научный медицинский центр"
+  },
+  "manager": {
+    "name": "Петров Петр Петрович",
+    "position": "руководитель отдела",
+    "department": "ОЦМК-2"
+  },
+  "vacation": {
+    "type": "Ежегодный оплачиваемый отпуск",
+    "startDate": "2026-07-01",
+    "endDate": "2026-07-14",
+    "calendarDays": 14,
+    "replacementEmployeeName": "Сидоров Сидор Сидорович",
+    "comment": "Плановый отпуск"
+  }
+}
+```
+
 Example response:
 
 ```json
@@ -89,7 +153,9 @@ Example response:
 
 - Publish only through HTTPS.
 - Allow access only from the `server-kpi`/Coolify host at the firewall or IIS.
-- Use a dedicated read-only 1C account.
+- Use dedicated 1C accounts: read-only for employee/KPI reads, and a restricted
+  writer account for BPM vacation drafts with permission to create unposted
+  `Документ.Отпуск`.
 - Store the 1C username and password only in Coolify secrets.
 - Do not call 1C directly from the frontend.
 - Keep 1C authentication enabled for the publication.
@@ -100,7 +166,7 @@ Add these Coolify environment variables:
 
 ```env
 ONEC_API_URL=https://onec.internal/base/hs/nnmc
-ONEC_API_USER=nnmc_rest_reader
+ONEC_API_USER=nnmc_rest_reader_or_bpm_writer
 ONEC_API_PASSWORD=secret
 ONEC_API_TIMEOUT_MS=30000
 ```
