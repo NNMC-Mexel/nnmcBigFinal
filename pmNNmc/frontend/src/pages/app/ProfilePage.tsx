@@ -1,4 +1,4 @@
-import { useRef, useState, FormEvent, ChangeEvent } from 'react';
+import { useEffect, useRef, useState, FormEvent, ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Mail, Building2, Shield, Camera, Lock, Save, Eye, EyeOff, Briefcase, Trash2 } from 'lucide-react';
 import { useAuthStore, useUserRole } from '../../store/authStore';
@@ -38,6 +38,13 @@ export default function ProfilePage() {
     position: user?.position || '',
   });
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const isSyncedEmployeeProfile = user?.provider === 'keycloak' && /^\d{12}$/.test(String(user?.username || ''));
+
+  useEffect(() => {
+    if (isSyncedEmployeeProfile && isEditingProfile) {
+      setIsEditingProfile(false);
+    }
+  }, [isSyncedEmployeeProfile, isEditingProfile]);
 
   const handlePasswordChange = async (e: FormEvent) => {
     e.preventDefault();
@@ -82,6 +89,10 @@ export default function ProfilePage() {
 
   const handleProfileUpdate = async (e: FormEvent) => {
     e.preventDefault();
+    if (isSyncedEmployeeProfile) {
+      setIsEditingProfile(false);
+      return;
+    }
     setIsUpdatingProfile(true);
     try {
       await client.put(`/users/${user?.id}`, {
@@ -265,19 +276,21 @@ export default function ProfilePage() {
               <>
                 <div className="flex items-center gap-3 mb-2">
                   <h2 className="text-xl font-bold text-slate-800">{getFullName()}</h2>
-                  <button
-                    onClick={() => {
-                      setProfileData({
-                        firstName: user?.firstName || '',
-                        lastName: user?.lastName || '',
-                        position: user?.position || '',
-                      });
-                      setIsEditingProfile(true);
-                    }}
-                    className="text-primary-600 hover:text-primary-700 text-sm"
-                  >
-                    Редактировать
-                  </button>
+                  {!isSyncedEmployeeProfile && (
+                    <button
+                      onClick={() => {
+                        setProfileData({
+                          firstName: user?.firstName || '',
+                          lastName: user?.lastName || '',
+                          position: user?.position || '',
+                        });
+                        setIsEditingProfile(true);
+                      }}
+                      className="text-primary-600 hover:text-primary-700 text-sm"
+                    >
+                      Редактировать
+                    </button>
+                  )}
                 </div>
                 {user?.position && (
                   <p className="text-slate-600 mb-3 flex items-center gap-2">
