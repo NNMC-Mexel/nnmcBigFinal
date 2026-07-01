@@ -238,7 +238,8 @@ export default function AppLayout() {
             return `${user.firstName || ""} ${user.lastName || ""}`.trim();
         }
         const email = user?.email || "";
-        if (email && !email.endsWith("@bpm.local")) return email;
+        const isTechnicalEmail = email.endsWith("@bpm.local") || email.endsWith("@employees.nnmc.kz");
+        if (email && !isTechnicalEmail) return email;
         return "Сотрудник";
     };
 

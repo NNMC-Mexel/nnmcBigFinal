@@ -163,13 +163,14 @@ export default function ProfilePage() {
       return `${user.firstName || ''} ${user.lastName || ''}`.trim();
     }
     const email = user?.email || '';
-    if (email && !email.endsWith('@bpm.local')) return email;
+    const isTechnicalEmail = email.endsWith('@bpm.local') || email.endsWith('@employees.nnmc.kz');
+    if (email && !isTechnicalEmail) return email;
     return 'Сотрудник';
   };
 
-  const visibleEmail = user?.email && !user.email.endsWith('@bpm.local')
+  const visibleEmail = user?.email && !user.email.endsWith('@bpm.local') && !user.email.endsWith('@employees.nnmc.kz')
     ? user.email
-    : 'Не указан';
+    : '';
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -307,15 +308,17 @@ export default function ProfilePage() {
       <Card>
         <h3 className="font-semibold text-slate-800 mb-4">Контактная информация</h3>
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
-              <Mail className="w-5 h-5 text-slate-500" />
+          {visibleEmail && (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+                <Mail className="w-5 h-5 text-slate-500" />
+              </div>
+              <div>
+                <p className="text-sm text-slate-500">Email</p>
+                <p className="font-medium text-slate-800">{visibleEmail}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-slate-500">Email</p>
-              <p className="font-medium text-slate-800">{visibleEmail}</p>
-            </div>
-          </div>
+          )}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
               <Building2 className="w-5 h-5 text-slate-500" />
