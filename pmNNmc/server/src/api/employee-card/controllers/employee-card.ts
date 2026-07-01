@@ -208,6 +208,19 @@ export default {
     };
   },
 
+  async me(ctx: Context) {
+    const strapi = (global as any).strapi;
+    const currentUser = await loadCurrentUser(ctx, strapi);
+    const username = cleanString(currentUser?.username);
+    if (!/^\d{12}$/.test(username)) {
+      ctx.body = { data: null };
+      return;
+    }
+
+    const card = await strapi.db.query(CARD_UID).findOne({ where: { iin: username } });
+    ctx.body = { data: card ? formatCard(card) : null };
+  },
+
   async findOne(ctx: Context) {
     const strapi = (global as any).strapi;
     await ensureDirectoryAccess(ctx, strapi);

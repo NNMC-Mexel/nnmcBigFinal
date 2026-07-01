@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Department } from '../types';
 import { authApi } from '../api/auth';
+import bpmClient from '../api/bpmClient';
 
 interface AuthState {
   user: User | null;
@@ -16,6 +17,42 @@ interface AuthState {
   logout: () => void;
   checkAuth: () => Promise<void>;
   clearError: () => void;
+}
+
+async function enrichUserFromEmployeeCard(user: User): Promise<User> {
+  if (!/^\d{12}$/.test(String(user?.username || ''))) return user;
+
+  try {
+    const response = await bpmClient.get('/employee-cards/me');
+    const card = response.data?.data;
+    if (!card) return user;
+
+    const primaryWorkplace = card.primaryWorkplace || (Array.isArray(card.workplaces) ? card.workplaces[0] : null);
+    const departmentName = String(primaryWorkplace?.department || '').trim();
+    const position = String(primaryWorkplace?.position || '').trim();
+    const firstName = String(card.firstName || '').trim();
+    const lastName = String(card.lastName || '').trim();
+
+    const fallbackDepartment: Department | undefined = departmentName
+      ? {
+          id: 0,
+          documentId: '',
+          key: String(primaryWorkplace?.departmentId || departmentName).trim(),
+          name_ru: departmentName,
+          name_kz: departmentName,
+        }
+      : undefined;
+
+    return {
+      ...user,
+      firstName: firstName || user.firstName,
+      lastName: lastName || user.lastName,
+      position: position || user.position,
+      department: user.department || fallbackDepartment,
+    };
+  } catch {
+    return user;
+  }
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -39,7 +76,7 @@ export const useAuthStore = create<AuthState>()(
             sessionStorage.setItem('jwt', response.jwt);
           }
 
-          const userWithDetails = await authApi.getMe();
+          const userWithDetails = await enrichUserFromEmployeeCard(await authApi.getMe());
 
           set({
             user: userWithDetails,
@@ -67,7 +104,7 @@ export const useAuthStore = create<AuthState>()(
             sessionStorage.setItem('jwt', response.jwt);
           }
 
-          const userWithDetails = await authApi.getMe();
+          const userWithDetails = await enrichUserFromEmployeeCard(await authApi.getMe());
 
           set({
             user: userWithDetails,
@@ -114,7 +151,7 @@ export const useAuthStore = create<AuthState>()(
 
         set({ isLoading: true });
         try {
-          const user = await authApi.getMe();
+          const user = await enrichUserFromEmployeeCard(await authApi.getMe());
           set({
             user,
             token,

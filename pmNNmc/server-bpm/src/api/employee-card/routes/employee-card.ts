@@ -13,6 +13,12 @@ export default {
       config: { policies: [] },
     },
     {
+      method: 'GET',
+      path: '/employee-cards/me',
+      handler: 'employee-card.me',
+      config: { policies: [] },
+    },
+    {
       method: 'POST',
       path: '/employee-cards/sync',
       handler: 'employee-card.sync',

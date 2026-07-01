@@ -38,6 +38,125 @@ function internalEmployeeEmail(username: any): string {
   return value ? `${value}@bpm.local` : '';
 }
 
+function cleanString(value: any): string {
+  return String(value ?? '').trim();
+}
+
+function normalizeText(value: any): string {
+  return cleanString(value).toLocaleLowerCase('ru');
+}
+
+function primaryWorkplace(workplaces: any[]) {
+  return (
+    workplaces.find((workplace) => workplace?.primary === true) ||
+    workplaces[0] ||
+    null
+  );
+}
+
+function transliterate(value: string): string {
+  const map: Record<string, string> = {
+    а: 'a', ә: 'a', б: 'b', в: 'v', г: 'g', ғ: 'g', д: 'd', е: 'e', ё: 'e',
+    ж: 'zh', з: 'z', и: 'i', й: 'i', к: 'k', қ: 'k', л: 'l', м: 'm',
+    н: 'n', ң: 'n', о: 'o', ө: 'o', п: 'p', р: 'r', с: 's', т: 't',
+    у: 'u', ұ: 'u', ү: 'u', ф: 'f', х: 'h', һ: 'h', ц: 'c', ч: 'ch',
+    ш: 'sh', щ: 'sh', ы: 'y', і: 'i', э: 'e', ю: 'yu', я: 'ya',
+    ъ: '', ь: '',
+  };
+
+  return Array.from(cleanString(value).toLocaleLowerCase('ru'))
+    .map((char) => map[char] ?? char)
+    .join('');
+}
+
+function departmentKeyFromName(departmentName: string): string {
+  const fallback = Buffer.from(departmentName).toString('hex').slice(0, 8).toUpperCase();
+  return (
+    transliterate(departmentName)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 52) || `DEP_${fallback}`
+  );
+}
+
+function namePartsFromEmployeeCard(card: any) {
+  const fioParts = cleanString(card?.fio).split(/\s+/).filter(Boolean);
+  const lastName = cleanString(card?.lastName) || fioParts[0] || cleanString(card?.iin);
+  const firstName = cleanString(card?.firstName) || fioParts[1] || lastName;
+  return { firstName, lastName };
+}
+
+async function ensureDepartmentForWorkplace(strapi: any, workplace: any) {
+  const departmentName = cleanString(workplace?.department);
+  if (!departmentName) return null;
+
+  const departments = await strapi.db.query('api::department.department').findMany({
+    select: ['id', 'key', 'name_ru', 'name_kz'],
+  });
+  const nameKey = normalizeText(departmentName);
+  const existing = (departments || []).find((department: any) =>
+    [department.key, department.name_ru, department.name_kz].some((value) => normalizeText(value) === nameKey)
+  );
+  if (existing?.id) return existing;
+
+  const baseKey = cleanString(workplace?.departmentId)
+    ? `ONEC_${cleanString(workplace.departmentId)}`
+    : departmentKeyFromName(departmentName);
+  let key = baseKey;
+  let index = 1;
+  const usedKeys = new Set((departments || []).map((department: any) => cleanString(department.key)).filter(Boolean));
+  while (usedKeys.has(key)) {
+    key = `${baseKey.slice(0, 48)}_${index}`;
+    index += 1;
+  }
+
+  return await strapi.entityService.create('api::department.department', {
+    data: {
+      key,
+      name_ru: departmentName,
+      name_kz: departmentName,
+    } as any,
+  });
+}
+
+async function enrichEmployeeUserFromCard(strapi: any, user: any) {
+  const username = cleanString(user?.username);
+  if (user?.provider !== 'keycloak' || !/^\d{12}$/.test(username)) return user;
+
+  const card = await strapi.db.query('api::employee-card.employee-card').findOne({
+    where: { iin: username },
+  });
+  if (!card?.id) return user;
+
+  const workplace = primaryWorkplace(Array.isArray(card.workplaces) ? card.workplaces : []);
+  const { firstName, lastName } = namePartsFromEmployeeCard(card);
+  const position = cleanString(workplace?.position);
+  const department = await ensureDepartmentForWorkplace(strapi, workplace);
+
+  const patch: Record<string, any> = {
+    firstName,
+    lastName,
+    email: internalEmployeeEmail(username),
+  };
+  if (position) patch.position = position;
+  if (department?.id) patch.department = department.id;
+
+  const needsUpdate =
+    cleanString(user.firstName) !== firstName ||
+    cleanString(user.lastName) !== lastName ||
+    cleanString(user.position) !== position ||
+    cleanString(user.email) !== patch.email ||
+    (department?.id && Number(user.department?.id || 0) !== Number(department.id));
+
+  if (!needsUpdate) return user;
+
+  return await strapi.entityService.update('plugin::users-permissions.user', user.id, {
+    data: patch as any,
+    populate: ['role', 'department'],
+  });
+}
+
 async function bumpSessionVersion(strapi: any, userId: number): Promise<number> {
   const user = await strapi.db.query('plugin::users-permissions.user').findOne({
     where: { id: userId },
@@ -502,11 +621,12 @@ export default (plugin) => {
         const body = ctx.body as any;
         const userId = body?.user?.id;
         if (ctx.params?.provider === 'keycloak' && userId) {
-          const user = await strapi.entityService.findOne(
+          let user = await strapi.entityService.findOne(
             'plugin::users-permissions.user',
             userId,
-            { populate: ['role'] }
+            { populate: ['role', 'department'] }
           );
+          user = await enrichEmployeeUserFromCard(strapi, user);
 
           const role = (user as any)?.role;
           if (role?.type === 'authenticated') {
@@ -615,13 +735,14 @@ export default (plugin) => {
         await original.me(ctx);
 
         if (ctx.body && ctx.state.user) {
-          const user = await strapi.entityService.findOne(
+          let user = await strapi.entityService.findOne(
             'plugin::users-permissions.user',
             ctx.state.user.id,
             { populate: ['role', 'department'] }
           );
 
           if (user) {
+            user = await enrichEmployeeUserFromCard(strapi, user);
             ctx.body = user;
           }
         }
