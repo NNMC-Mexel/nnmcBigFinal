@@ -1,0 +1,155 @@
+{
+  "kind": "collectionType",
+  "collectionName": "bpm_requests",
+  "info": {
+    "singularName": "bpm-request",
+    "pluralName": "bpm-requests",
+    "displayName": "BPM Request",
+    "description": "Employee BPM requests and workflow state"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "requestNumber": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": [
+        "VACATION",
+        "SICK_LEAVE",
+        "BUSINESS_TRIP",
+        "MEMO",
+        "TRAINING",
+        "CERTIFICATE"
+      ],
+      "required": true
+    },
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "DRAFT",
+        "SUBMITTED",
+        "MANAGER_REVIEW",
+        "HR_REVIEW",
+        "ACCOUNTING_REVIEW",
+        "ONEC_PENDING",
+        "ONEC_SENT",
+        "COMPLETED",
+        "REJECTED",
+        "CANCELLED"
+      ],
+      "default": "SUBMITTED",
+      "required": true
+    },
+    "workflowStage": {
+      "type": "string"
+    },
+    "employeeIin": {
+      "type": "string",
+      "minLength": 12,
+      "maxLength": 12
+    },
+    "employeeName": {
+      "type": "string"
+    },
+    "employeePosition": {
+      "type": "string"
+    },
+    "employeeDepartment": {
+      "type": "string"
+    },
+    "employeeDepartmentId": {
+      "type": "string"
+    },
+    "employeeOrganization": {
+      "type": "string"
+    },
+    "employeeOrganizationId": {
+      "type": "string"
+    },
+    "employeePersonnelNumber": {
+      "type": "string"
+    },
+    "managerName": {
+      "type": "string"
+    },
+    "managerPosition": {
+      "type": "string"
+    },
+    "managerDepartment": {
+      "type": "string"
+    },
+    "signingDirectorName": {
+      "type": "string"
+    },
+    "signingDirectorPosition": {
+      "type": "string"
+    },
+    "vacationType": {
+      "type": "string"
+    },
+    "startDate": {
+      "type": "date"
+    },
+    "endDate": {
+      "type": "date"
+    },
+    "days": {
+      "type": "integer"
+    },
+    "replacementEmployeeName": {
+      "type": "string"
+    },
+    "comment": {
+      "type": "text"
+    },
+    "history": {
+      "type": "json",
+      "default": []
+    },
+    "onecPayload": {
+      "type": "json"
+    },
+    "onecStatus": {
+      "type": "enumeration",
+      "enum": [
+        "not_required",
+        "pending",
+        "sent",
+        "error"
+      ],
+      "default": "pending"
+    },
+    "onecDocumentNumber": {
+      "type": "string"
+    },
+    "onecError": {
+      "type": "text"
+    },
+    "submittedAt": {
+      "type": "datetime"
+    },
+    "completedAt": {
+      "type": "datetime"
+    },
+    "initiator": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "employeeCard": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::employee-card.employee-card"
+    }
+  }
+}

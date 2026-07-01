@@ -98,6 +98,11 @@ export const employeeCardsApi = {
     return response.data.data;
   },
 
+  me: async (): Promise<EmployeeCard | null> => {
+    const response = await bpmClient.get('/employee-cards/me');
+    return response.data.data || null;
+  },
+
   sync: async (): Promise<{
     success: boolean;
     source?: string;

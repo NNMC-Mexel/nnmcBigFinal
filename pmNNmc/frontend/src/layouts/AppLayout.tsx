@@ -202,10 +202,15 @@ export default function AppLayout() {
     const navItems = [...projectNavItems, ...helpdeskNavItems];
 
     const bpmNavItems = [
-        ...(canViewEmployeeDirectory ? [{
-            to: "/app/bpm",
+        {
+            to: "/app/bpm-requests",
             icon: Workflow,
             label: "BPM",
+        },
+        ...(canViewEmployeeDirectory ? [{
+            to: "/app/bpm",
+            icon: Users,
+            label: "BPM Реестр",
         }] : []),
     ];
 
