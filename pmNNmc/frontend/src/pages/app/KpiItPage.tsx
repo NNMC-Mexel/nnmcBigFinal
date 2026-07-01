@@ -55,6 +55,8 @@ const statusRu: Record<Ticket['status'], string> = {
 const getTicketCategoryName = (ticket: Ticket) =>
   ticket.category?.name_ru || ticket.category?.name_kz || ticket.serviceGroup?.name_ru || ticket.serviceGroup?.name_kz || '-';
 
+const getTicketComplexity = (ticket: Ticket) => ticket.complexity || '-';
+
 const toMonthKey = (date?: string) => {
   if (!date) return '';
   const d = new Date(date);
@@ -231,13 +233,14 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
       ['Среднее время (done)', formatDuration(stats.avgDoneMinutes)],
       [],
       ['Таблица заявок'],
-      ['Сотрудник', 'Номер', 'Категория заявки', 'Заявитель', 'Отдел', 'Создано', 'Обновлено', 'Статус', 'Время (мин)', 'Время (формат)'],
+      ['Сотрудник', 'Номер', 'Категория заявки', 'Сложность', 'Заявитель', 'Отдел', 'Создано', 'Обновлено', 'Статус', 'Время (мин)', 'Время (формат)'],
       ...filtered.map((ticket) => {
         const actual = toMinutesDiff(ticket.createdAt, ticket.completedAt || ticket.updatedAt);
         return [
           selectedUser ? toUserName(selectedUser) : '',
           ticket.ticketNumber,
           getTicketCategoryName(ticket),
+          getTicketComplexity(ticket),
           ticket.requesterName,
           ticket.requesterDepartment,
           formatDateTime(ticket.createdAt),
@@ -308,6 +311,10 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
             <span className="min-w-0 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
               {getTicketCategoryName(ticket)}
             </span>
+          </div>
+          <div className="flex min-w-0 items-center gap-2">
+            <Hash className="h-4 w-4 flex-shrink-0 text-slate-400" />
+            <span className="truncate">Сложность: {getTicketComplexity(ticket)}</span>
           </div>
           <div className="flex min-w-0 items-start gap-2">
             <Hash className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
@@ -469,6 +476,7 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
                   <th className="text-left px-4 py-3 font-medium text-slate-600">Имя сотрудника</th>
                   <th className="text-left px-4 py-3 font-medium text-slate-600">Номер</th>
                   <th className="text-left px-4 py-3 font-medium text-slate-600">Категория заявки</th>
+                  <th className="text-left px-4 py-3 font-medium text-slate-600">Сложность</th>
                   <th className="text-left px-4 py-3 font-medium text-slate-600">Дата создания</th>
                   <th className="text-left px-4 py-3 font-medium text-slate-600">Дата обновления</th>
                   <th className="text-left px-4 py-3 font-medium text-slate-600">Время выполнения</th>
@@ -489,6 +497,7 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
                       <td className="px-4 py-3 text-slate-800">{selectedUser ? toUserName(selectedUser) : '-'}</td>
                       <td className="px-4 py-3 text-slate-700">{ticket.ticketNumber}</td>
                       <td className="px-4 py-3 text-slate-700">{getTicketCategoryName(ticket)}</td>
+                      <td className="px-4 py-3 text-slate-700">{getTicketComplexity(ticket)}</td>
                       <td className="px-4 py-3 text-slate-600">{ticket.createdAt ? new Date(ticket.createdAt).toLocaleString('ru-RU') : '-'}</td>
                       <td className="px-4 py-3 text-slate-600">{ticket.completedAt || ticket.updatedAt ? new Date(ticket.completedAt || ticket.updatedAt || '').toLocaleString('ru-RU') : '-'}</td>
                       <td className="px-4 py-3">
@@ -534,6 +543,8 @@ export default function KpiItPage({ forcedDepartmentKey, title }: KpiPageProps) 
                 <p className="text-lg text-slate-800">{selectedTicket.requesterDepartment}</p>
                 <p className="text-sm text-slate-500 mt-4">Категория заявки</p>
                 <p className="text-lg text-slate-800">{getTicketCategoryName(selectedTicket)}</p>
+                <p className="text-sm text-slate-500 mt-4">Сложность</p>
+                <p className="text-lg text-slate-800">{getTicketComplexity(selectedTicket)}</p>
               </div>
               <div className="space-y-2">
                 <p className="text-sm text-slate-500">Исполнители</p>
