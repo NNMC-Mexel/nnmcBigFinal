@@ -7,7 +7,7 @@ const DEPARTMENT_UID = 'api::department.department' as any;
 
 const AUTHENTICATED_PERMISSIONS: Record<string, string[]> = {
   'api::bpm-request.bpm-request': ['find', 'findOne', 'topTypes', 'createVacation', 'sendToOneC'],
-  'api::employee-card.employee-card': ['find', 'findOne', 'sync', 'syncStatus'],
+  'api::employee-card.employee-card': ['find', 'findOne', 'me', 'sync', 'syncStatus'],
   'api::department.department': ['find', 'findOne'],
   'plugin::users-permissions.user': ['me'],
   'plugin::users-permissions.auth': ['callback', 'connect', 'changePassword'],
