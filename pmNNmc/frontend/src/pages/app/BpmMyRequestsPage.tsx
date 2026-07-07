@@ -128,6 +128,14 @@ export default function BpmMyRequestsPage() {
       setError('Укажите даты начала и окончания отпуска');
       return;
     }
+    if (!employeeCard) {
+      setError('Карточка сотрудника не найдена. Нужно сначала синхронизировать сотрудников с 1С или войти под логином сотрудника с ИИН.');
+      return;
+    }
+    if (!primaryWorkplace) {
+      setError('В карточке сотрудника нет активного места работы из 1С. Обновите синхронизацию сотрудников.');
+      return;
+    }
     if (requestedDays <= 0) {
       setError('Дата окончания должна быть позже даты начала');
       return;
@@ -251,6 +259,11 @@ export default function BpmMyRequestsPage() {
               <p className="text-sm text-slate-500">{primaryWorkplace?.organization || 'Организация не указана'}</p>
             </div>
           </div>
+          {!employeeCard || !primaryWorkplace ? (
+            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Для заявки на отпуск нужна карточка сотрудника из 1С с активным местом работы. Если вы вошли под тестовым аккаунтом или карточка не синхронизирована, заявка не будет создана.
+            </div>
+          ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-1.5 md:col-span-2">
@@ -334,7 +347,7 @@ export default function BpmMyRequestsPage() {
           <div className="mt-5 flex justify-end">
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !employeeCard || !primaryWorkplace}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

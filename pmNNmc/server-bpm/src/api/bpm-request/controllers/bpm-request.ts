@@ -219,13 +219,13 @@ export default {
     const user = await loadCurrentUser(ctx, strapi);
     const card = await loadEmployeeCardForUser(strapi, user);
     if (!card) {
-      ctx.throw(400, 'Employee card was not found. Run 1C employee synchronization first.');
+      ctx.throw(400, 'Карточка сотрудника не найдена. Нужно синхронизировать сотрудников с 1С или войти под логином сотрудника с ИИН.');
       return;
     }
 
     const workplace = preferredWorkplace(card);
     if (!workplace) {
-      ctx.throw(400, 'Primary workplace was not found in employee card.');
+      ctx.throw(400, 'В карточке сотрудника нет активного места работы из 1С.');
       return;
     }
 
