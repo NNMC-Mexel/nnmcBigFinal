@@ -76,7 +76,7 @@ export default function BpmMyRequestsPage() {
   const [success, setSuccess] = useState('');
   const [activeStatus, setActiveStatus] = useState<'ALL' | BpmRequestStatus>('ALL');
   const [form, setForm] = useState({
-    vacationType: 'Ежегодный оплачиваемый отпуск',
+    vacationType: 'Отпуск ежегодный',
     startDate: '',
     endDate: '',
     replacementEmployeeName: '',
@@ -232,7 +232,7 @@ export default function BpmMyRequestsPage() {
               <h2 className="mt-1 text-xl font-bold text-slate-900">Отпуск</h2>
             </div>
             <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700">
-              1С: Документ.Отпуск
+              1С: Отпуска сотрудников
             </span>
           </div>
 
@@ -260,10 +260,14 @@ export default function BpmMyRequestsPage() {
                 onChange={(event) => setForm({ ...form, vacationType: event.target.value })}
                 className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
               >
-                <option>Ежегодный оплачиваемый отпуск</option>
+                <option>Отпуск ежегодный</option>
                 <option>Отпуск без сохранения заработной платы</option>
-                <option>Учебный отпуск</option>
-                <option>Социальный отпуск</option>
+                <option>Отпуск без оплаты</option>
+                <option>Дополнительный учебный отпуск (оплачиваемый)</option>
+                <option>Дополнительный учебный отпуск без оплаты</option>
+                <option>Отпуск для прохождения скрининговых исследований</option>
+                <option>отпуск по беременности и родам</option>
+                <option>Отпуск по уходу за ребенком</option>
               </select>
             </label>
             <label className="space-y-1.5">

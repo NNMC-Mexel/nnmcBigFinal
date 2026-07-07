@@ -7,6 +7,9 @@ This directory contains the server-side code for a direct REST integration with
 `NNMC`. When applying an update, replace the complete 1C module with this file.
 Run `node build-module.js` after changing any source handler file.
 
+Project integration rules and confirmed 1C objects are documented in
+[`INTEGRATION_PRINCIPLES.md`](./INTEGRATION_PRINCIPLES.md).
+
 ## Employee endpoint
 
 ```http
@@ -56,10 +59,11 @@ Add URL template `/v1/vacation-requests` and POST handler
 [`NNMCHttpServiceModule.bsl`](./NNMCHttpServiceModule.bsl).
 
 The endpoint accepts vacation requests from `server-bpm` and creates an
-unposted `Документ.Отпуск` draft. It fills the safest shared fields
-(`Дата`, `Месяц`, `Организация`, `Сотрудник`, vacation dates and day count)
-and stores the full BPM payload in `Комментарий` with marker `[NNMC-BPM]`.
-Duplicate requests are detected by `requestNumber`.
+unposted `Документ.ОтпускаСотрудников` draft. It finds the employee by 1C UUID,
+IIN or FIO, resolves the current кадровые данные when possible, fills the
+safest shared fields in the header and tabular sections, and stores the full
+BPM payload in `Комментарий` with marker `[NNMC-BPM]`. Duplicate requests are
+detected by `requestNumber`.
 
 `server-bpm` sends this endpoint automatically when `ONEC_API_URL` points to
 the HTTP service root:
@@ -78,7 +82,7 @@ Example payload:
 
 ```json
 {
-  "documentForm": "Документ.Отпуск.Форма.ФормаДокумента",
+  "documentForm": "Документ.ОтпускаСотрудников.Форма.ФормаДокумента",
   "source": "NNMC BPM",
   "requestNumber": "BPM-2026-000001",
   "employee": {
@@ -98,7 +102,7 @@ Example payload:
     "department": "ОЦМК-2"
   },
   "vacation": {
-    "type": "Ежегодный оплачиваемый отпуск",
+    "type": "Отпуск ежегодный",
     "startDate": "2026-07-01",
     "endDate": "2026-07-14",
     "calendarDays": 14,
@@ -155,7 +159,7 @@ Example response:
 - Allow access only from the `server-kpi`/Coolify host at the firewall or IIS.
 - Use dedicated 1C accounts: read-only for employee/KPI reads, and a restricted
   writer account for BPM vacation drafts with permission to create unposted
-  `Документ.Отпуск`.
+  `Документ.ОтпускаСотрудников`.
 - Store the 1C username and password only in Coolify secrets.
 - Do not call 1C directly from the frontend.
 - Keep 1C authentication enabled for the publication.

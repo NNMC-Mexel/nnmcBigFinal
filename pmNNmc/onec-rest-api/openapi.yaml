@@ -302,7 +302,7 @@ components:
       properties:
         documentForm:
           type: string
-          example: Документ.Отпуск.Форма.ФормаДокумента
+          example: Документ.ОтпускаСотрудников.Форма.ФормаДокумента
         source:
           type: string
           example: NNMC BPM

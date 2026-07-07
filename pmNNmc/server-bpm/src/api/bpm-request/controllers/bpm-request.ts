@@ -99,7 +99,7 @@ function buildVacationPayload(data: {
   managerDepartment: string;
 }) {
   return {
-    documentForm: 'Документ.Отпуск.Форма.ФормаДокумента',
+    documentForm: 'Документ.ОтпускаСотрудников.Форма.ФормаДокумента',
     source: 'NNMC BPM',
     requestNumber: data.requestNumber,
     employee: {
@@ -239,7 +239,7 @@ export default {
     const requestNumber = await nextRequestNumber(strapi);
     const startDate = toDateString(start);
     const endDate = toDateString(end);
-    const vacationType = cleanString(body.vacationType) || 'Ежегодный оплачиваемый отпуск';
+    const vacationType = cleanString(body.vacationType) || 'Отпуск ежегодный';
     const replacementEmployeeName = cleanString(body.replacementEmployeeName);
     const comment = cleanString(body.comment);
     const managerName = cleanString(body.managerName || workplace.managerName || card.managerName);
