@@ -1,3 +1,21 @@
+function decodeJwtPayload(token?: string): Record<string, any> {
+  const payload = token?.split('.')[1];
+  if (!payload) return {};
+
+  const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+}
+
+function keycloakUsernameFromPayload(payload: any): string {
+  return String(payload?.preferred_username || payload?.username || payload?.sub || '').trim();
+}
+
+function internalEmployeeEmail(username: any): string {
+  const value = String(username || '').trim().toLowerCase();
+  return value ? `${value}@nnmc.local` : '';
+}
+
 export default (plugin) => {
   // Override bootstrap to patch Keycloak grant URLs to use HTTP instead of
   // grant's hardcoded https:// scheme (needed for internal HTTP-only deployments)
@@ -43,6 +61,34 @@ export default (plugin) => {
     } catch (e: any) {
       strapi.log.warn('[keycloak] Could not patch purest config:', e?.message);
     }
+
+    try {
+      const providersRegistry = strapi
+        .plugin('users-permissions')
+        .service('providers-registry') as any;
+
+      if (providersRegistry?.run && !providersRegistry.__nnmcKeycloakEmailPatch) {
+        const originalRun = providersRegistry.run.bind(providersRegistry);
+
+        providersRegistry.run = async (args: any) => {
+          const profile = await originalRun(args);
+          if (args?.provider !== 'keycloak') return profile;
+
+          const username = String(profile?.username || '').trim();
+          if (profile?.email || !username) return profile;
+
+          return {
+            ...profile,
+            email: internalEmployeeEmail(username),
+          };
+        };
+
+        providersRegistry.__nnmcKeycloakEmailPatch = true;
+        strapi.log.info('[keycloak] provider email fallback enabled for username-only users');
+      }
+    } catch (e: any) {
+      strapi.log.warn('[keycloak] Could not patch provider email fallback:', e?.message);
+    }
   };
 
   // Wrap the auth controller factory to override the callback method.
@@ -55,27 +101,38 @@ export default (plugin) => {
     return {
       ...original,
       async callback(ctx) {
-        // Pre-link: if a local user exists with same email, update provider to keycloak
+        // Pre-link: if a local user exists with same username/email, connect it
+        // to Keycloak before Strapi creates a duplicate user.
         if (ctx.params?.provider === 'keycloak') {
           try {
             const token = ctx.query?.access_token as string;
             if (token) {
-              const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-              const email = (payload.email || '').toLowerCase();
+              const payload = decodeJwtPayload(token);
+              const username = keycloakUsernameFromPayload(payload);
+              const email = String(payload.email || '').trim().toLowerCase();
+              const lookupEmail = email || internalEmployeeEmail(username);
 
-              if (email) {
-                const existingUser = await strapi.db
+              const existingByUsername = username
+                ? await strapi.db
                   .query('plugin::users-permissions.user')
-                  .findOne({ where: { email } });
+                  .findOne({ where: { username } })
+                : null;
 
-                if (existingUser && existingUser.provider !== 'keycloak') {
-                  strapi.log.info(
-                    `[keycloak] Pre-linking user ${existingUser.id} (${email}) from '${existingUser.provider}' to 'keycloak'`
-                  );
-                  await strapi.entityService.update('plugin::users-permissions.user', existingUser.id, {
-                    data: { provider: 'keycloak' },
-                  });
-                }
+              const existingByEmail = !existingByUsername && lookupEmail
+                ? await strapi.db
+                  .query('plugin::users-permissions.user')
+                  .findOne({ where: { email: lookupEmail } })
+                : null;
+
+              const existingUser = existingByUsername || existingByEmail;
+
+              if (existingUser && existingUser.provider !== 'keycloak') {
+                strapi.log.info(
+                  `[keycloak] Pre-linking user ${existingUser.id} (${username || lookupEmail}) from '${existingUser.provider}' to 'keycloak'`
+                );
+                await strapi.entityService.update('plugin::users-permissions.user', existingUser.id, {
+                  data: { provider: 'keycloak' } as any,
+                });
               }
             }
           } catch (e: any) {
