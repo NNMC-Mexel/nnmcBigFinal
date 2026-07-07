@@ -36,12 +36,6 @@ const WORKFLOW_NEXT: Record<string, { status: string; stage: string; action: str
     action: 'accounting_approved',
     label: 'Этап бухгалтерии пройден',
   },
-  ONEC_PENDING: {
-    status: 'ONEC_SENT',
-    stage: 'Передано в 1С',
-    action: 'onec_marked_sent',
-    label: 'Супер-админ отметил передачу в 1С',
-  },
   ONEC_SENT: {
     status: 'COMPLETED',
     stage: 'Завершено',
@@ -369,6 +363,8 @@ export default {
 
     const item = await strapi.entityService.findOne(REQUEST_UID, ctx.params.id);
     if (!item) ctx.throw(404, 'BPM request not found');
+    const currentStatus = cleanString(item.status);
+    const history = Array.isArray(item.history) ? item.history : [];
 
     const baseOnecUrl = cleanString(process.env.ONEC_API_URL).replace(/\/+$/, '');
     const endpoint = cleanString(process.env.ONEC_VACATION_REQUEST_URL) ||
@@ -376,8 +372,8 @@ export default {
     if (!endpoint) {
       await strapi.entityService.update(REQUEST_UID, item.id, {
         data: {
-          status: 'ONEC_PENDING',
-          workflowStage: 'Ожидает настройки отправки в 1С',
+          status: currentStatus === 'COMPLETED' ? 'COMPLETED' : 'ONEC_PENDING',
+          workflowStage: currentStatus === 'COMPLETED' ? item.workflowStage : 'Ожидает настройки отправки в 1С',
           onecStatus: 'pending',
           onecError: 'ONEC_VACATION_REQUEST_URL is not configured',
         },
@@ -396,6 +392,7 @@ export default {
     try {
       const username = cleanString(process.env.ONEC_API_USER);
       const password = String(process.env.ONEC_API_PASSWORD || '');
+      const now = new Date().toISOString();
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (username || password) {
         headers.Authorization = `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
@@ -420,19 +417,29 @@ export default {
 
       const updated = await strapi.entityService.update(REQUEST_UID, item.id, {
         data: {
-          status: 'ONEC_SENT',
-          workflowStage: 'Передано в 1С',
+          status: currentStatus === 'COMPLETED' ? 'COMPLETED' : 'ONEC_SENT',
+          workflowStage: currentStatus === 'COMPLETED' ? 'Завершено' : 'Передано в 1С',
           onecStatus: 'sent',
           onecDocumentNumber: cleanString(parsed?.number || parsed?.documentNumber),
           onecError: null,
+          completedAt: currentStatus === 'COMPLETED' ? item.completedAt || now : item.completedAt,
+          history: [
+            ...history,
+            {
+              at: now,
+              by: userDisplayName(user),
+              action: 'sent_to_1c',
+              label: 'Заявка реально передана в 1С',
+            },
+          ],
         },
       } as any);
       ctx.body = { data: formatRequest(updated) };
     } catch (error: any) {
       const updated = await strapi.entityService.update(REQUEST_UID, item.id, {
         data: {
-          status: 'ONEC_PENDING',
-          workflowStage: 'Ошибка отправки в 1С',
+          status: currentStatus === 'COMPLETED' ? 'COMPLETED' : 'ONEC_PENDING',
+          workflowStage: currentStatus === 'COMPLETED' ? item.workflowStage : 'Ошибка отправки в 1С',
           onecStatus: 'error',
           onecError: error?.message || String(error),
         },

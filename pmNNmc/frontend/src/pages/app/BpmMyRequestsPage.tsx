@@ -43,6 +43,14 @@ const statusClass: Record<BpmRequestStatus, string> = {
 };
 
 const terminalStatuses = new Set<BpmRequestStatus>(['COMPLETED', 'REJECTED', 'CANCELLED']);
+const advanceableStatuses = new Set<BpmRequestStatus>([
+  'DRAFT',
+  'SUBMITTED',
+  'MANAGER_REVIEW',
+  'HR_REVIEW',
+  'ACCOUNTING_REVIEW',
+  'ONEC_SENT',
+]);
 const historyFilters: Array<'ALL' | BpmRequestStatus> = [
   'ALL',
   'SUBMITTED',
@@ -172,6 +180,12 @@ export default function BpmMyRequestsPage() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  const canSendRequestToOneC = (request: BpmRequest) => {
+    if (!canReview) return false;
+    if (request.status === 'ACCOUNTING_REVIEW' || request.status === 'ONEC_PENDING') return true;
+    return canAdvance && (request.status === 'ONEC_SENT' || request.status === 'COMPLETED') && !request.onecDocumentNumber;
+  };
 
   const submitVacation = async (event: FormEvent) => {
     event.preventDefault();
@@ -479,7 +493,7 @@ export default function BpmMyRequestsPage() {
                   ) : null}
                   {canReview ? (
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {request.status === 'ACCOUNTING_REVIEW' || request.status === 'ONEC_PENDING' ? (
+                      {canSendRequestToOneC(request) ? (
                         <button
                           type="button"
                           onClick={() => void sendRequestToOneC(request)}
@@ -490,7 +504,7 @@ export default function BpmMyRequestsPage() {
                           Передать в 1С
                         </button>
                       ) : null}
-                      {canAdvance && !terminalStatuses.has(request.status) ? (
+                      {canAdvance && !terminalStatuses.has(request.status) && advanceableStatuses.has(request.status) ? (
                         <button
                           type="button"
                           onClick={() => void advanceRequest(request)}
