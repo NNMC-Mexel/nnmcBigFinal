@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
+  ArrowRight,
   Briefcase,
   CalendarDays,
   CheckCircle2,
@@ -41,6 +42,19 @@ const statusClass: Record<BpmRequestStatus, string> = {
   CANCELLED: 'bg-slate-100 text-slate-500',
 };
 
+const terminalStatuses = new Set<BpmRequestStatus>(['COMPLETED', 'REJECTED', 'CANCELLED']);
+const historyFilters: Array<'ALL' | BpmRequestStatus> = [
+  'ALL',
+  'SUBMITTED',
+  'MANAGER_REVIEW',
+  'HR_REVIEW',
+  'ACCOUNTING_REVIEW',
+  'ONEC_PENDING',
+  'ONEC_SENT',
+  'COMPLETED',
+  'REJECTED',
+];
+
 const typeIcons: Record<string, typeof CalendarDays> = {
   VACATION: CalendarDays,
   SICK_LEAVE: FileCheck2,
@@ -70,8 +84,12 @@ export default function BpmMyRequestsPage() {
   const [topTypes, setTopTypes] = useState<BpmRequestTopType[]>([]);
   const [requests, setRequests] = useState<BpmRequest[]>([]);
   const [employeeCard, setEmployeeCard] = useState<EmployeeCard | null>(null);
+  const [canReview, setCanReview] = useState(false);
+  const [canAdvance, setCanAdvance] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [advancingId, setAdvancingId] = useState<number | null>(null);
+  const [sendingOneCId, setSendingOneCId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [activeStatus, setActiveStatus] = useState<'ALL' | BpmRequestStatus>('ALL');
@@ -102,16 +120,52 @@ export default function BpmMyRequestsPage() {
     try {
       const [types, list, card] = await Promise.all([
         bpmRequestsApi.topTypes(),
-        bpmRequestsApi.list({ mine: true }),
-        employeeCardsApi.me(),
+        bpmRequestsApi.list(),
+        employeeCardsApi.me().catch(() => null),
       ]);
       setTopTypes(types);
       setRequests(list.data);
+      setCanReview(list.canReview);
+      setCanAdvance(list.canAdvance);
       setEmployeeCard(card);
     } catch (requestError: any) {
       setError(requestError?.response?.data?.error?.message || requestError?.message || 'Не удалось загрузить BPM заявки');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const replaceRequest = (updated: BpmRequest) => {
+    setRequests((current) => current.map((request) => (request.id === updated.id ? updated : request)));
+  };
+
+  const advanceRequest = async (request: BpmRequest) => {
+    setError('');
+    setSuccess('');
+    setAdvancingId(request.id);
+    try {
+      const updated = await bpmRequestsApi.advance(request.id);
+      replaceRequest(updated);
+      setSuccess(`Заявка ${updated.requestNumber} переведена на этап: ${updated.workflowStage || statusLabels[updated.status]}`);
+    } catch (requestError: any) {
+      setError(requestError?.response?.data?.error?.message || requestError?.message || 'Не удалось перевести заявку дальше');
+    } finally {
+      setAdvancingId(null);
+    }
+  };
+
+  const sendRequestToOneC = async (request: BpmRequest) => {
+    setError('');
+    setSuccess('');
+    setSendingOneCId(request.id);
+    try {
+      const updated = await bpmRequestsApi.sendToOneC(request.id);
+      replaceRequest(updated);
+      setSuccess(`Заявка ${updated.requestNumber} передана в 1С`);
+    } catch (requestError: any) {
+      setError(requestError?.response?.data?.error?.message || requestError?.message || 'Не удалось передать заявку в 1С');
+    } finally {
+      setSendingOneCId(null);
     }
   };
 
@@ -181,8 +235,12 @@ export default function BpmMyRequestsPage() {
       <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="mb-1 text-xs font-semibold uppercase text-teal-600">BPM</p>
-          <h1 className="text-2xl font-bold text-slate-900">Мои заявки</h1>
-          <p className="mt-1 text-sm text-slate-500">Подача кадровых и корпоративных заявок без внутреннего дерева процессов.</p>
+          <h1 className="text-2xl font-bold text-slate-900">{canReview ? 'BPM заявки' : 'Мои заявки'}</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {canReview
+              ? 'Общий поток кадровых и корпоративных заявок по этапам.'
+              : 'Подача кадровых и корпоративных заявок без внутреннего дерева процессов.'}
+          </p>
         </div>
         <button
           type="button"
@@ -359,9 +417,11 @@ export default function BpmMyRequestsPage() {
         <aside className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 p-4">
             <h2 className="text-lg font-bold text-slate-900">История заявок</h2>
-            <p className="text-sm text-slate-500">Ваши BPM заявки и текущий маршрут</p>
+            <p className="text-sm text-slate-500">
+              {canReview ? 'Все BPM заявки и текущий маршрут' : 'Ваши BPM заявки и текущий маршрут'}
+            </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {(['ALL', 'SUBMITTED', 'ONEC_PENDING', 'COMPLETED'] as Array<'ALL' | BpmRequestStatus>).map((status) => (
+              {historyFilters.map((status) => (
                 <button
                   key={status}
                   type="button"
@@ -391,10 +451,58 @@ export default function BpmMyRequestsPage() {
                     </span>
                   </div>
                   <div className="space-y-1 text-sm text-slate-600">
+                    {canReview ? (
+                      <p>
+                        <span className="font-semibold text-slate-700">{request.employeeName || 'Сотрудник'}</span>
+                        {request.employeeDepartment ? ` · ${request.employeeDepartment}` : ''}
+                      </p>
+                    ) : null}
                     <p>{formatDate(request.startDate)} - {formatDate(request.endDate)} · {request.days || 0} дн.</p>
                     <p>{request.workflowStage || 'Маршрут формируется'}</p>
                     <p className="text-xs text-slate-400">Создано: {formatDate(request.createdAt || request.submittedAt)}</p>
                   </div>
+                  {canReview && (request.onecError || request.onecDocumentNumber) ? (
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                      {request.onecDocumentNumber ? <p>Документ 1С: {request.onecDocumentNumber}</p> : null}
+                      {request.onecError ? <p className="text-red-600">1С: {request.onecError}</p> : null}
+                    </div>
+                  ) : null}
+                  {canReview && Array.isArray(request.history) && request.history.length > 0 ? (
+                    <div className="mt-3 space-y-1 border-l border-slate-200 pl-3 text-xs text-slate-500">
+                      {request.history.slice(-3).map((event, index) => (
+                        <p key={`${event.at || 'event'}-${index}`}>
+                          <span className="font-medium text-slate-600">{event.label || event.action || 'Этап'}</span>
+                          {event.at ? ` · ${formatDate(event.at)}` : ''}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+                  {canReview ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {request.status === 'ACCOUNTING_REVIEW' || request.status === 'ONEC_PENDING' ? (
+                        <button
+                          type="button"
+                          onClick={() => void sendRequestToOneC(request)}
+                          disabled={sendingOneCId === request.id}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-white px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {sendingOneCId === request.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                          Передать в 1С
+                        </button>
+                      ) : null}
+                      {canAdvance && !terminalStatuses.has(request.status) ? (
+                        <button
+                          type="button"
+                          onClick={() => void advanceRequest(request)}
+                          disabled={advancingId === request.id}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {advancingId === request.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
+                          Далее
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ))
             )}

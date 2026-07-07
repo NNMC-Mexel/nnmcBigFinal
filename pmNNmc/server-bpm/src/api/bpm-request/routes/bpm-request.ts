@@ -29,6 +29,12 @@ export default {
       path: '/bpm-requests/:id/send-to-1c',
       handler: 'bpm-request.sendToOneC',
       config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/bpm-requests/:id/advance',
+      handler: 'bpm-request.advance',
+      config: { policies: [] },
     }
   ]
 };

@@ -72,11 +72,12 @@ export const bpmRequestsApi = {
     mine?: boolean;
     status?: string;
     type?: string;
-  }): Promise<{ data: BpmRequest[]; canReview: boolean }> => {
+  }): Promise<{ data: BpmRequest[]; canReview: boolean; canAdvance: boolean }> => {
     const response = await bpmClient.get('/bpm-requests', { params });
     return {
       data: response.data.data || [],
       canReview: response.data.meta?.canReview === true,
+      canAdvance: response.data.meta?.canAdvance === true,
     };
   },
 
@@ -95,6 +96,11 @@ export const bpmRequestsApi = {
 
   sendToOneC: async (id: number | string): Promise<BpmRequest> => {
     const response = await bpmClient.post(`/bpm-requests/${id}/send-to-1c`);
+    return response.data.data;
+  },
+
+  advance: async (id: number | string): Promise<BpmRequest> => {
+    const response = await bpmClient.post(`/bpm-requests/${id}/advance`);
     return response.data.data;
   },
 };

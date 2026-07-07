@@ -4,6 +4,51 @@ const REQUEST_UID = 'api::bpm-request.bpm-request' as any;
 const CARD_UID = 'api::employee-card.employee-card' as any;
 const USER_UID = 'plugin::users-permissions.user' as any;
 const REVIEW_DEPARTMENTS = new Set(['HR', 'ACCOUNTING']);
+const TERMINAL_STATUSES = new Set(['COMPLETED', 'REJECTED', 'CANCELLED']);
+const WORKFLOW_NEXT: Record<string, { status: string; stage: string; action: string; label: string }> = {
+  DRAFT: {
+    status: 'SUBMITTED',
+    stage: 'Рассмотрение руководителем отдела',
+    action: 'submitted_by_admin',
+    label: 'Супер-админ отправил заявку на согласование',
+  },
+  SUBMITTED: {
+    status: 'MANAGER_REVIEW',
+    stage: 'Рассмотрение руководителем отдела',
+    action: 'manager_review_started',
+    label: 'Заявка передана руководителю отдела',
+  },
+  MANAGER_REVIEW: {
+    status: 'HR_REVIEW',
+    stage: 'Рассмотрение заявления сотрудником отдела кадров',
+    action: 'manager_approved',
+    label: 'Этап руководителя пройден',
+  },
+  HR_REVIEW: {
+    status: 'ACCOUNTING_REVIEW',
+    stage: 'Рассмотрение расчетного стола',
+    action: 'hr_approved',
+    label: 'Этап кадров пройден',
+  },
+  ACCOUNTING_REVIEW: {
+    status: 'ONEC_PENDING',
+    stage: 'Ожидает передачи в 1С',
+    action: 'accounting_approved',
+    label: 'Этап бухгалтерии пройден',
+  },
+  ONEC_PENDING: {
+    status: 'ONEC_SENT',
+    stage: 'Передано в 1С',
+    action: 'onec_marked_sent',
+    label: 'Супер-админ отметил передачу в 1С',
+  },
+  ONEC_SENT: {
+    status: 'COMPLETED',
+    stage: 'Завершено',
+    action: 'completed',
+    label: 'Заявка завершена',
+  },
+};
 
 function cleanString(value: any): string {
   return String(value ?? '').trim();
@@ -54,6 +99,10 @@ async function loadCurrentUser(ctx: Context, strapi: any) {
 function canReviewBpm(user: any): boolean {
   const key = cleanString(user?.department?.key).toUpperCase();
   return user?.isSuperAdmin === true || REVIEW_DEPARTMENTS.has(key);
+}
+
+function canAdvanceBpm(user: any): boolean {
+  return user?.isSuperAdmin === true;
 }
 
 async function loadEmployeeCardForUser(strapi: any, user: any) {
@@ -196,7 +245,13 @@ export default {
       limit: 200,
     } as any);
 
-    ctx.body = { data: (items || []).map(formatRequest), meta: { canReview: reviewer } };
+    ctx.body = {
+      data: (items || []).map(formatRequest),
+      meta: {
+        canReview: reviewer,
+        canAdvance: canAdvanceBpm(user),
+      },
+    };
   },
 
   async findOne(ctx: Context) {
@@ -384,5 +439,46 @@ export default {
       } as any);
       ctx.throw(502, updated.onecError || '1C integration failed');
     }
+  },
+
+  async advance(ctx: Context) {
+    const strapi = (global as any).strapi;
+    const user = await loadCurrentUser(ctx, strapi);
+    if (!canAdvanceBpm(user)) ctx.throw(403, 'Only BPM SuperAdmin can advance BPM requests');
+
+    const item = await strapi.entityService.findOne(REQUEST_UID, ctx.params.id);
+    if (!item) ctx.throw(404, 'BPM request not found');
+
+    const currentStatus = cleanString(item.status);
+    if (TERMINAL_STATUSES.has(currentStatus)) {
+      ctx.throw(400, 'Заявка уже находится в конечном статусе');
+    }
+
+    const transition = WORKFLOW_NEXT[currentStatus];
+    if (!transition) {
+      ctx.throw(400, `Нет следующего этапа для статуса ${currentStatus || 'без статуса'}`);
+    }
+
+    const now = new Date().toISOString();
+    const history = Array.isArray(item.history) ? item.history : [];
+    const updated = await strapi.entityService.update(REQUEST_UID, item.id, {
+      data: {
+        status: transition.status,
+        workflowStage: transition.stage,
+        onecStatus: transition.status === 'ONEC_SENT' ? 'sent' : item.onecStatus,
+        completedAt: transition.status === 'COMPLETED' ? now : item.completedAt,
+        history: [
+          ...history,
+          {
+            at: now,
+            by: userDisplayName(user),
+            action: transition.action,
+            label: transition.label,
+          },
+        ],
+      },
+    } as any);
+
+    ctx.body = { data: formatRequest(updated) };
   },
 };
