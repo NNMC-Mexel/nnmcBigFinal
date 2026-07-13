@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Building2, CalendarClock, ExternalLink, Headphones, RefreshCw, Tag, UserRound } from 'lucide-react';
+import { Building2, CalendarClock, ExternalLink, Headphones, Phone, RefreshCw, Tag, UserRound } from 'lucide-react';
 import { useTicketStore } from '../../store/ticketStore';
 import { useAuthStore, useUserRole } from '../../store/authStore';
 import TicketStatusBadge from '../../components/tickets/TicketStatusBadge';
@@ -248,6 +248,10 @@ export default function HelpdeskPage() {
                       <Building2 className="h-4 w-4 flex-shrink-0 text-slate-400" />
                       <span className="truncate">{ticket.requesterDepartment || '-'}</span>
                     </div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Phone className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                      <span className="truncate">{ticket.requesterPhone || '-'}</span>
+                    </div>
                     <div className="flex min-w-0 items-start gap-2">
                       <Tag className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
                       <span className="min-w-0 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
@@ -292,6 +296,9 @@ export default function HelpdeskPage() {
                         {t('helpdesk.requesterName', 'ФИО')}
                       </th>
                       <th className="text-left px-4 py-3 font-medium text-slate-600">
+                        {t('helpdesk.requesterPhone', 'Телефон')}
+                      </th>
+                      <th className="text-left px-4 py-3 font-medium text-slate-600">
                         {t('helpdesk.requesterDepartment', 'Отдел')}
                       </th>
                       <th className="text-left px-4 py-3 font-medium text-slate-600">
@@ -325,6 +332,9 @@ export default function HelpdeskPage() {
                           {ticket.ticketNumber}
                         </td>
                         <td className="px-4 py-3 text-slate-800">{ticket.requesterName}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-slate-600">
+                          {ticket.requesterPhone || '-'}
+                        </td>
                         <td className="px-4 py-3 text-slate-600">{ticket.requesterDepartment}</td>
                         <td className="px-4 py-3 text-slate-600">{getCategoryName(ticket)}</td>
                         <td className="px-4 py-3">
