@@ -339,7 +339,7 @@ export default function NewEmployeeOnboardingPage() {
     if (stepKey === 'documents') {
       if (!documents.documentType) errors.push('Выберите вид документа');
       if (!documents.documentNumber) errors.push('Укажите номер документа');
-      if (documents.documentType === 'Удостоверение личности' && !/^\d+$/.test(documents.documentNumber || '')) errors.push('Номер удостоверения личности должен содержать только цифры');
+      if (documents.documentType === 'Удостоверение личности' && !/^\d{9}$/.test(documents.documentNumber || '')) errors.push('Номер удостоверения личности должен содержать ровно 9 цифр');
       if (!documents.issuedBy) errors.push('Укажите, кем выдан документ');
       if (!documents.issueDate || !documents.expiryDate) errors.push('Укажите дату выдачи и срок действия документа');
       if (!hasFiles(documents.identityFiles)) errors.push('Загрузите PDF документа, удостоверяющего личность');
@@ -547,10 +547,11 @@ export default function NewEmployeeOnboardingPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Select label="Вид документа" options={sectionOptions.documentType} value={section.documentType || 'Удостоверение личности'} onChange={(event) => updateSection('documents', 'documentType', event.target.value)} />
           <Input
-            label={`${section.documentType === 'Удостоверение личности' ? 'Номер удостоверения (только цифры)' : 'Номер документа'} *`}
+            label={`${section.documentType === 'Удостоверение личности' ? 'Номер удостоверения (9 цифр)' : 'Номер документа'} *`}
             inputMode={section.documentType === 'Удостоверение личности' ? 'numeric' : 'text'}
+            maxLength={section.documentType === 'Удостоверение личности' ? 9 : 30}
             value={section.documentNumber || ''}
-            onChange={(event) => updateSection('documents', 'documentNumber', section.documentType === 'Удостоверение личности' ? event.target.value.replace(/\D/g, '').slice(0, 20) : event.target.value.slice(0, 30))}
+            onChange={(event) => updateSection('documents', 'documentNumber', section.documentType === 'Удостоверение личности' ? event.target.value.replace(/\D/g, '').slice(0, 9) : event.target.value.slice(0, 30))}
           />
           <Input label="Кем выдан *" value={section.issuedBy || ''} onChange={(event) => updateSection('documents', 'issuedBy', event.target.value)} />
           <Input label="Дата выдачи *" type="date" min="1900-01-01" max={today} value={section.issueDate || ''} onChange={(event) => updateSection('documents', 'issueDate', normalizeDateInput(event.target.value))} />

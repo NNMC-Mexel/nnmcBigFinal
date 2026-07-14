@@ -128,8 +128,8 @@ function validateSubmissionDraft(draft: any): string[] {
   if (!cleanString(documents.documentType) || !cleanString(documents.documentNumber) || !cleanString(documents.issuedBy)) {
     errors.push('Не заполнены реквизиты удостоверяющего документа');
   }
-  if (documents.documentType === 'Удостоверение личности' && !/^\d+$/.test(cleanString(documents.documentNumber))) {
-    errors.push('Номер удостоверения личности должен содержать только цифры');
+  if (documents.documentType === 'Удостоверение личности' && !/^\d{9}$/.test(cleanString(documents.documentNumber))) {
+    errors.push('Номер удостоверения личности должен содержать ровно 9 цифр');
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanString(documents.issueDate)) || !/^\d{4}-\d{2}-\d{2}$/.test(cleanString(documents.expiryDate))) {
     errors.push('Некорректно заполнены даты удостоверяющего документа');
