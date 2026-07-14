@@ -20,11 +20,33 @@ import {
   Users,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import ComboboxSelect, { type ComboboxOption } from '../../components/ui/ComboboxSelect';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import { onboardingApi, type OnboardingInvitation } from '../../api/onboarding';
+import {
+  cityOptionsFor,
+  countryOptions,
+  kazakhstanRegionOptions,
+  nationalityOptions,
+} from './onboardingLookups';
 
-type FileMeta = { name: string; size: number; type: string; lastModified: number };
+type FileMeta = {
+  id: number;
+  name: string;
+  size: number;
+  type: string;
+  mime?: string;
+  url: string;
+  lastModified?: number;
+};
+
+type AddressValue = {
+  country?: string;
+  region?: string;
+  city?: string;
+  details?: string;
+};
 
 const steps = [
   { key: 'intro', title: 'Знакомство с ННМЦ', icon: PlayCircle },
@@ -37,7 +59,8 @@ const steps = [
   { key: 'family', title: 'Семья', icon: Users },
   { key: 'work', title: 'Трудовая деятельность', icon: Briefcase },
   { key: 'bank', title: 'Реквизиты', icon: Banknote },
-  { key: 'safety', title: 'Безопасность', icon: ShieldCheck },
+  { key: 'safety-medical', title: 'Безопасность: коды', icon: ShieldCheck },
+  { key: 'safety-fire', title: 'Пожарная безопасность', icon: ShieldCheck },
   { key: 'review', title: 'Проверка', icon: FileText },
 ];
 
@@ -65,6 +88,9 @@ const sectionOptions = {
 };
 
 const inputClass = 'w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all bg-white';
+const today = new Date().toISOString().slice(0, 10);
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const namePattern = /^[A-Za-zА-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі' -]+$/;
 
 function toYoutubeEmbed(url: string) {
   const id = url.match(/[?&]v=([^&]+)/)?.[1] || url.split('/').pop()?.split('?')[0] || '';
@@ -83,13 +109,17 @@ function normalizePhoneInput(value: string) {
   return `+7 ${source.slice(0, 3)} ${source.slice(3, 6)} ${source.slice(6, 8)} ${source.slice(8, 10)}`.trim();
 }
 
-function filesToMeta(files: FileList | null): FileMeta[] {
-  return Array.from(files || []).map((file) => ({
-    name: file.name,
-    size: file.size,
-    type: file.type,
-    lastModified: file.lastModified,
-  }));
+function normalizeDateInput(value: string) {
+  const [year = '', month = '', day = ''] = value.split('-');
+  return [year.slice(0, 4), month.slice(0, 2), day.slice(0, 2)].filter(Boolean).join('-');
+}
+
+function formatAddress(value?: AddressValue) {
+  return [value?.country, value?.region, value?.city, value?.details].filter(Boolean).join(', ');
+}
+
+function hasFiles(value: unknown): value is FileMeta[] {
+  return Array.isArray(value) && value.length > 0 && value.every((file) => Number(file?.id) > 0 && Boolean(file?.url));
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -105,37 +135,123 @@ function FileInput({
   label,
   accept,
   multiple,
+  required,
   value,
+  uploadFiles,
   onChange,
 }: {
   label: string;
   accept?: string;
   multiple?: boolean;
+  required?: boolean;
   value?: FileMeta[];
+  uploadFiles: (files: File[]) => Promise<FileMeta[]>;
   onChange: (files: FileMeta[]) => void;
 }) {
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const handleFiles = async (files: FileList | null) => {
+    const selected = Array.from(files || []);
+    if (selected.length === 0) return;
+    setUploadError('');
+    setIsUploading(true);
+    try {
+      onChange(await uploadFiles(selected));
+    } catch (requestError: any) {
+      setUploadError(requestError?.response?.data?.error?.message || requestError?.message || 'Не удалось загрузить файл');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return (
-    <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4">
+    <div className={`rounded-lg border border-dashed bg-slate-50 p-4 ${required && !hasFiles(value) ? 'border-amber-300' : 'border-slate-300'}`}>
       <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
-        <Upload className="h-5 w-5 text-primary-500" />
-        <span>{label}</span>
+        {isUploading ? <Loader2 className="h-5 w-5 animate-spin text-primary-500" /> : <Upload className="h-5 w-5 text-primary-500" />}
+        <span>{label}{required && <span className="ml-1 text-red-500">*</span>}</span>
         <input
           type="file"
           accept={accept}
           multiple={multiple}
+          disabled={isUploading}
           className="sr-only"
-          onChange={(event) => onChange(filesToMeta(event.target.files))}
+          onChange={(event) => void handleFiles(event.target.files)}
         />
       </label>
+      {isUploading && <p className="mt-2 text-xs text-primary-600">Файл загружается...</p>}
+      {uploadError && <p className="mt-2 text-xs text-red-600">{uploadError}</p>}
       {value && value.length > 0 && (
         <div className="mt-3 space-y-1 text-sm text-slate-600">
           {value.map((file) => (
             <div key={`${file.name}-${file.lastModified}`} className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-slate-400" />
-              <span>{file.name}</span>
+              <a href={file.url} target="_blank" rel="noreferrer" className="text-primary-700 hover:underline">{file.name}</a>
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+function SearchableField({
+  label,
+  value,
+  options,
+  onChange,
+  placeholder = 'Выберите значение',
+  allowCustom = true,
+}: {
+  label: string;
+  value: string;
+  options: ComboboxOption[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+  allowCustom?: boolean;
+}) {
+  return (
+    <Field label={label}>
+      <ComboboxSelect
+        value={value}
+        options={options}
+        onChange={onChange}
+        placeholder={placeholder}
+        searchPlaceholder="Начните вводить..."
+        searchable
+        allowCustom={allowCustom}
+      />
+    </Field>
+  );
+}
+
+function AddressFields({
+  title,
+  value,
+  onChange,
+  withDetails = true,
+}: {
+  title: string;
+  value?: AddressValue;
+  onChange: (value: AddressValue) => void;
+  withDetails?: boolean;
+}) {
+  const current = value || {};
+  const country = current.country || 'Казахстан';
+  const regionOptions = country === 'Казахстан' ? kazakhstanRegionOptions : [];
+  const cityOptions = cityOptionsFor(country, current.region || '');
+  const update = (patch: Partial<AddressValue>) => onChange({ ...current, country, ...patch });
+
+  return (
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4 lg:col-span-2">
+      <h3 className="font-semibold text-slate-800">{title}</h3>
+      <div className="grid gap-3 md:grid-cols-3">
+        <SearchableField label="Страна *" value={country} options={countryOptions} onChange={(nextCountry) => onChange({ country: nextCountry, region: '', city: '', details: current.details || '' })} />
+        <SearchableField label="Область / регион *" value={current.region || ''} options={regionOptions} onChange={(region) => update({ region, city: '' })} />
+        <SearchableField label="Город / населенный пункт *" value={current.city || ''} options={cityOptions} onChange={(city) => update({ city })} />
+      </div>
+      {withDetails && (
+        <Input label="Улица, дом, квартира *" value={current.details || ''} onChange={(event) => update({ details: event.target.value })} />
       )}
     </div>
   );
@@ -183,6 +299,89 @@ export default function NewEmployeeOnboardingPage() {
     setDraft((current) => ({ ...current, [section]: value }));
   };
 
+  const uploadFiles = async (files: File[]) => {
+    if (!verified) throw new Error('Сначала подтвердите ИИН');
+    return onboardingApi.uploadFiles(token, iin, files);
+  };
+
+  const validateStep = (stepKey: string, data = draft): string[] => {
+    const errors: string[] = [];
+    const identity = data.identity || {};
+    const documents = data.documents || {};
+    const contacts = data.contacts || {};
+    const medical = data.medical || {};
+    const family = data.family || {};
+
+    if (stepKey === 'law' && data.legal?.accepted !== true) {
+      errors.push('Подтвердите согласие на обработку персональных данных');
+    }
+    if (stepKey === 'identity') {
+      if (!hasFiles(identity.photo)) errors.push('Загрузите фотографию 3x4');
+      for (const [field, label] of [['lastName', 'фамилию'], ['firstName', 'имя']] as const) {
+        const value = String(identity[field] || '').trim();
+        if (!value) errors.push(`Укажите ${label} как в документе`);
+        else if (!namePattern.test(value)) errors.push(`${label[0].toUpperCase()}${label.slice(1)} может содержать только буквы, пробел, дефис и апостроф`);
+      }
+      if (!identity.noMiddleName) {
+        const middleName = String(identity.middleName || '').trim();
+        if (!middleName) errors.push('Укажите отчество или отметьте «Отчество отсутствует»');
+        else if (!namePattern.test(middleName)) errors.push('Отчество может содержать только буквы, пробел, дефис и апостроф');
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(identity.birthDate || '') || identity.birthDate < '1900-01-01' || identity.birthDate > today) {
+        errors.push('Укажите корректную дату рождения с годом из 4 цифр');
+      }
+      if (!identity.gender) errors.push('Выберите пол');
+      if (!identity.nationality) errors.push('Выберите национальность');
+      if (!identity.citizenship) errors.push('Выберите гражданство');
+      const birthPlace = identity.birthPlaceAddress || {};
+      if (!birthPlace.country || !birthPlace.region || !birthPlace.city) errors.push('Полностью заполните место рождения: страна, область и город');
+    }
+    if (stepKey === 'documents') {
+      if (!documents.documentType) errors.push('Выберите вид документа');
+      if (!documents.documentNumber) errors.push('Укажите номер документа');
+      if (documents.documentType === 'Удостоверение личности' && !/^\d+$/.test(documents.documentNumber || '')) errors.push('Номер удостоверения личности должен содержать только цифры');
+      if (!documents.issuedBy) errors.push('Укажите, кем выдан документ');
+      if (!documents.issueDate || !documents.expiryDate) errors.push('Укажите дату выдачи и срок действия документа');
+      if (!hasFiles(documents.identityFiles)) errors.push('Загрузите PDF документа, удостоверяющего личность');
+    }
+    if (stepKey === 'contacts') {
+      for (const [address, label] of [[contacts.registration, 'адрес по прописке'], [contacts.living, 'адрес проживания']] as const) {
+        if (!address?.country || !address?.region || !address?.city || !address?.details) errors.push(`Полностью заполните ${label}`);
+      }
+      if (String(contacts.mobilePhone || '').replace(/\D/g, '').length !== 11) errors.push('Укажите мобильный телефон в формате +7 700 000 00 00');
+      if (contacts.email && !emailPattern.test(contacts.email)) errors.push('Укажите корректный email, например name@example.com');
+      if (!hasFiles(contacts.signatureFile)) errors.push('Загрузите образец личной подписи');
+    }
+    if (stepKey === 'education') {
+      for (const [index, item] of (data.education?.items || []).entries()) {
+        if (!item.institution || !item.degree || !hasFiles(item.files)) errors.push(`Заполните образование №${index + 1} и загрузите диплом/сертификат`);
+      }
+    }
+    if (stepKey === 'medical') {
+      const requiredMedical = [
+        ['form075', 'медицинскую справку формы 075'],
+        ['noCriminalRecord', 'справку о несудимости'],
+        ['narcology', 'справку из наркологического диспансера'],
+        ['psychiatry', 'справку из психиатрического диспансера'],
+      ];
+      for (const [key, label] of requiredMedical) if (!hasFiles(medical[key])) errors.push(`Загрузите ${label}`);
+      if (!medical.emergencyContactName || !medical.emergencyContactRelation || String(medical.emergencyContactPhone || '').replace(/\D/g, '').length !== 11) {
+        errors.push('Заполните ФИО, степень родства и телефон контактного лица');
+      }
+    }
+    if (stepKey === 'family') {
+      if (!family.maritalStatus) errors.push('Выберите семейное положение');
+      if (family.maritalStatus === 'Состоит в зарегистрированном браке' && !hasFiles(family.marriageFiles)) errors.push('Загрузите свидетельство о браке');
+      for (const [index, member] of (family.members || []).entries()) {
+        if (!member.relation || !member.fio || !member.birthDate || !hasFiles(member.files)) errors.push(`Заполните члена семьи №${index + 1} и загрузите подтверждающий документ`);
+      }
+    }
+    if (stepKey === 'bank' && !hasFiles(data.bank?.halykRequisites)) errors.push('Загрузите PDF с банковскими реквизитами Halyk Bank');
+    if (stepKey === 'safety-medical' && data.safety?.introReviewed !== true) errors.push('Подтвердите просмотр первого видео');
+    if (stepKey === 'safety-fire' && data.safety?.hospitalSafetyReviewed !== true) errors.push('Подтвердите просмотр второго видео');
+    return errors;
+  };
+
   const verify = async () => {
     setError('');
     setSuccess('');
@@ -193,8 +392,19 @@ export default function NewEmployeeOnboardingPage() {
     setIsSaving(true);
     try {
       const data = await onboardingApi.verify(token, iin);
+      const initialDraft = {
+        ...(data.draft || {}),
+        identity: {
+          ...(data.draft?.identity || {}),
+          citizenship: data.draft?.identity?.citizenship || 'Казахстан',
+        },
+        documents: {
+          ...(data.draft?.documents || {}),
+          documentType: data.draft?.documents?.documentType || 'Удостоверение личности',
+        },
+      };
       setInvitation(data);
-      setDraft(data.draft || {});
+      setDraft(initialDraft);
       setStep(Number(data.draft?.currentStep || 0));
       setVerified(true);
       setSuccess('ИИН подтвержден. Можно начинать заполнение анкеты.');
@@ -221,14 +431,23 @@ export default function NewEmployeeOnboardingPage() {
     }
   };
 
-  const next = () => void save(Math.min(step + 1, steps.length - 1));
+  const next = () => {
+    const errors = validateStep(activeStep.key);
+    if (errors.length > 0) {
+      setError(errors.join('. '));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    void save(Math.min(step + 1, steps.length - 1));
+  };
   const previous = () => setStep((current) => Math.max(current - 1, 0));
 
   const submit = async () => {
     setError('');
     setSuccess('');
-    if (!draft.safety?.introReviewed || !draft.safety?.hospitalSafetyReviewed) {
-      setError('Отметьте просмотр двух видео по безопасности');
+    const allErrors = steps.flatMap((item) => validateStep(item.key));
+    if (allErrors.length > 0) {
+      setError(allErrors[0]);
       return;
     }
     setIsSaving(true);
@@ -295,21 +514,29 @@ export default function NewEmployeeOnboardingPage() {
       const section = draft.identity || {};
       return (
         <div className="grid gap-4 lg:grid-cols-2">
-          <FileInput label="Фото 3x4" accept="image/png,image/jpeg" value={section.photo} onChange={(files) => updateSection('identity', 'photo', files)} />
+          <FileInput label="Фото 3x4" accept="image/png,image/jpeg" required value={section.photo} uploadFiles={uploadFiles} onChange={(files) => updateSection('identity', 'photo', files)} />
           <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Фото нужно для личного дела. Обычно отдел кадров предупреждает требования заранее.</div>
-          <Input label="Фамилия" value={section.lastName || ''} onChange={(event) => updateSection('identity', 'lastName', event.target.value)} />
-          <Input label="Имя" value={section.firstName || ''} onChange={(event) => updateSection('identity', 'firstName', event.target.value)} />
-          <Input label="Отчество" value={section.middleName || ''} onChange={(event) => updateSection('identity', 'middleName', event.target.value)} disabled={section.noMiddleName} />
+          <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-900 lg:col-span-2">
+            Внесите ФИО строго так, как оно указано в удостоверении личности или паспорте. Не используйте сокращения.
+          </div>
+          <Input label="Фамилия по документу *" value={section.lastName || ''} onChange={(event) => updateSection('identity', 'lastName', event.target.value.replace(/[^A-Za-zА-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі' -]/g, ''))} />
+          <Input label="Имя по документу *" value={section.firstName || ''} onChange={(event) => updateSection('identity', 'firstName', event.target.value.replace(/[^A-Za-zА-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі' -]/g, ''))} />
+          <Input label="Отчество по документу *" value={section.middleName || ''} onChange={(event) => updateSection('identity', 'middleName', event.target.value.replace(/[^A-Za-zА-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі' -]/g, ''))} disabled={section.noMiddleName} />
           <label className="flex items-center gap-2 pt-7 text-sm text-slate-600">
             <input type="checkbox" checked={section.noMiddleName === true} onChange={(event) => updateSection('identity', 'noMiddleName', event.target.checked)} />
             Отчество отсутствует
           </label>
           <Input label="ИИН" value={iin} readOnly className="bg-slate-100" />
-          <Input label="Дата рождения" type="date" value={section.birthDate || ''} onChange={(event) => updateSection('identity', 'birthDate', event.target.value)} />
-          <Select label="Пол" placeholder="Выберите" options={sectionOptions.gender} value={section.gender || ''} onChange={(event) => updateSection('identity', 'gender', event.target.value)} />
-          <Input label="Национальность" value={section.nationality || ''} onChange={(event) => updateSection('identity', 'nationality', event.target.value)} />
-          <Input label="Место рождения" value={section.birthPlace || ''} onChange={(event) => updateSection('identity', 'birthPlace', event.target.value)} />
-          <Input label="Гражданство" value={section.citizenship || 'КАЗАХСТАН'} onChange={(event) => updateSection('identity', 'citizenship', event.target.value)} />
+          <Input label="Дата рождения *" type="date" min="1900-01-01" max={today} value={section.birthDate || ''} onChange={(event) => updateSection('identity', 'birthDate', normalizeDateInput(event.target.value))} />
+          <Select label="Пол *" placeholder="Выберите" options={sectionOptions.gender} value={section.gender || ''} onChange={(event) => updateSection('identity', 'gender', event.target.value)} />
+          <SearchableField label="Национальность *" value={section.nationality || ''} options={nationalityOptions} onChange={(value) => updateSection('identity', 'nationality', value)} />
+          <SearchableField label="Гражданство *" value={section.citizenship || 'Казахстан'} options={countryOptions} onChange={(value) => updateSection('identity', 'citizenship', value)} />
+          <AddressFields
+            title="Место рождения"
+            withDetails={false}
+            value={section.birthPlaceAddress}
+            onChange={(value) => setSection('identity', { ...section, birthPlaceAddress: value, birthPlace: formatAddress(value) })}
+          />
         </div>
       );
     }
@@ -319,11 +546,16 @@ export default function NewEmployeeOnboardingPage() {
       return (
         <div className="grid gap-4 lg:grid-cols-2">
           <Select label="Вид документа" options={sectionOptions.documentType} value={section.documentType || 'Удостоверение личности'} onChange={(event) => updateSection('documents', 'documentType', event.target.value)} />
-          <Input label="Номер документа" value={section.documentNumber || ''} onChange={(event) => updateSection('documents', 'documentNumber', event.target.value)} />
-          <Input label="Кем выдан" value={section.issuedBy || ''} onChange={(event) => updateSection('documents', 'issuedBy', event.target.value)} />
-          <Input label="Дата выдачи" type="date" value={section.issueDate || ''} onChange={(event) => updateSection('documents', 'issueDate', event.target.value)} />
-          <Input label="Срок действия" type="date" value={section.expiryDate || ''} onChange={(event) => updateSection('documents', 'expiryDate', event.target.value)} />
-          <FileInput label="PDF удостоверения личности, максимум 2 файла" accept="application/pdf" multiple value={section.identityFiles} onChange={(files) => updateSection('documents', 'identityFiles', files.slice(0, 2))} />
+          <Input
+            label={`${section.documentType === 'Удостоверение личности' ? 'Номер удостоверения (только цифры)' : 'Номер документа'} *`}
+            inputMode={section.documentType === 'Удостоверение личности' ? 'numeric' : 'text'}
+            value={section.documentNumber || ''}
+            onChange={(event) => updateSection('documents', 'documentNumber', section.documentType === 'Удостоверение личности' ? event.target.value.replace(/\D/g, '').slice(0, 20) : event.target.value.slice(0, 30))}
+          />
+          <Input label="Кем выдан *" value={section.issuedBy || ''} onChange={(event) => updateSection('documents', 'issuedBy', event.target.value)} />
+          <Input label="Дата выдачи *" type="date" min="1900-01-01" max={today} value={section.issueDate || ''} onChange={(event) => updateSection('documents', 'issueDate', normalizeDateInput(event.target.value))} />
+          <Input label="Срок действия *" type="date" min="1900-01-01" value={section.expiryDate || ''} onChange={(event) => updateSection('documents', 'expiryDate', normalizeDateInput(event.target.value))} />
+          <FileInput label="PDF документа, максимум 2 файла" accept="application/pdf" multiple required value={section.identityFiles} uploadFiles={uploadFiles} onChange={(files) => updateSection('documents', 'identityFiles', files.slice(0, 2))} />
         </div>
       );
     }
@@ -332,12 +564,12 @@ export default function NewEmployeeOnboardingPage() {
       const section = draft.contacts || {};
       return (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Input label="Адрес по прописке" value={section.registrationAddress || ''} onChange={(event) => updateSection('contacts', 'registrationAddress', event.target.value)} />
-          <Input label="Адрес проживания" value={section.livingAddress || ''} onChange={(event) => updateSection('contacts', 'livingAddress', event.target.value)} />
-          <Input label="Мобильный телефон" value={section.mobilePhone || ''} onChange={(event) => updateSection('contacts', 'mobilePhone', normalizePhoneInput(event.target.value))} />
+          <AddressFields title="Адрес по прописке" value={section.registration} onChange={(value) => setSection('contacts', { ...section, registration: value, registrationAddress: formatAddress(value) })} />
+          <AddressFields title="Адрес проживания" value={section.living} onChange={(value) => setSection('contacts', { ...section, living: value, livingAddress: formatAddress(value) })} />
+          <Input label="Мобильный телефон *" inputMode="tel" value={section.mobilePhone || ''} onChange={(event) => updateSection('contacts', 'mobilePhone', normalizePhoneInput(event.target.value))} placeholder="+7 700 000 00 00" />
           <Input label="Домашний телефон" value={section.homePhone || ''} onChange={(event) => updateSection('contacts', 'homePhone', event.target.value)} />
-          <Input label="Email, если есть" type="email" value={section.email || ''} onChange={(event) => updateSection('contacts', 'email', event.target.value)} />
-          <FileInput label="Образец личной подписи" accept="application/pdf,image/png,image/jpeg" value={section.signatureFile} onChange={(files) => updateSection('contacts', 'signatureFile', files.slice(0, 1))} />
+          <Input label="Email, если есть" type="email" inputMode="email" placeholder="name@example.com" value={section.email || ''} onChange={(event) => updateSection('contacts', 'email', event.target.value.trim())} />
+          <FileInput label="Образец личной подписи" accept="application/pdf,image/png,image/jpeg" required value={section.signatureFile} uploadFiles={uploadFiles} onChange={(files) => updateSection('contacts', 'signatureFile', files.slice(0, 1))} />
         </div>
       );
     }
@@ -372,7 +604,7 @@ export default function NewEmployeeOnboardingPage() {
                 const nextRows = [...rows]; nextRows[index] = { ...row, diplomaNumber: event.target.value }; setSection('education', { ...(draft.education || {}), items: nextRows });
               }} />
               <div className="lg:col-span-3">
-                <FileInput label="Диплом / сертификаты" accept="application/pdf,image/png,image/jpeg" multiple value={row.files} onChange={(files) => {
+                <FileInput label="Диплом / сертификаты" accept="application/pdf,image/png,image/jpeg" multiple required value={row.files} uploadFiles={uploadFiles} onChange={(files) => {
                   const nextRows = [...rows]; nextRows[index] = { ...row, files }; setSection('education', { ...(draft.education || {}), items: nextRows });
                 }} />
               </div>
@@ -401,10 +633,10 @@ export default function NewEmployeeOnboardingPage() {
       const section = draft.medical || {};
       return (
         <div className="grid gap-4 lg:grid-cols-2">
-          <FileInput label="Медицинская справка форма 075" accept="application/pdf" value={section.form075} onChange={(files) => updateSection('medical', 'form075', files.slice(0, 1))} />
-          <FileInput label="Справка о несудимости" accept="application/pdf" value={section.noCriminalRecord} onChange={(files) => updateSection('medical', 'noCriminalRecord', files.slice(0, 1))} />
-          <FileInput label="Справка с наркологического диспансера" accept="application/pdf" value={section.narcology} onChange={(files) => updateSection('medical', 'narcology', files.slice(0, 1))} />
-          <FileInput label="Справка с психиатрического диспансера" accept="application/pdf" value={section.psychiatry} onChange={(files) => updateSection('medical', 'psychiatry', files.slice(0, 1))} />
+          <FileInput label="Медицинская справка форма 075" accept="application/pdf" required value={section.form075} uploadFiles={uploadFiles} onChange={(files) => updateSection('medical', 'form075', files.slice(0, 1))} />
+          <FileInput label="Справка о несудимости" accept="application/pdf" required value={section.noCriminalRecord} uploadFiles={uploadFiles} onChange={(files) => updateSection('medical', 'noCriminalRecord', files.slice(0, 1))} />
+          <FileInput label="Справка с наркологического диспансера" accept="application/pdf" required value={section.narcology} uploadFiles={uploadFiles} onChange={(files) => updateSection('medical', 'narcology', files.slice(0, 1))} />
+          <FileInput label="Справка с психиатрического диспансера" accept="application/pdf" required value={section.psychiatry} uploadFiles={uploadFiles} onChange={(files) => updateSection('medical', 'psychiatry', files.slice(0, 1))} />
           <Input label="Группа крови" value={section.bloodType || ''} onChange={(event) => updateSection('medical', 'bloodType', event.target.value)} />
           <Input label="Контактное лицо при экстренном случае" value={section.emergencyContactName || ''} onChange={(event) => updateSection('medical', 'emergencyContactName', event.target.value)} />
           <Input label="Степень родства" value={section.emergencyContactRelation || ''} onChange={(event) => updateSection('medical', 'emergencyContactRelation', event.target.value)} />
@@ -418,7 +650,7 @@ export default function NewEmployeeOnboardingPage() {
       return (
         <div className="space-y-5">
           <Select label="Семейное положение" options={sectionOptions.maritalStatus} value={draft.family?.maritalStatus || ''} onChange={(event) => updateSection('family', 'maritalStatus', event.target.value)} />
-          <FileInput label="Свидетельство о браке / расторжении брака" accept="application/pdf,image/png,image/jpeg" value={draft.family?.marriageFiles} onChange={(files) => updateSection('family', 'marriageFiles', files)} />
+          <FileInput label="Свидетельство о браке / расторжении брака" accept="application/pdf,image/png,image/jpeg" required={draft.family?.maritalStatus === 'Состоит в зарегистрированном браке'} value={draft.family?.marriageFiles} uploadFiles={uploadFiles} onChange={(files) => updateSection('family', 'marriageFiles', files)} />
           <div className="flex justify-between gap-3">
             <h3 className="font-semibold text-slate-800">Состав семьи</h3>
             <Button type="button" size="sm" onClick={() => setSection('family', { ...(draft.family || {}), members: [...rows, {}] })}>Добавить</Button>
@@ -433,13 +665,13 @@ export default function NewEmployeeOnboardingPage() {
                   value={row[key] || ''}
                   onChange={(event) => {
                     const nextRows = [...rows];
-                    nextRows[index] = { ...row, [key]: key === 'contactPhone' ? normalizePhoneInput(event.target.value) : event.target.value };
+                    nextRows[index] = { ...row, [key]: key === 'contactPhone' ? normalizePhoneInput(event.target.value) : key === 'birthDate' ? normalizeDateInput(event.target.value) : event.target.value };
                     setSection('family', { ...(draft.family || {}), members: nextRows });
                   }}
                 />
               ))}
               <div className="lg:col-span-4">
-                <FileInput label="Свидетельство о рождении / документ" accept="application/pdf,image/png,image/jpeg" value={row.files} onChange={(files) => {
+                <FileInput label="Свидетельство о рождении / документ" accept="application/pdf,image/png,image/jpeg" required value={row.files} uploadFiles={uploadFiles} onChange={(files) => {
                   const nextRows = [...rows]; nextRows[index] = { ...row, files }; setSection('family', { ...(draft.family || {}), members: nextRows });
                 }} />
               </div>
@@ -466,7 +698,7 @@ export default function NewEmployeeOnboardingPage() {
                   type={key === 'from' || key === 'to' ? 'date' : 'text'}
                   value={row[key] || ''}
                   onChange={(event) => {
-                    const nextRows = [...rows]; nextRows[index] = { ...row, [key]: event.target.value }; setSection('work', { ...(draft.work || {}), items: nextRows });
+                    const nextRows = [...rows]; nextRows[index] = { ...row, [key]: key === 'from' || key === 'to' ? normalizeDateInput(event.target.value) : event.target.value }; setSection('work', { ...(draft.work || {}), items: nextRows });
                   }}
                 />
               ))}
@@ -480,7 +712,7 @@ export default function NewEmployeeOnboardingPage() {
     if (activeStep.key === 'bank') {
       return (
         <div className="space-y-4">
-          <FileInput label="PDF с банковскими реквизитами Halyk Bank" accept="application/pdf" value={draft.bank?.halykRequisites} onChange={(files) => updateSection('bank', 'halykRequisites', files.slice(0, 1))} />
+          <FileInput label="PDF с банковскими реквизитами Halyk Bank" accept="application/pdf" required value={draft.bank?.halykRequisites} uploadFiles={uploadFiles} onChange={(files) => updateSection('bank', 'halykRequisites', files.slice(0, 1))} />
           <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
             Пока реквизиты принимаются файлом. Если позже понадобится ручной ввод IBAN/BIC, добавим отдельные поля.
           </div>
@@ -488,29 +720,34 @@ export default function NewEmployeeOnboardingPage() {
       );
     }
 
-    if (activeStep.key === 'safety') {
+    if (activeStep.key === 'safety-medical') {
       return (
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div className="space-y-3">
             <h3 className="font-semibold text-slate-800">Безопасность: больничный лист и коды цветов</h3>
             <div className="aspect-video overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
               <iframe title="Безопасность 1" src={toYoutubeEmbed('https://www.youtube.com/watch?v=LastBYmQ634')} className="h-full w-full" allowFullScreen />
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" checked={draft.safety?.introReviewed === true} onChange={(event) => updateSection('safety', 'introReviewed', event.target.checked)} />
-              Просмотрено
+            <label className="flex cursor-pointer items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-base font-medium text-slate-800">
+              <input type="checkbox" checked={draft.safety?.introReviewed === true} onChange={(event) => updateSection('safety', 'introReviewed', event.target.checked)} className="h-7 w-7 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+              Я посмотрел(а) первое видео полностью
             </label>
           </div>
-          <div className="space-y-3">
-            <h3 className="font-semibold text-slate-800">Пожарная и техническая безопасность в больнице</h3>
-            <div className="aspect-video overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-              <iframe title="Безопасность 2" src={toYoutubeEmbed('https://www.youtube.com/watch?v=aUNTztjE_ss')} className="h-full w-full" allowFullScreen />
-            </div>
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" checked={draft.safety?.hospitalSafetyReviewed === true} onChange={(event) => updateSection('safety', 'hospitalSafetyReviewed', event.target.checked)} />
-              Просмотрено
-            </label>
+        </div>
+      );
+    }
+
+    if (activeStep.key === 'safety-fire') {
+      return (
+        <div className="space-y-5">
+          <h3 className="font-semibold text-slate-800">Пожарная и техническая безопасность в больнице</h3>
+          <div className="aspect-video overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+            <iframe title="Безопасность 2" src={toYoutubeEmbed('https://www.youtube.com/watch?v=aUNTztjE_ss')} className="h-full w-full" allowFullScreen />
           </div>
+          <label className="flex cursor-pointer items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-base font-medium text-slate-800">
+            <input type="checkbox" checked={draft.safety?.hospitalSafetyReviewed === true} onChange={(event) => updateSection('safety', 'hospitalSafetyReviewed', event.target.checked)} className="h-7 w-7 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+            Я посмотрел(а) второе видео полностью
+          </label>
         </div>
       );
     }

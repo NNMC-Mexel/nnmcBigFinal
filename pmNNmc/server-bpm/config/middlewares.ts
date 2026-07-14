@@ -1,6 +1,8 @@
 export default ({ env }) => {
   const frontendUrl = env('FRONTEND_URL', 'http://192.168.101.25:13010');
   const extraOrigins = env.array('CORS_EXTRA_ORIGINS', []);
+  const minioEndpoint = env('MINIO_ENDPOINT', '');
+  const minioOrigin = minioEndpoint ? new URL(minioEndpoint).origin : '';
 
   return [
     'strapi::logger',
@@ -12,8 +14,8 @@ export default ({ env }) => {
           useDefaults: true,
           directives: {
             'connect-src': ["'self'", 'https:', 'http:'],
-            'img-src': ["'self'", 'data:', 'blob:', 'market-assets.strapi.io'],
-            'media-src': ["'self'", 'data:', 'blob:', 'market-assets.strapi.io'],
+            'img-src': ["'self'", 'data:', 'blob:', 'market-assets.strapi.io', minioOrigin].filter(Boolean),
+            'media-src': ["'self'", 'data:', 'blob:', 'market-assets.strapi.io', minioOrigin].filter(Boolean),
           },
         },
       },
@@ -43,6 +45,10 @@ export default ({ env }) => {
         formLimit: '64mb',
         jsonLimit: '20mb',
         textLimit: '20mb',
+        formidable: {
+          maxFileSize: 25 * 1024 * 1024,
+          multiples: true,
+        },
       },
     },
     {
@@ -52,6 +58,7 @@ export default ({ env }) => {
       },
     },
     'strapi::favicon',
+    ...(minioEndpoint ? ['global::minio-proxy'] : []),
     'strapi::public',
   ];
 };

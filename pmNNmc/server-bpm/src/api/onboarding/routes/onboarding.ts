@@ -20,6 +20,12 @@ export default {
     },
     {
       method: 'POST',
+      path: '/onboarding/public/:token/files',
+      handler: 'onboarding.uploadFiles',
+      config: { auth: false, policies: [] },
+    },
+    {
+      method: 'POST',
       path: '/onboarding/public/:token/submit',
       handler: 'onboarding.submit',
       config: { auth: false, policies: [] },

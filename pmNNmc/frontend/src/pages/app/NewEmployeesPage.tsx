@@ -86,6 +86,25 @@ function SummaryRow({ label, value }: { label: string; value?: string | number |
   );
 }
 
+function FileLink({ files, empty = '-' }: { files?: Array<{ id?: number; name?: string; url?: string }>; empty?: string }) {
+  if (!files?.length) return <>{empty}</>;
+  return (
+    <span className="inline-flex flex-wrap gap-x-2 gap-y-1">
+      {files.map((file, index) => file.url ? (
+        <a
+          key={`${file.id || file.name}-${index}`}
+          href={file.url}
+          target="_blank"
+          rel="noreferrer"
+          className="font-medium text-primary-600 underline-offset-2 hover:underline"
+        >
+          {file.name || `Файл ${index + 1}`}
+        </a>
+      ) : <span key={`${file.id || file.name}-${index}`}>{file.name || `Файл ${index + 1}`}</span>)}
+    </span>
+  );
+}
+
 export default function NewEmployeesPage() {
   const [items, setItems] = useState<OnboardingInvitation[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -269,6 +288,17 @@ export default function NewEmployeesPage() {
                     <p>Национальность: {identity.nationality || '-'}</p>
                     <p>Гражданство: {identity.citizenship || '-'}</p>
                     <p>Место рождения: {identity.birthPlace || '-'}</p>
+                    <p>Фото 3x4: <FileLink files={identity.photo} /></p>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <h3 className="font-semibold text-slate-900">Удостоверяющий документ</h3>
+                  <div className="mt-3 grid gap-2 text-sm text-slate-600">
+                    <p>Вид: {documents.documentType || '-'}</p>
+                    <p>Номер: {documents.documentNumber || '-'}</p>
+                    <p>Кем выдан: {documents.issuedBy || '-'}</p>
+                    <p>Выдан: {documents.issueDate || '-'} · до {documents.expiryDate || '-'}</p>
+                    <p>Файл: <FileLink files={documents.identityFiles} /></p>
                   </div>
                 </div>
                 <div className="rounded-xl border border-slate-200 p-4">
@@ -276,22 +306,22 @@ export default function NewEmployeesPage() {
                   <div className="mt-3 grid gap-2 text-sm text-slate-600">
                     <p>Прописка: {contacts.registrationAddress || '-'}</p>
                     <p>Проживание: {contacts.livingAddress || '-'}</p>
-                    <p>Подпись: {contacts.signatureFile?.[0]?.name || '-'}</p>
+                    <p>Подпись: <FileLink files={contacts.signatureFile} /></p>
                   </div>
                 </div>
                 <div className="rounded-xl border border-slate-200 p-4">
                   <h3 className="font-semibold text-slate-900">Медицинские документы</h3>
                   <div className="mt-3 grid gap-2 text-sm text-slate-600">
-                    <p>Форма 075: {medical.form075?.[0]?.name || '-'}</p>
-                    <p>Несудимость: {medical.noCriminalRecord?.[0]?.name || '-'}</p>
-                    <p>Наркология: {medical.narcology?.[0]?.name || '-'}</p>
-                    <p>Психиатрия: {medical.psychiatry?.[0]?.name || '-'}</p>
+                    <p>Форма 075: <FileLink files={medical.form075} /></p>
+                    <p>Несудимость: <FileLink files={medical.noCriminalRecord} /></p>
+                    <p>Наркология: <FileLink files={medical.narcology} /></p>
+                    <p>Психиатрия: <FileLink files={medical.psychiatry} /></p>
                   </div>
                 </div>
                 <div className="rounded-xl border border-slate-200 p-4">
                   <h3 className="font-semibold text-slate-900">Банк и финал</h3>
                   <div className="mt-3 grid gap-2 text-sm text-slate-600">
-                    <p>Halyk PDF: {bank.halykRequisites?.[0]?.name || '-'}</p>
+                    <p>Halyk PDF: <FileLink files={bank.halykRequisites} /></p>
                     <p>Видео 1: {draft.safety?.introReviewed ? 'просмотрено' : 'нет'}</p>
                     <p>Видео 2: {draft.safety?.hospitalSafetyReviewed ? 'просмотрено' : 'нет'}</p>
                   </div>

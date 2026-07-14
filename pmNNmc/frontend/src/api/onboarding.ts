@@ -36,6 +36,15 @@ export interface OnboardingInvitation {
   updatedAt?: string;
 }
 
+export interface OnboardingUploadedFile {
+  id: number;
+  name: string;
+  url: string;
+  mime?: string;
+  type: string;
+  size: number;
+}
+
 export const onboardingApi = {
   async publicStatus(token: string): Promise<OnboardingInvitation> {
     const response = await bpmClient.get(`/onboarding/public/${token}`);
@@ -50,6 +59,16 @@ export const onboardingApi = {
   async saveDraft(token: string, iin: string, draft: Record<string, any>, currentStep: number): Promise<OnboardingInvitation> {
     const response = await bpmClient.put(`/onboarding/public/${token}/draft`, { iin, draft, currentStep });
     return response.data.data;
+  },
+
+  async uploadFiles(token: string, iin: string, files: File[]): Promise<OnboardingUploadedFile[]> {
+    const formData = new FormData();
+    formData.append('iin', iin);
+    files.forEach((file) => formData.append('files', file));
+    const response = await bpmClient.post(`/onboarding/public/${token}/files`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data.data || [];
   },
 
   async submit(token: string, iin: string): Promise<OnboardingInvitation> {

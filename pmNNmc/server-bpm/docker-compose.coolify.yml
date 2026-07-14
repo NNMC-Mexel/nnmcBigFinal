@@ -30,6 +30,8 @@ services:
       - bpm-internal
     ports:
       - "12016:12016"
+    volumes:
+      - server-bpm-uploads:/app/public/uploads
     environment:
       NODE_ENV: ${NODE_ENV}
       HOST: ${HOST}
@@ -69,9 +71,17 @@ services:
       EMPLOYEE_SYNC_KEYCLOAK_ENABLED: ${EMPLOYEE_SYNC_KEYCLOAK_ENABLED}
       EMPLOYEE_KEYCLOAK_EMAIL_DOMAIN: ${EMPLOYEE_KEYCLOAK_EMAIL_DOMAIN}
       BPM_SUPERADMIN_USERNAMES: ${BPM_SUPERADMIN_USERNAMES}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-}
+      MINIO_BUCKET: ${MINIO_BUCKET:-}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-}
+      MINIO_ROOT_PATH: ${MINIO_ROOT_PATH:-onboarding}
 
 volumes:
   server-bpm-db16-data:
+  server-bpm-uploads:
 
 networks:
   bpm-internal:

@@ -1,5 +1,36 @@
-export default ({ env }) => ({
-  'users-permissions': {
+export default ({ env }) => {
+  const useMinio = Boolean(env('MINIO_ENDPOINT', '') && env('MINIO_BUCKET', ''));
+
+  return {
+    ...(useMinio
+      ? {
+          upload: {
+            config: {
+              provider: 'aws-s3',
+              providerOptions: {
+                baseUrl: env('MINIO_PUBLIC_URL') || `${env('SERVER_URL', '')}/uploads`,
+                rootPath: env('MINIO_ROOT_PATH', ''),
+                s3Options: {
+                  endpoint: env('MINIO_ENDPOINT'),
+                  region: env('MINIO_REGION', 'us-east-1'),
+                  credentials: {
+                    accessKeyId: env('MINIO_ACCESS_KEY'),
+                    secretAccessKey: env('MINIO_SECRET_KEY'),
+                  },
+                  forcePathStyle: true,
+                  params: { Bucket: env('MINIO_BUCKET') },
+                },
+              },
+              actionOptions: {
+                upload: {},
+                uploadStream: {},
+                delete: {},
+              },
+            },
+          },
+        }
+      : {}),
+    'users-permissions': {
     config: {
       ratelimit: {
         max: 100,
@@ -25,5 +56,6 @@ export default ({ env }) => ({
         },
       },
     },
-  },
-});
+    },
+  };
+};

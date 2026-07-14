@@ -62,6 +62,7 @@ function safeInvitation(item: any) {
     attemptsLeft: item.attemptsLeft,
     returnedSections: item.returnedSections || [],
     hrComment: item.hrComment || '',
+    draft: item.draft || {},
     submittedAt: item.submittedAt,
     approvedAt: item.approvedAt,
     sentToOnecAt: item.sentToOnecAt,
@@ -73,6 +74,113 @@ function safeInvitation(item: any) {
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   };
+}
+
+function normalizeUploadFiles(files: any): any[] {
+  const raw = files?.files || files?.file || files;
+  if (!raw) return [];
+  return Array.isArray(raw) ? raw : [raw];
+}
+
+function absoluteFileUrl(url: any): string {
+  const value = cleanString(url);
+  if (!value || /^https?:\/\//i.test(value)) return value;
+  const serverUrl = cleanString(process.env.SERVER_URL || process.env.PUBLIC_URL).replace(/\/+$/, '');
+  return `${serverUrl}${value.startsWith('/') ? value : `/${value}`}`;
+}
+
+function hasUploadedFiles(value: any): boolean {
+  return Array.isArray(value) && value.length > 0 && value.every(
+    (file: any) => Number(file?.id) > 0 && Boolean(cleanString(file?.url))
+  );
+}
+
+function validateSubmissionDraft(draft: any): string[] {
+  const errors: string[] = [];
+  const identity = draft?.identity || {};
+  const documents = draft?.documents || {};
+  const contacts = draft?.contacts || {};
+  const medical = draft?.medical || {};
+  const family = draft?.family || {};
+  const namePattern = /^[A-Za-zА-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі' -]+$/;
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (draft?.legal?.accepted !== true) errors.push('Не подтверждено согласие на обработку персональных данных');
+  if (!hasUploadedFiles(identity.photo)) errors.push('Не загружена фотография 3x4');
+  for (const [key, label] of [['lastName', 'фамилия'], ['firstName', 'имя']] as const) {
+    const value = cleanString(identity[key]);
+    if (!value || !namePattern.test(value)) errors.push(`Некорректно заполнено поле «${label}»`);
+  }
+  if (!identity.noMiddleName && (!cleanString(identity.middleName) || !namePattern.test(cleanString(identity.middleName)))) {
+    errors.push('Некорректно заполнено отчество');
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanString(identity.birthDate)) || identity.birthDate < '1900-01-01' || identity.birthDate > today) {
+    errors.push('Некорректная дата рождения');
+  }
+  if (!cleanString(identity.gender) || !cleanString(identity.nationality) || !cleanString(identity.citizenship)) {
+    errors.push('Не заполнены пол, национальность или гражданство');
+  }
+  if (!identity.birthPlaceAddress?.country || !identity.birthPlaceAddress?.region || !identity.birthPlaceAddress?.city) {
+    errors.push('Не заполнено место рождения');
+  }
+
+  if (!cleanString(documents.documentType) || !cleanString(documents.documentNumber) || !cleanString(documents.issuedBy)) {
+    errors.push('Не заполнены реквизиты удостоверяющего документа');
+  }
+  if (documents.documentType === 'Удостоверение личности' && !/^\d+$/.test(cleanString(documents.documentNumber))) {
+    errors.push('Номер удостоверения личности должен содержать только цифры');
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cleanString(documents.issueDate)) || !/^\d{4}-\d{2}-\d{2}$/.test(cleanString(documents.expiryDate))) {
+    errors.push('Некорректно заполнены даты удостоверяющего документа');
+  } else if (documents.issueDate > today || documents.expiryDate < documents.issueDate) {
+    errors.push('Проверьте дату выдачи и срок действия удостоверяющего документа');
+  }
+  if (!hasUploadedFiles(documents.identityFiles)) errors.push('Не загружен PDF удостоверяющего документа');
+
+  for (const address of [contacts.registration, contacts.living]) {
+    if (!address?.country || !address?.region || !address?.city || !address?.details) {
+      errors.push('Не полностью заполнены адреса регистрации и проживания');
+      break;
+    }
+  }
+  if (cleanString(contacts.mobilePhone).replace(/\D/g, '').length !== 11) errors.push('Некорректный мобильный телефон');
+  if (contacts.email && !emailPattern.test(cleanString(contacts.email))) errors.push('Некорректный email');
+  if (!hasUploadedFiles(contacts.signatureFile)) errors.push('Не загружен образец личной подписи');
+
+  for (const [key, label] of [
+    ['form075', 'форма 075'],
+    ['noCriminalRecord', 'справка о несудимости'],
+    ['narcology', 'справка из наркологического диспансера'],
+    ['psychiatry', 'справка из психиатрического диспансера'],
+  ]) {
+    if (!hasUploadedFiles(medical[key])) errors.push(`Не загружен обязательный документ: ${label}`);
+  }
+  if (!medical.emergencyContactName || !medical.emergencyContactRelation || cleanString(medical.emergencyContactPhone).replace(/\D/g, '').length !== 11) {
+    errors.push('Не заполнено контактное лицо для экстренного случая');
+  }
+
+  if (!family.maritalStatus) errors.push('Не заполнено семейное положение');
+  if (family.maritalStatus === 'Состоит в зарегистрированном браке' && !hasUploadedFiles(family.marriageFiles)) {
+    errors.push('Не загружено свидетельство о браке');
+  }
+  for (const member of family.members || []) {
+    if (!member?.relation || !member?.fio || !member?.birthDate || !hasUploadedFiles(member?.files)) {
+      errors.push('Не полностью заполнены сведения и документы члена семьи');
+      break;
+    }
+  }
+  for (const education of draft?.education?.items || []) {
+    if (!education?.institution || !education?.degree || !hasUploadedFiles(education?.files)) {
+      errors.push('Не полностью заполнены сведения и документы об образовании');
+      break;
+    }
+  }
+  if (!hasUploadedFiles(draft?.bank?.halykRequisites)) errors.push('Не загружен PDF банковских реквизитов Halyk Bank');
+  if (draft?.safety?.introReviewed !== true || draft?.safety?.hospitalSafetyReviewed !== true) {
+    errors.push('Не подтвержден просмотр двух видео по безопасности');
+  }
+  return errors;
 }
 
 function safePublicInvitation(item: any, includeDraft = false) {
@@ -230,6 +338,41 @@ export default {
     ctx.body = { data: safePublicInvitation(updated, true) };
   },
 
+  async uploadFiles(ctx: Context) {
+    const strapi = (global as any).strapi;
+    const token = cleanString(ctx.params.token);
+    const iin = normalizeIin((ctx.request.body as any)?.iin);
+    const invitation = await ensureInvitationForPublic(ctx, strapi, token, iin);
+    if (['SUBMITTED', 'APPROVED', 'SENT_ONEC'].includes(invitation.status)) {
+      ctx.throw(400, 'Анкета уже отправлена, загрузка новых файлов недоступна');
+    }
+
+    const files = normalizeUploadFiles((ctx.request as any).files);
+    if (files.length === 0) ctx.throw(400, 'Выберите файл для загрузки');
+    if (files.length > 5) ctx.throw(400, 'За один раз можно загрузить не более 5 файлов');
+
+    const allowedTypes = new Set(['application/pdf', 'image/png', 'image/jpeg']);
+    for (const file of files) {
+      const mime = cleanString(file?.mimetype || file?.type);
+      if (!allowedTypes.has(mime)) ctx.throw(400, 'Разрешены только PDF, PNG и JPG файлы');
+      if (Number(file?.size || 0) > 25 * 1024 * 1024) ctx.throw(400, 'Размер одного файла не должен превышать 25 МБ');
+    }
+
+    const uploaded = await strapi.plugin('upload').service('upload').upload({
+      data: {},
+      files: files.length === 1 ? files[0] : files,
+    });
+    const normalized = (Array.isArray(uploaded) ? uploaded : [uploaded]).map((file: any) => ({
+      id: file.id,
+      name: file.name,
+      url: absoluteFileUrl(file.url),
+      mime: file.mime,
+      type: file.mime,
+      size: file.size,
+    }));
+    ctx.body = { data: normalized };
+  },
+
   async submit(ctx: Context) {
     const strapi = (global as any).strapi;
     const token = cleanString(ctx.params.token);
@@ -237,10 +380,8 @@ export default {
     const iin = normalizeIin(body.iin);
     const item = await ensureInvitationForPublic(ctx, strapi, token, iin);
     const draft = item.draft || {};
-    const safety = draft.safety || {};
-    if (!safety.introReviewed || !safety.hospitalSafetyReviewed) {
-      ctx.throw(400, 'Перед отправкой нужно отметить просмотр двух видео по безопасности');
-    }
+    const validationErrors = validateSubmissionDraft(draft);
+    if (validationErrors.length > 0) ctx.throw(400, validationErrors[0], { details: { errors: validationErrors } });
 
     const now = new Date().toISOString();
     const updated = await strapi.entityService.update(INVITATION_UID, item.id, {

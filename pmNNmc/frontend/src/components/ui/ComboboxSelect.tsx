@@ -16,6 +16,7 @@ interface ComboboxSelectProps {
   emptyText?: string;
   disabled?: boolean;
   searchable?: boolean;
+  allowCustom?: boolean;
   className?: string;
 }
 
@@ -28,6 +29,7 @@ export default function ComboboxSelect({
   emptyText = 'Ничего не найдено',
   disabled = false,
   searchable = false,
+  allowCustom = false,
   className = '',
 }: ComboboxSelectProps) {
   const listboxId = useId();
@@ -44,6 +46,10 @@ export default function ComboboxSelect({
       `${option.label} ${option.description || ''}`.toLowerCase().includes(term)
     );
   }, [options, query]);
+  const customValue = query.trim();
+  const canUseCustomValue = allowCustom && customValue.length > 0 && !options.some(
+    (option) => option.value.toLowerCase() === customValue.toLowerCase() || option.label.toLowerCase() === customValue.toLowerCase()
+  );
 
   useEffect(() => {
     if (!open) return undefined;
@@ -108,8 +114,8 @@ export default function ComboboxSelect({
             : 'border-slate-300 hover:border-cyan-300'
         } ${disabled ? 'cursor-not-allowed bg-slate-50 text-slate-400' : 'text-slate-800'}`}
       >
-        <span className={`min-w-0 truncate ${selectedOption ? 'font-medium' : 'text-slate-500'}`}>
-          {selectedOption?.label || placeholder}
+        <span className={`min-w-0 truncate ${selectedOption || value ? 'font-medium' : 'text-slate-500'}`}>
+          {selectedOption?.label || value || placeholder}
         </span>
         <ChevronDown
           className={`h-4 w-4 flex-shrink-0 text-slate-500 transition-transform ${
@@ -137,7 +143,19 @@ export default function ComboboxSelect({
           )}
 
           <div id={listboxId} role="listbox" className="max-h-72 overflow-y-auto p-1">
-            {filteredOptions.length === 0 ? (
+            {canUseCustomValue && (
+              <button
+                type="button"
+                role="option"
+                aria-selected={false}
+                onClick={() => handleSelect(customValue)}
+                className="mb-1 flex w-full items-center gap-3 rounded-lg bg-cyan-50 px-3 py-2.5 text-left text-cyan-800 hover:bg-cyan-100"
+              >
+                <Check className="h-4 w-4" />
+                <span className="text-sm font-medium">Использовать «{customValue}»</span>
+              </button>
+            )}
+            {filteredOptions.length === 0 && !canUseCustomValue ? (
               <div className="px-3 py-6 text-center text-sm text-slate-500">{emptyText}</div>
             ) : (
               filteredOptions.map((option) => {
