@@ -2,6 +2,7 @@ import { factories } from '@strapi/strapi';
 import { getUserFlags } from '../../../utils/project-assignments';
 import { publishNotificationCreated, publishToUser } from '../../../utils/notification-realtime';
 import { createAuditEvent } from '../../../utils/audit-event';
+import { getHelpdeskAssignmentScope } from '../../../utils/helpdesk-visibility';
 
 const TICKET_UID = 'api::ticket.ticket';
 const HOUSEHOLD_EXECUTOR_UID = 'api::household-executor.household-executor';
@@ -240,12 +241,31 @@ async function publishTicketRealtime(strapi: any, ticket: any, type = 'tickets:u
   );
 }
 
-function userCanManageTicket(userWithDept: any, ticket: any, isSuperAdmin: boolean): boolean {
+function getTicketAssigneeUsernames(ticket: any): string[] {
+  const assignees = Array.isArray(ticket?.assignee)
+    ? ticket.assignee
+    : ticket?.assignee
+      ? [ticket.assignee]
+      : [];
+
+  return assignees
+    .map((assignee: any) => String(assignee?.username || '').trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function userCanManageTicket(userWithDept: any, ticket: any, isSuperAdmin: boolean): boolean {
   if (isSuperAdmin || isKuatHelpdeskHead(userWithDept)) return true;
   const userId = Number(userWithDept?.id);
   const assigneeIds = extractRelationIds(ticket?.assignee);
 
   if (assigneeIds.includes(userId)) return true;
+
+  const assignmentScope = getHelpdeskAssignmentScope(userWithDept);
+  if (assignmentScope) {
+    const allowedUsernames = new Set(assignmentScope.assigneeUsernames);
+    return getTicketAssigneeUsernames(ticket).some((username) => allowedUsernames.has(username));
+  }
+
   if (userCanViewDepartmentQueue(userWithDept, isSuperAdmin)) {
     const userDeptKey = userWithDept?.department?.key;
     const ticketDeptKey = ticket?.targetDepartment?.key || ticket?.serviceGroup?.department?.key;
@@ -264,6 +284,7 @@ function ticketBelongsToUserDepartment(userWithDept: any, ticket: any): boolean 
 
 function userCanReassignTicket(userWithDept: any, ticket: any, isSuperAdmin: boolean): boolean {
   if (userCanManageTicket(userWithDept, ticket, isSuperAdmin)) return true;
+  if (getHelpdeskAssignmentScope(userWithDept)) return false;
   const userId = Number(userWithDept?.id);
   const assigneeIds = extractRelationIds(ticket?.assignee);
   if (assigneeIds.includes(userId)) return true;
@@ -763,6 +784,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
     const dept = userWithDept?.department;
     const isHelpdeskHead = isKuatHelpdeskHead(userWithDept);
     const canViewQueue = userCanViewDepartmentQueue(userWithDept, isSuperAdmin);
+    const assignmentScope = getHelpdeskAssignmentScope(userWithDept);
 
     const andFilters: any[] = [];
 
@@ -797,6 +819,27 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
         andFilters.push({ assignee: { id: user.id } });
       } else if (assigneeId) {
         andFilters.push({ assignee: { id: assigneeId } });
+      }
+    } else if (assignmentScope) {
+      const allowedUsernames = myTicketsOnly
+        ? [assignmentScope.viewerUsername]
+        : assignmentScope.assigneeUsernames;
+
+      if (assigneeId) {
+        const requestedAssignee = (await strapi.entityService.findOne(
+          'plugin::users-permissions.user',
+          assigneeId,
+          { fields: ['id', 'username'] }
+        )) as any;
+        const requestedUsername = String(requestedAssignee?.username || '').trim().toLowerCase();
+
+        if (!requestedUsername || !allowedUsernames.includes(requestedUsername)) {
+          ctx.body = { data: [], meta: { pagination: { total: 0, page: 1, pageSize, pageCount: 0 } } };
+          return;
+        }
+        andFilters.push({ assignee: { id: assigneeId } });
+      } else {
+        andFilters.push({ assignee: { username: { $in: allowedUsernames } } });
       }
     } else if (canViewQueue) {
       const deptKey = dept?.key;
