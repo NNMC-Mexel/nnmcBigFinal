@@ -1,0 +1,89 @@
+{
+  "kind": "collectionType",
+  "collectionName": "onboarding_invitations",
+  "info": {
+    "singularName": "onboarding-invitation",
+    "pluralName": "onboarding-invitations",
+    "displayName": "Onboarding Invitation",
+    "description": "New employee onboarding invitations, drafts and HR workflow"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "token": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "iin": {
+      "type": "string",
+      "required": true,
+      "minLength": 12,
+      "maxLength": 12
+    },
+    "phone": {
+      "type": "string",
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "CREATED",
+        "OPENED",
+        "DRAFT",
+        "BLOCKED",
+        "EXPIRED",
+        "SUBMITTED",
+        "RETURNED",
+        "APPROVED",
+        "SENT_ONEC",
+        "ONEC_ERROR"
+      ],
+      "default": "CREATED",
+      "required": true
+    },
+    "expiresAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "attemptsLeft": {
+      "type": "integer",
+      "default": 3
+    },
+    "draft": {
+      "type": "json",
+      "default": {}
+    },
+    "returnedSections": {
+      "type": "json",
+      "default": []
+    },
+    "hrComment": {
+      "type": "text"
+    },
+    "applicationGeneratedAt": {
+      "type": "datetime"
+    },
+    "submittedAt": {
+      "type": "datetime"
+    },
+    "approvedAt": {
+      "type": "datetime"
+    },
+    "sentToOnecAt": {
+      "type": "datetime"
+    },
+    "oneCStatus": {
+      "type": "string"
+    },
+    "oneCResponse": {
+      "type": "json"
+    },
+    "history": {
+      "type": "json",
+      "default": []
+    }
+  }
+}

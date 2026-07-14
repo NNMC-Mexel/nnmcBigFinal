@@ -7,6 +7,7 @@ const DEPT_PERMISSION_FLAGS = [
   'canViewKpiTimesheet', 'canAccessConf', 'canAccessJournal', 'canAccessSigndoc',
   'canManageNews', 'canDeleteProject', 'canDragProjects',
   'canManageProjectAssignments', 'canManageTickets', 'canViewActivityLog',
+  'canApproveNewEmployees',
 ];
 const ALLOWED_DEPT_FIELDS = [...DEPT_FIELDS, ...DEPT_PERMISSION_FLAGS];
 const HELPDESK_DEPARTMENT_KEYS = ['IT', 'MEDICAL_EQUIPMENT', 'ENGINEERING'];

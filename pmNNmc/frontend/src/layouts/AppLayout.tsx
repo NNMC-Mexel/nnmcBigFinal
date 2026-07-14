@@ -25,6 +25,7 @@ import {
     ClipboardList,
     Users,
     Workflow,
+    UserPlus,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuthStore, useUserRole } from "../store/authStore";
@@ -56,6 +57,7 @@ export default function AppLayout() {
         canManageNews,
         canViewActivityLog,
         canViewEmployeeDirectory,
+        canApproveNewEmployees,
         departmentKey,
     } = useUserRole();
 
@@ -211,6 +213,11 @@ export default function AppLayout() {
             to: "/app/bpm",
             icon: Users,
             label: "BPM Реестр",
+        }] : []),
+        ...(canApproveNewEmployees ? [{
+            to: "/app/onboarding/new-employees",
+            icon: UserPlus,
+            label: "Новые сотрудники",
         }] : []),
     ];
 

@@ -43,6 +43,7 @@ export interface Department {
   canManageProjectAssignments?: boolean;
   canManageTickets?: boolean;
   canViewActivityLog?: boolean;
+  canApproveNewEmployees?: boolean;
 }
 
 // User types

@@ -32,6 +32,7 @@ const NotificationsPage = lazy(() => import('./pages/app/NotificationsPage'));
 const AdminPanelPage = lazy(() => import('./pages/app/AdminPanelPage'));
 const BpmPage = lazy(() => import('./pages/app/BpmPage'));
 const BpmMyRequestsPage = lazy(() => import('./pages/app/BpmMyRequestsPage'));
+const NewEmployeesPage = lazy(() => import('./pages/app/NewEmployeesPage'));
 const EmployeeDirectoryPage = lazy(() => import('./pages/app/EmployeeDirectoryPage'));
 const EmployeeCardPage = lazy(() => import('./pages/app/EmployeeCardPage'));
 const HelpdeskPage = lazy(() => import('./pages/app/HelpdeskPage'));
@@ -47,6 +48,7 @@ const ProtocolsPage = lazy(() => import('./pages/app/ProtocolsPage'));
 // Lazy public pages
 const PublicSurveyPage = lazy(() => import('./pages/public/PublicSurveyPage'));
 const PublicTicketPage = lazy(() => import('./pages/public/PublicTicketPage'));
+const NewEmployeeOnboardingPage = lazy(() => import('./pages/public/NewEmployeeOnboardingPage'));
 
 // Loader shown while a lazy chunk is being fetched.
 const PageLoader = () => (
@@ -178,6 +180,7 @@ function App() {
     canAccessJournal,
     canAccessSigndoc,
     canViewEmployeeDirectory,
+    canApproveNewEmployees,
   } = useUserRole();
 
   useEffect(() => {
@@ -271,6 +274,12 @@ function App() {
         <Route path="employees" element={<Navigate to="/app/bpm/employees" replace />} />
         <Route path="bpm-requests" element={withSuspense(<BpmMyRequestsPage />)} />
         <Route
+          path="onboarding/new-employees"
+          element={
+            <FeatureRoute allow={canApproveNewEmployees}>{withSuspense(<NewEmployeesPage />)}</FeatureRoute>
+          }
+        />
+        <Route
           path="bpm"
           element={
             <FeatureRoute allow={canViewEmployeeDirectory}>{withSuspense(<BpmPage />)}</FeatureRoute>
@@ -347,6 +356,8 @@ function App() {
 
       {/* Public pages (no auth required) */}
       <Route path="/survey/:token" element={withSuspense(<PublicSurveyPage />)} />
+      <Route path="/onboarding" element={withSuspense(<NewEmployeeOnboardingPage />)} />
+      <Route path="/onboarding/:token" element={withSuspense(<NewEmployeeOnboardingPage />)} />
 
       {/* Redirect root — if not authenticated, ProtectedRoute will redirect to Keycloak */}
       <Route path="/" element={<ProtectedRoute><DefaultAppRedirect /></ProtectedRoute>} />

@@ -1,0 +1,70 @@
+export default {
+  routes: [
+    {
+      method: 'GET',
+      path: '/onboarding/public/:token',
+      handler: 'onboarding.publicStatus',
+      config: { auth: false, policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/onboarding/public/:token/verify',
+      handler: 'onboarding.verify',
+      config: { auth: false, policies: [] },
+    },
+    {
+      method: 'PUT',
+      path: '/onboarding/public/:token/draft',
+      handler: 'onboarding.saveDraft',
+      config: { auth: false, policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/onboarding/public/:token/submit',
+      handler: 'onboarding.submit',
+      config: { auth: false, policies: [] },
+    },
+    {
+      method: 'GET',
+      path: '/onboarding/invitations',
+      handler: 'onboarding.list',
+      config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/onboarding/invitations',
+      handler: 'onboarding.createInvitation',
+      config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/onboarding/invitations/:id/extend',
+      handler: 'onboarding.extend',
+      config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/onboarding/invitations/:id/unblock',
+      handler: 'onboarding.unblock',
+      config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/onboarding/invitations/:id/return',
+      handler: 'onboarding.returnForCorrection',
+      config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/onboarding/invitations/:id/approve',
+      handler: 'onboarding.approve',
+      config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/onboarding/invitations/:id/send-to-1c',
+      handler: 'onboarding.sendToOneC',
+      config: { policies: [] },
+    },
+  ],
+};

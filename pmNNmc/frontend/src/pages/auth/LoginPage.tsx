@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LogIn, Mail, Lock, Eye, EyeOff, Headphones, X } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff, Headphones, X, UserPlus } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import Card from '../../components/ui/Card';
 import Input from '../../components/ui/Input';
@@ -27,13 +27,6 @@ export default function LoginPage() {
     }
   }, []);
 
-  // In production the org uses Keycloak SSO only — skip local auth forms.
-  useEffect(() => {
-    if (isKeycloakEnabled || Capacitor.isNativePlatform()) {
-      startKeycloakLogin();
-    }
-  }, []);
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     clearError();
@@ -53,19 +46,28 @@ export default function LoginPage() {
     }
   };
 
-  // Keycloak mode: no email/password/register forms, only SSO redirect.
+  // Keycloak mode: keep the auth screen visible so new employees can start onboarding without an account.
   if (isKeycloakEnabled || Capacitor.isNativePlatform()) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6">
         <img src="/logo.png" alt="ННМЦ" className="w-20 h-20 object-contain mb-6" />
-        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-slate-500 text-sm mb-6">Вход через Keycloak…</p>
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-display font-bold text-slate-800">Вход в систему</h1>
+          <p className="text-slate-500 text-sm mt-1">АО "ННМЦ" — корпоративная система</p>
+        </div>
         <button
           onClick={startKeycloakLogin}
-          className="px-6 py-2.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-medium"
+          className="w-full max-w-xs px-6 py-2.5 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-medium"
         >
           Войти через Keycloak
         </button>
+        <Link
+          to="/onboarding"
+          className="mt-3 w-full max-w-xs px-6 py-2.5 border border-primary-200 text-primary-700 bg-white rounded-lg hover:bg-primary-50 transition-colors font-medium flex items-center justify-center gap-2"
+        >
+          <UserPlus className="w-4 h-4" />
+          Я новый сотрудник
+        </Link>
       </div>
     );
   }
@@ -140,6 +142,14 @@ export default function LoginPage() {
           >
             {t('auth.login')}
           </Button>
+
+          <Link
+            to="/onboarding"
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-primary-200 text-primary-700 bg-white hover:bg-primary-50 transition-colors font-medium"
+          >
+            <UserPlus className="w-4 h-4" />
+            Я новый сотрудник
+          </Link>
 
           <button
             type="button"

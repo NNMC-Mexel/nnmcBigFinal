@@ -52,6 +52,7 @@ const PERMISSION_FLAGS = [
   { key: 'canManageProjectAssignments', label: 'Назначения' },
   { key: 'canManageTickets', label: 'Упр. заявками' },
   { key: 'canViewActivityLog', label: 'История' },
+  { key: 'canApproveNewEmployees', label: 'Утвердитель новых сотрудников' },
 ] as const;
 
 type PermissionKey = typeof PERMISSION_FLAGS[number]['key'];

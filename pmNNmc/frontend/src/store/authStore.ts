@@ -221,6 +221,8 @@ export const useUserRole = () => {
     isSuperAdmin || departmentKey === 'HR' || departmentKey === 'ACCOUNTING';
   const canSyncEmployeeDirectory =
     isSuperAdmin || departmentKey === 'HR';
+  const canApproveNewEmployees =
+    isSuperAdmin || departmentKey === 'HR' || dept?.canApproveNewEmployees === true;
 
   // Composite
   const canViewKpi = canViewKpiIt || canViewKpiMedical || canViewKpiEngineering;
@@ -289,6 +291,7 @@ export const useUserRole = () => {
     canViewActivityLog,
     canViewEmployeeDirectory,
     canSyncEmployeeDirectory,
+    canApproveNewEmployees,
     // Project capabilities
     canEditProject,
     canAssignResponsible,

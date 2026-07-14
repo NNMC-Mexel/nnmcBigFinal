@@ -35,6 +35,10 @@
     "canManageEmployees": {
       "type": "boolean",
       "default": false
+    },
+    "canApproveNewEmployees": {
+      "type": "boolean",
+      "default": false
     }
   }
 }

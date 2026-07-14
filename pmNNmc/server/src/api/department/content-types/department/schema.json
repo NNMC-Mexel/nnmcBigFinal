@@ -50,6 +50,7 @@
     "canDragProjects": { "type": "boolean", "default": false },
     "canManageProjectAssignments": { "type": "boolean", "default": false },
     "canManageTickets": { "type": "boolean", "default": false },
-    "canViewActivityLog": { "type": "boolean", "default": false }
+    "canViewActivityLog": { "type": "boolean", "default": false },
+    "canApproveNewEmployees": { "type": "boolean", "default": false }
   }
 }
