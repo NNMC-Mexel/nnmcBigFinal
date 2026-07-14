@@ -8,6 +8,15 @@ const DEPARTMENT_UID = 'api::department.department' as any;
 const AUTHENTICATED_PERMISSIONS: Record<string, string[]> = {
   'api::bpm-request.bpm-request': ['find', 'findOne', 'topTypes', 'createVacation', 'sendToOneC', 'advance'],
   'api::employee-card.employee-card': ['find', 'findOne', 'me', 'sync', 'syncStatus'],
+  'api::onboarding.onboarding': [
+    'list',
+    'createInvitation',
+    'extend',
+    'unblock',
+    'returnForCorrection',
+    'approve',
+    'sendToOneC',
+  ],
   'api::department.department': ['find', 'findOne'],
   'plugin::users-permissions.user': ['me'],
   'plugin::users-permissions.auth': ['callback', 'connect', 'changePassword'],
@@ -57,7 +66,9 @@ async function ensurePermission(strapi: any, roleId: number, contentType: string
 async function setupPermissions(strapi: any) {
   const roles = await strapi.db.query(ROLE_UID).findMany();
   const publicRole = roles.find((role: any) => role.type === 'public');
-  const authenticatedRole = roles.find((role: any) => role.type === 'authenticated');
+  const authenticatedRoles = roles.filter((role: any) =>
+    role.type === 'authenticated' || String(role.name || '').trim().toLowerCase() === 'member'
+  );
 
   if (publicRole) {
     for (const [contentType, actions] of Object.entries(PUBLIC_PERMISSIONS)) {
@@ -67,7 +78,7 @@ async function setupPermissions(strapi: any) {
     }
   }
 
-  if (authenticatedRole) {
+  for (const authenticatedRole of authenticatedRoles) {
     for (const [contentType, actions] of Object.entries(AUTHENTICATED_PERMISSIONS)) {
       for (const action of actions) {
         await ensurePermission(strapi, authenticatedRole.id, contentType, action);
