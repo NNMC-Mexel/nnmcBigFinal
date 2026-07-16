@@ -19,14 +19,17 @@ export default function HelpdeskPage() {
   const isKuat =
     currentUser?.username?.toLowerCase() === 'kuat' ||
     currentUser?.email?.toLowerCase() === 'kuat@nnmc.kz';
-  const canFilterByAssignee = isSuperAdmin || isKuat;
+  const isZhandosSupervisor =
+    currentUser?.username?.toLowerCase() === 'zhandos' ||
+    currentUser?.email?.toLowerCase() === 'zhandos@nnmc.kz';
+  const canFilterByAssignee = isSuperAdmin || isKuat || isZhandosSupervisor;
 
   const { tickets, total, isLoading, error, fetchTickets, setFilters, filters, assignableUsers, fetchAssignableUsers } = useTicketStore();
 
   const [statusFilter, setStatusFilter] = useState(filters.status || 'ALL');
   const [searchFilter, setSearchFilter] = useState(filters.search || '');
   const [assigneeFilter, setAssigneeFilter] = useState<number | undefined>(filters.assigneeId);
-  const [myTicketsOnly, setMyTicketsOnly] = useState(true);
+  const [myTicketsOnly, setMyTicketsOnly] = useState(!isZhandosSupervisor);
   const [currentPage, setCurrentPage] = useState(filters.page || 1);
   const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));

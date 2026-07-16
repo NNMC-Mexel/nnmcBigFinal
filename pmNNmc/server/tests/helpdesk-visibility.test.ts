@@ -4,7 +4,7 @@ import {
   getHelpdeskAssignmentScope,
   parseHelpdeskSupervision,
 } from '../src/utils/helpdesk-visibility';
-import { userCanManageTicket } from '../src/api/ticket/controllers/ticket';
+import { userCanManageTicket, userCanViewTicket } from '../src/api/ticket/controllers/ticket';
 
 const supervision = 'zhandos=ernar;lead=user1,user2';
 
@@ -67,4 +67,34 @@ test('Ernar cannot manage Zhandos tickets despite department queue permission', 
     userCanManageTicket(ernar, { assignee: [{ id: 21, username: 'ernar' }] }, false),
     true
   );
+});
+
+test('Zhandos can view a ticket completed by Ernar even if Ernar is no longer assigned', () => {
+  const zhandos = {
+    id: 20,
+    username: 'zhandos',
+    department: { key: 'IT', canManageTickets: true },
+  };
+  const completedTicket = {
+    assignee: [{ id: 22, username: 'said' }],
+    completedBy: { id: 21, username: 'ernar' },
+  };
+
+  assert.equal(userCanManageTicket(zhandos, completedTicket, false), false);
+  assert.equal(userCanViewTicket(zhandos, completedTicket, false), true);
+});
+
+test('Ernar cannot view tickets assigned to or completed by Zhandos', () => {
+  const ernar = {
+    id: 21,
+    username: 'ernar',
+    department: { key: 'IT', canManageTickets: true },
+  };
+  const zhandosTicket = {
+    assignee: [{ id: 20, username: 'zhandos' }],
+    completedBy: { id: 20, username: 'zhandos' },
+    requester: { id: 99, username: 'requester' },
+  };
+
+  assert.equal(userCanViewTicket(ernar, zhandosTicket, false), false);
 });

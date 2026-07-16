@@ -253,6 +253,28 @@ function getTicketAssigneeUsernames(ticket: any): string[] {
     .filter(Boolean);
 }
 
+function getTicketCompletedByUsername(ticket: any): string {
+  return String(ticket?.completedBy?.username || '').trim().toLowerCase();
+}
+
+function buildScopedTicketFilter(usernames: string[], userId?: number): any {
+  if (userId) {
+    return {
+      $or: [
+        { assignee: { id: userId } },
+        { completedBy: { id: userId } },
+      ],
+    };
+  }
+
+  return {
+    $or: [
+      { assignee: { username: { $in: usernames } } },
+      { completedBy: { username: { $in: usernames } } },
+    ],
+  };
+}
+
 export function userCanManageTicket(userWithDept: any, ticket: any, isSuperAdmin: boolean): boolean {
   if (isSuperAdmin || isKuatHelpdeskHead(userWithDept)) return true;
   const userId = Number(userWithDept?.id);
@@ -291,8 +313,12 @@ function userCanReassignTicket(userWithDept: any, ticket: any, isSuperAdmin: boo
   return userCanViewDepartmentQueue(userWithDept, isSuperAdmin) && ticketBelongsToUserDepartment(userWithDept, ticket);
 }
 
-function userCanViewTicket(userWithDept: any, ticket: any, isSuperAdmin: boolean): boolean {
+export function userCanViewTicket(userWithDept: any, ticket: any, isSuperAdmin: boolean): boolean {
   if (userCanManageTicket(userWithDept, ticket, isSuperAdmin)) return true;
+  const assignmentScope = getHelpdeskAssignmentScope(userWithDept);
+  if (assignmentScope && assignmentScope.assigneeUsernames.includes(getTicketCompletedByUsername(ticket))) {
+    return true;
+  }
   const userId = Number(userWithDept?.id);
   const requesterIds = extractRelationIds(ticket?.requester);
   return requesterIds.includes(userId);
@@ -837,9 +863,9 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
           ctx.body = { data: [], meta: { pagination: { total: 0, page: 1, pageSize, pageCount: 0 } } };
           return;
         }
-        andFilters.push({ assignee: { id: assigneeId } });
+        andFilters.push(buildScopedTicketFilter(allowedUsernames, assigneeId));
       } else {
-        andFilters.push({ assignee: { username: { $in: allowedUsernames } } });
+        andFilters.push(buildScopedTicketFilter(allowedUsernames));
       }
     } else if (canViewQueue) {
       const deptKey = dept?.key;
@@ -1811,6 +1837,7 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
 
     const { isSuperAdmin } = getUserFlags(userWithDept);
     const deptKey = userWithDept?.department?.key;
+    const assignmentScope = getHelpdeskAssignmentScope(userWithDept);
     const canUseServicePool =
       isSuperAdmin ||
       isKuatHelpdeskHead(userWithDept) ||
@@ -1826,6 +1853,9 @@ export default factories.createCoreController('api::ticket.ticket', ({ strapi })
       department: { key: { $in: HELP_SERVICE_DEPARTMENT_KEYS } },
       blocked: false,
     };
+    if (assignmentScope) {
+      filters.username = { $in: assignmentScope.assigneeUsernames };
+    }
 
     const users = (await strapi.entityService.findMany('plugin::users-permissions.user', {
       filters,
