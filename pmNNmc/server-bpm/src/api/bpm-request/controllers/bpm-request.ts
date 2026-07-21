@@ -85,7 +85,7 @@ async function loadCurrentUser(ctx: Context, strapi: any) {
   if (!user?.id) ctx.throw(401, 'Not authenticated');
 
   return await strapi.entityService.findOne(USER_UID, user.id, {
-    fields: ['id', 'username', 'email', 'firstName', 'lastName', 'isSuperAdmin'],
+    fields: ['id', 'username', 'email', 'firstName', 'lastName', 'position', 'isSuperAdmin'],
     populate: ['department', 'role'],
   });
 }
@@ -266,17 +266,33 @@ export default {
   async createVacation(ctx: Context) {
     const strapi = (global as any).strapi;
     const user = await loadCurrentUser(ctx, strapi);
-    const card = await loadEmployeeCardForUser(strapi, user);
-    if (!card) {
+    const employeeCard = await loadEmployeeCardForUser(strapi, user);
+    const isSuperAdmin = user?.isSuperAdmin === true;
+    if (!employeeCard && !isSuperAdmin) {
       ctx.throw(400, 'Карточка сотрудника не найдена. Нужно синхронизировать сотрудников с 1С или войти под логином сотрудника с ИИН.');
       return;
     }
 
-    const workplace = preferredWorkplace(card);
-    if (!workplace) {
+    const synchronizedWorkplace = preferredWorkplace(employeeCard);
+    if (!synchronizedWorkplace && !isSuperAdmin) {
       ctx.throw(400, 'В карточке сотрудника нет активного места работы из 1С.');
       return;
     }
+
+    const card = employeeCard || {
+      iin: /^\d{12}$/.test(cleanString(user?.username)) ? cleanString(user.username) : '',
+      fio: userDisplayName(user) || 'Супер-администратор',
+      physicalPersonId: null,
+    };
+    const workplace = synchronizedWorkplace || {
+      employeeId: null,
+      personnelNumber: '',
+      position: cleanString(user?.position) || 'Супер-администратор',
+      departmentId: cleanString(user?.department?.documentId || user?.department?.id),
+      department: cleanString(user?.department?.name_ru || user?.department?.name_kz) || 'Администрация',
+      organizationId: '',
+      organization: 'АО «ННМЦ»',
+    };
 
     const body = ctx.request.body || {};
     const start = parseDate(body.startDate);
@@ -342,14 +358,16 @@ export default {
             at: now,
             by: userDisplayName(user),
             action: 'submitted',
-            label: 'Заявка создана сотрудником',
+            label: isSuperAdmin && !employeeCard
+              ? 'Административная заявка создана супер-админом без карточки 1С'
+              : 'Заявка создана сотрудником',
           },
         ],
         onecPayload,
         onecStatus: 'pending',
         submittedAt: now,
         initiator: Number(user.id),
-        employeeCard: Number(card.id),
+        ...(employeeCard?.id ? { employeeCard: Number(employeeCard.id) } : {}),
       },
     } as any);
 
