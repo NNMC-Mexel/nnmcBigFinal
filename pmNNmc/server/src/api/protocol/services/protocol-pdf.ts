@@ -40,6 +40,8 @@ type User = {
 type Task = {
   order?: number;
   title?: string;
+  shortDescription?: string | null;
+  description?: string | null;
   deadline?: string | null;
   responsibleId?: number | null;
   responsibleName?: string;
@@ -227,10 +229,10 @@ export async function generateProtocolPdf(data: ProtocolPdfData): Promise<Buffer
   drawText('Задачи:', MARGIN, { font: bold, size: 11 });
   y -= 16;
 
-  const cols = { num: 30, title: 200, deadline: 75, responsible: 130, fact: 80 };
-  const tableWidth = cols.num + cols.title + cols.deadline + cols.responsible + cols.fact;
-  const headers = ['№', 'Название задачи', 'Срок', 'Ответственный', 'Факт'];
-  const colWidths = [cols.num, cols.title, cols.deadline, cols.responsible, cols.fact];
+  const cols = { num: 24, title: 80, short: 90, description: 105, deadline: 62, responsible: 105, fact: 49 };
+  const tableWidth = cols.num + cols.title + cols.short + cols.description + cols.deadline + cols.responsible + cols.fact;
+  const headers = ['№', 'Название', 'Кратко', 'Описание задачи', 'Срок', 'Ответственный', 'Факт'];
+  const colWidths = [cols.num, cols.title, cols.short, cols.description, cols.deadline, cols.responsible, cols.fact];
 
   // Table header
   ensureSpace(22);
@@ -248,7 +250,7 @@ export async function generateProtocolPdf(data: ProtocolPdfData): Promise<Buffer
     page.drawText(headers[i], {
       x: xCursor + 4,
       y: y - 13,
-      size: 9.5,
+      size: 8,
       font: bold,
       color: COLOR_TEXT,
     });
@@ -278,14 +280,18 @@ export async function generateProtocolPdf(data: ProtocolPdfData): Promise<Buffer
     data.tasks.forEach((task, index) => {
       const num = String(index + 1);
       const title = task.title || '—';
+      const shortDescription = task.shortDescription || '—';
+      const description = task.description || '—';
       const deadline = formatDate(task.deadline);
       const responsible = task.responsibleName || '—';
       const fact = task.fact || '—';
 
-      const titleLines = wrapText(title, regular, 9.5, cols.title - 8);
-      const respLines = wrapText(responsible, regular, 9.5, cols.responsible - 8);
-      const factLines = wrapText(fact, regular, 9.5, cols.fact - 8);
-      const rowH = Math.max(18, Math.max(titleLines.length, respLines.length, factLines.length) * 12 + 6);
+      const titleLines = wrapText(title, regular, 8.5, cols.title - 8);
+      const shortLines = wrapText(shortDescription, regular, 8.5, cols.short - 8);
+      const descriptionLines = wrapText(description, regular, 8.5, cols.description - 8);
+      const respLines = wrapText(responsible, regular, 8.5, cols.responsible - 8);
+      const factLines = wrapText(fact, regular, 8.5, cols.fact - 8);
+      const rowH = Math.max(18, Math.max(titleLines.length, shortLines.length, descriptionLines.length, respLines.length, factLines.length) * 11 + 6);
 
       ensureSpace(rowH + 2);
       page.drawRectangle({
@@ -304,11 +310,11 @@ export async function generateProtocolPdf(data: ProtocolPdfData): Promise<Buffer
           page.drawText(line, {
             x: cx + 4,
             y: cy,
-            size: 9.5,
+            size: 8.5,
             font: regular,
             color: mono ? COLOR_MUTED : COLOR_TEXT,
           });
-          cy -= 12;
+          cy -= 11;
         }
       };
 
@@ -316,11 +322,15 @@ export async function generateProtocolPdf(data: ProtocolPdfData): Promise<Buffer
       cx += cols.num;
       drawCell(titleLines, 1);
       cx += cols.title;
-      drawCell([deadline], 2, true);
+      drawCell(shortLines, 2);
+      cx += cols.short;
+      drawCell(descriptionLines, 3);
+      cx += cols.description;
+      drawCell([deadline], 4, true);
       cx += cols.deadline;
-      drawCell(respLines, 3);
+      drawCell(respLines, 5);
       cx += cols.responsible;
-      drawCell(factLines, 4);
+      drawCell(factLines, 6);
 
       y -= rowH;
     });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Save, Send, Loader2 } from 'lucide-react';
 import {
@@ -8,6 +8,7 @@ import {
   type ProtocolTask,
 } from '../api/protocolsClient';
 import { useAuthStore } from '../../../store/authStore';
+import ComboboxSelect, { type ComboboxOption } from '../../../components/ui/ComboboxSelect';
 
 type Attendee = {
   userId: number;
@@ -39,6 +40,8 @@ export default function ProtocolForm() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [formReady, setFormReady] = useState(false);
+  const [draftStatus, setDraftStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [departments, setDepartments] = useState<ProtocolDepartmentUsers[]>([]);
   const [protocol, setProtocol] = useState<Protocol | null>(null);
@@ -50,8 +53,10 @@ export default function ProtocolForm() {
   const [conclusion, setConclusion] = useState('');
   const [nextMeetingDate, setNextMeetingDate] = useState('');
 
-  const [pickerDeptId, setPickerDeptId] = useState<number | ''>('');
-  const [pickerUserId, setPickerUserId] = useState<number | ''>('');
+  const [pickerDeptId, setPickerDeptId] = useState('');
+  const [pickerUserId, setPickerUserId] = useState('');
+  const lastServerSnapshot = useRef('');
+  const restoredEditDraft = useRef(false);
 
   useEffect(() => {
     protocolsApi.usersByDepartment().then(setDepartments).catch(() => {});
@@ -76,12 +81,77 @@ export default function ProtocolForm() {
         setTasks(p.tasks || []);
         setConclusion(p.conclusion || '');
         setNextMeetingDate(p.nextMeetingDate || '');
+        lastServerSnapshot.current = JSON.stringify({
+          theme: p.theme || '',
+          meetingDate: p.meetingDate || todayIso(),
+          attendees: (p.attendees || []).map((attendee) => attendee.id),
+          tasks: (p.tasks || []).map((task, index) => ({
+            order: index + 1,
+            title: task.title || '',
+            shortDescription: task.shortDescription || null,
+            description: task.description || null,
+            deadline: task.deadline || null,
+            responsibleId: task.responsibleId || null,
+            fact: task.fact || null,
+          })),
+          conclusion: p.conclusion || null,
+          nextMeetingDate: p.nextMeetingDate || null,
+        });
+        setFormReady(true);
       })
       .catch((e) =>
         setError(e?.response?.data?.error?.message || 'Не удалось загрузить протокол')
       )
       .finally(() => setLoading(false));
   }, [id, isEdit]);
+
+  const draftStorageKey = useMemo(
+    () => `nnmc-protocol-draft:${id || 'new'}:${user?.id || 'anonymous'}`,
+    [id, user?.id]
+  );
+
+  useEffect(() => {
+    if (isEdit) return;
+    try {
+      const stored = window.localStorage.getItem(draftStorageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setTheme(parsed.theme || '');
+        setMeetingDate(parsed.meetingDate || todayIso());
+        setAttendees(Array.isArray(parsed.attendees) ? parsed.attendees : []);
+        setTasks(Array.isArray(parsed.tasks) ? parsed.tasks : []);
+        setConclusion(parsed.conclusion || '');
+        setNextMeetingDate(parsed.nextMeetingDate || '');
+        setDraftStatus('Черновик восстановлен');
+      }
+    } catch {
+      window.localStorage.removeItem(draftStorageKey);
+    } finally {
+      setFormReady(true);
+    }
+  }, [draftStorageKey, isEdit]);
+
+  useEffect(() => {
+    if (!isEdit || !formReady || !protocol || restoredEditDraft.current) return;
+    restoredEditDraft.current = true;
+    try {
+      const stored = window.localStorage.getItem(draftStorageKey);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      const localSavedAt = new Date(parsed.savedAt || 0).getTime();
+      const serverSavedAt = new Date(protocol.updatedAt || 0).getTime();
+      if (!Number.isFinite(localSavedAt) || localSavedAt <= serverSavedAt) return;
+      setTheme(parsed.theme || '');
+      setMeetingDate(parsed.meetingDate || todayIso());
+      setAttendees(Array.isArray(parsed.attendees) ? parsed.attendees : []);
+      setTasks(Array.isArray(parsed.tasks) ? parsed.tasks : []);
+      setConclusion(parsed.conclusion || '');
+      setNextMeetingDate(parsed.nextMeetingDate || '');
+      setDraftStatus('Восстановлены последние несохраненные изменения');
+    } catch {
+      window.localStorage.removeItem(draftStorageKey);
+    }
+  }, [draftStorageKey, formReady, isEdit, protocol]);
 
   const allUsersFlat = useMemo(() => {
     const map = new Map<number, { userId: number; fullName: string; departmentName: string }>();
@@ -98,10 +168,40 @@ export default function ProtocolForm() {
   }, [departments]);
 
   const pickerUsers = useMemo(() => {
-    if (!pickerDeptId) return [];
-    const dept = departments.find((d) => d.id === pickerDeptId);
-    return dept?.users || [];
-  }, [pickerDeptId, departments]);
+    if (!pickerDeptId) return Array.from(allUsersFlat.values());
+    const dept = departments.find((d) => String(d.id) === pickerDeptId);
+    return (dept?.users || []).map((entry) => ({
+      userId: entry.id,
+      fullName: userLabel(entry),
+      departmentName: dept?.name || '',
+    }));
+  }, [allUsersFlat, pickerDeptId, departments]);
+
+  const departmentOptions = useMemo<ComboboxOption[]>(
+    () => departments.map((department) => ({ value: String(department.id), label: department.name })),
+    [departments]
+  );
+
+  const pickerUserOptions = useMemo<ComboboxOption[]>(
+    () => pickerUsers
+      .filter((entry) => !attendees.some((attendee) => attendee.userId === entry.userId))
+      .sort((left, right) => left.fullName.localeCompare(right.fullName, 'ru'))
+      .map((entry) => ({
+        value: String(entry.userId),
+        label: entry.fullName,
+        description: entry.departmentName,
+      })),
+    [attendees, pickerUsers]
+  );
+
+  const responsibleOptions = useMemo<ComboboxOption[]>(
+    () => attendees.map((attendee) => ({
+      value: String(attendee.userId),
+      label: attendee.fullName,
+      description: attendee.departmentName,
+    })),
+    [attendees]
+  );
 
   const myDeptName = user?.department?.name_ru || (user?.department as any)?.name || '';
 
@@ -117,12 +217,23 @@ export default function ProtocolForm() {
 
   function removeAttendee(userId: number) {
     setAttendees((prev) => prev.filter((a) => a.userId !== userId));
+    setTasks((prev) => prev.map((task) =>
+      Number(task.responsibleId) === userId ? { ...task, responsibleId: null } : task
+    ));
   }
 
   function addTask() {
     setTasks((prev) => [
       ...prev,
-      { order: prev.length + 1, title: '', deadline: null, responsibleId: null, fact: '' },
+      {
+        order: prev.length + 1,
+        title: '',
+        shortDescription: '',
+        description: '',
+        deadline: null,
+        responsibleId: null,
+        fact: '',
+      },
     ]);
   }
 
@@ -134,6 +245,58 @@ export default function ProtocolForm() {
     setTasks((prev) => prev.filter((_, i) => i !== index));
   }
 
+  const buildPayload = useCallback(() => ({
+    theme: theme.trim(),
+    meetingDate,
+    attendees: attendees.map((attendee) => attendee.userId),
+    tasks: tasks.map((task, index) => ({
+      order: index + 1,
+      title: task.title,
+      shortDescription: task.shortDescription?.trim() || null,
+      description: task.description?.trim() || null,
+      deadline: task.deadline || null,
+      responsibleId: task.responsibleId || null,
+      fact: task.fact || null,
+    })),
+    conclusion: conclusion.trim() || null,
+    nextMeetingDate: nextMeetingDate || null,
+  }), [attendees, conclusion, meetingDate, nextMeetingDate, tasks, theme]);
+
+  useEffect(() => {
+    if (!formReady) return;
+    const timer = window.setTimeout(() => {
+      window.localStorage.setItem(draftStorageKey, JSON.stringify({
+        theme,
+        meetingDate,
+        attendees,
+        tasks,
+        conclusion,
+        nextMeetingDate,
+        savedAt: new Date().toISOString(),
+      }));
+      setDraftStatus(isEdit && protocol?.status === 'draft' ? 'Черновик сохранен локально' : 'Черновик сохранен');
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [attendees, conclusion, draftStorageKey, formReady, isEdit, meetingDate, nextMeetingDate, protocol?.status, tasks, theme]);
+
+  useEffect(() => {
+    if (!formReady || !isEdit || !id || protocol?.status !== 'draft' || !theme.trim() || saving || publishing) return;
+    const payload = buildPayload();
+    const snapshot = JSON.stringify(payload);
+    if (snapshot === lastServerSnapshot.current) return;
+    const timer = window.setTimeout(async () => {
+      setDraftStatus('Сохраняем черновик...');
+      try {
+        await protocolsApi.update(id, { ...payload, autosave: true });
+        lastServerSnapshot.current = snapshot;
+        setDraftStatus('Черновик сохранен на сервере');
+      } catch {
+        setDraftStatus('Черновик сохранен локально');
+      }
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [buildPayload, formReady, id, isEdit, protocol?.status, publishing, saving, theme]);
+
   async function handleSave(publishAfter = false) {
     if (!theme.trim()) {
       setError('Введите тему');
@@ -142,20 +305,7 @@ export default function ProtocolForm() {
     setError(null);
     setSaving(true);
     try {
-      const payload = {
-        theme: theme.trim(),
-        meetingDate,
-        attendees: attendees.map((a) => a.userId),
-        tasks: tasks.map((t, idx) => ({
-          order: idx + 1,
-          title: t.title,
-          deadline: t.deadline || null,
-          responsibleId: t.responsibleId || null,
-          fact: t.fact || null,
-        })),
-        conclusion: conclusion.trim() || null,
-        nextMeetingDate: nextMeetingDate || null,
-      };
+      const payload = buildPayload();
 
       let target: Protocol;
       if (isEdit && id) {
@@ -179,6 +329,7 @@ export default function ProtocolForm() {
         await protocolsApi.publish(target.id);
       }
 
+      window.localStorage.removeItem(draftStorageKey);
       navigate(`/app/protocols/${target.id}`);
     } catch (e: any) {
       setError(e?.response?.data?.error?.message || 'Ошибка сохранения');
@@ -208,9 +359,12 @@ export default function ProtocolForm() {
         </Link>
       </div>
 
-      <h1 className="text-2xl font-semibold text-slate-800 mb-4">
-        {isEdit ? 'Редактировать протокол' : 'Новый протокол'}
-      </h1>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-semibold text-slate-800">
+          {isEdit ? 'Редактировать протокол' : 'Новый протокол'}
+        </h1>
+        {draftStatus && <span className="text-xs text-slate-500">{draftStatus}</span>}
+      </div>
 
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm mb-4">
@@ -282,46 +436,38 @@ export default function ProtocolForm() {
             <div className="text-sm text-slate-400 mb-3">Пока никого не добавили</div>
           )}
 
-          <div className="flex flex-wrap gap-2 items-end">
-            <div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(180px,0.8fr)_minmax(260px,1.2fr)_auto] sm:items-end">
+            <div className="min-w-0">
               <label className="block text-xs text-slate-500 mb-1">Отдел</label>
-              <select
+              <ComboboxSelect
                 value={pickerDeptId}
-                onChange={(e) => {
-                  setPickerDeptId(e.target.value ? Number(e.target.value) : '');
+                onChange={(value) => {
+                  setPickerDeptId(value);
                   setPickerUserId('');
                 }}
-                className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
-              >
-                <option value="">Выберите отдел</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+                options={departmentOptions}
+                placeholder="Все отделы"
+                searchPlaceholder="Поиск отдела..."
+                searchable
+              />
             </div>
-            <div>
+            <div className="min-w-0">
               <label className="block text-xs text-slate-500 mb-1">Сотрудник</label>
-              <select
+              <ComboboxSelect
                 value={pickerUserId}
-                onChange={(e) => setPickerUserId(e.target.value ? Number(e.target.value) : '')}
-                disabled={!pickerDeptId}
-                className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm disabled:bg-slate-50"
-              >
-                <option value="">Выберите сотрудника</option>
-                {pickerUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {userLabel(u)}
-                  </option>
-                ))}
-              </select>
+                onChange={setPickerUserId}
+                options={pickerUserOptions}
+                placeholder="Найдите сотрудника"
+                searchPlaceholder="ФИО, логин или отдел..."
+                emptyText="Сотрудник не найден"
+                searchable
+              />
             </div>
             <button
               type="button"
               onClick={addAttendee}
               disabled={!pickerUserId}
-              className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm"
+              className="inline-flex h-12 items-center justify-center gap-1 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm"
             >
               <Plus className="w-4 h-4" />
               Добавить
@@ -345,49 +491,78 @@ export default function ProtocolForm() {
           {tasks.length === 0 ? (
             <div className="text-sm text-slate-400">Пока задач нет</div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {tasks.map((task, index) => (
                 <div
                   key={index}
-                  className="grid grid-cols-12 gap-2 items-start bg-slate-50 p-2 rounded-lg"
+                  className="rounded-lg border border-slate-200 bg-slate-50 p-3"
                 >
-                  <div className="col-span-1 pt-2 text-sm font-medium text-slate-600">
-                    {index + 1}
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-700">Задача {index + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeTask(index)}
+                      className="p-2 text-slate-400 hover:text-red-600"
+                      title="Удалить задачу"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Название задачи"
-                    value={task.title || ''}
-                    onChange={(e) => updateTask(index, { title: e.target.value })}
-                    className="col-span-4 border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
-                  />
-                  <input
-                    type="date"
-                    value={task.deadline || ''}
-                    onChange={(e) => updateTask(index, { deadline: e.target.value || null })}
-                    className="col-span-2 border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
-                  />
-                  <select
-                    value={task.responsibleId || ''}
-                    onChange={(e) =>
-                      updateTask(index, {
-                        responsibleId: e.target.value ? Number(e.target.value) : null,
-                      })
-                    }
-                    className="col-span-3 border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
-                  >
-                    <option value="">Ответственный</option>
-                    {departments.map((d) => (
-                      <optgroup key={d.id} label={d.name}>
-                        {d.users.map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {userLabel(u)}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <div className="col-span-1">
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <label className="space-y-1">
+                      <span className="block text-xs font-medium text-slate-600">Название *</span>
+                      <input
+                        type="text"
+                        placeholder="Название задачи"
+                        value={task.title || ''}
+                        onChange={(e) => updateTask(index, { title: e.target.value })}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block text-xs font-medium text-slate-600">Краткое описание задачи</span>
+                      <input
+                        type="text"
+                        placeholder="Суть задачи в одной строке"
+                        value={task.shortDescription || ''}
+                        onChange={(e) => updateTask(index, { shortDescription: e.target.value })}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="space-y-1 lg:col-span-2">
+                      <span className="block text-xs font-medium text-slate-600">Описание задачи</span>
+                      <textarea
+                        rows={3}
+                        placeholder="Подробно опишите результат и условия выполнения"
+                        value={task.description || ''}
+                        onChange={(e) => updateTask(index, { description: e.target.value })}
+                        className="w-full resize-y border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="block text-xs font-medium text-slate-600">Срок</span>
+                      <input
+                        type="date"
+                        value={task.deadline || ''}
+                        onChange={(e) => updateTask(index, { deadline: e.target.value || null })}
+                        className="w-full h-12 border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                      />
+                    </label>
+                    <div className="min-w-0 space-y-1">
+                      <span className="block text-xs font-medium text-slate-600">Ответственный из присутствующих</span>
+                      <ComboboxSelect
+                        value={task.responsibleId ? String(task.responsibleId) : ''}
+                        onChange={(value) => updateTask(index, { responsibleId: value ? Number(value) : null })}
+                        options={responsibleOptions}
+                        placeholder={attendees.length ? 'Найдите ответственного' : 'Сначала добавьте присутствующих'}
+                        searchPlaceholder="Поиск по ФИО..."
+                        emptyText="Нет доступных присутствующих"
+                        disabled={attendees.length === 0}
+                        searchable
+                      />
+                    </div>
+                    <label className="space-y-1 sm:max-w-40">
+                      <span className="block text-xs font-medium text-slate-600">Факт выполнения</span>
                     <input
                       type="text"
                       placeholder="0%"
@@ -395,16 +570,10 @@ export default function ProtocolForm() {
                       onChange={(e) =>
                         updateTask(index, { fact: normalizeFactInput(e.target.value) })
                       }
-                      className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                     />
+                    </label>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeTask(index)}
-                    className="col-span-1 p-2 text-slate-400 hover:text-red-600"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
                 </div>
               ))}
             </div>

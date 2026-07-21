@@ -7,6 +7,18 @@ export default {
       config: { auth: false, policies: [] },
     },
     {
+      method: 'GET',
+      path: '/onboarding/public/:token/positions',
+      handler: 'onboarding.positions',
+      config: { auth: false, policies: [] },
+    },
+    {
+      method: 'GET',
+      path: '/onboarding/public/:token/settings',
+      handler: 'onboarding.publicSettings',
+      config: { auth: false, policies: [] },
+    },
+    {
       method: 'POST',
       path: '/onboarding/public/:token/verify',
       handler: 'onboarding.verify',
@@ -34,6 +46,18 @@ export default {
       method: 'GET',
       path: '/onboarding/invitations',
       handler: 'onboarding.list',
+      config: { policies: [] },
+    },
+    {
+      method: 'GET',
+      path: '/onboarding/settings',
+      handler: 'onboarding.settings',
+      config: { policies: [] },
+    },
+    {
+      method: 'PUT',
+      path: '/onboarding/settings',
+      handler: 'onboarding.updateSettings',
       config: { policies: [] },
     },
     {

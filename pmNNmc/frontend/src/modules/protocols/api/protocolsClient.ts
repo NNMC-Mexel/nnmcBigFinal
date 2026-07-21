@@ -12,6 +12,8 @@ export type ProtocolUser = {
 export type ProtocolTask = {
   order?: number;
   title: string;
+  shortDescription?: string | null;
+  description?: string | null;
   deadline?: string | null;
   responsibleId?: number | null;
   fact?: string | null;
@@ -68,6 +70,7 @@ export type ProtocolPayload = {
   tasks: ProtocolTask[];
   conclusion?: string | null;
   nextMeetingDate?: string | null;
+  autosave?: boolean;
 };
 
 export const protocolsApi = {

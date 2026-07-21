@@ -241,12 +241,14 @@ export default function ProtocolView() {
         <div>
           <div className="text-sm font-medium text-slate-700 mb-2">Задачи</div>
           {protocol.tasks && protocol.tasks.length > 0 ? (
-            <div className="overflow-hidden border border-slate-200 rounded-lg">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto border border-slate-200 rounded-lg">
+              <table className="w-full min-w-[1050px] text-sm">
                 <thead className="bg-slate-50 text-slate-600 text-xs uppercase">
                   <tr>
                     <th className="text-left p-2 w-10">№</th>
                     <th className="text-left p-2">Название</th>
+                    <th className="text-left p-2">Краткое описание</th>
+                    <th className="text-left p-2">Описание задачи</th>
                     <th className="text-left p-2 w-28">Срок</th>
                     <th className="text-left p-2 w-48">Ответственный</th>
                     <th className="text-left p-2 w-20">Факт</th>
@@ -258,7 +260,9 @@ export default function ProtocolView() {
                     return (
                       <tr key={i} className="border-t border-slate-100">
                         <td className="p-2 text-slate-500">{i + 1}</td>
-                        <td className="p-2 text-slate-700">{t.title}</td>
+                        <td className="p-2 text-slate-700 align-top">{t.title}</td>
+                        <td className="p-2 text-slate-600 align-top whitespace-pre-wrap">{t.shortDescription || '—'}</td>
+                        <td className="p-2 text-slate-600 align-top whitespace-pre-wrap">{t.description || '—'}</td>
                         <td className="p-2 text-slate-600">{formatDate(t.deadline)}</td>
                         <td className="p-2 text-slate-600">
                           {respUser ? userLabel(respUser) : t.responsibleId ? `User #${t.responsibleId}` : '—'}

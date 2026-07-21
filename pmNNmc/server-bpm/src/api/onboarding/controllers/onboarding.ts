@@ -2,9 +2,84 @@ import crypto from 'crypto';
 import type { Context } from 'koa';
 
 const INVITATION_UID = 'api::onboarding-invitation.onboarding-invitation' as any;
+const SETTINGS_UID = 'api::onboarding-setting.onboarding-setting' as any;
+const EMPLOYEE_CARD_UID = 'api::employee-card.employee-card' as any;
 const USER_UID = 'plugin::users-permissions.user' as any;
 const INVITATION_DAYS = 3;
 const MAX_ATTEMPTS = 3;
+
+const DOCUMENT_REQUIREMENT_KEYS = [
+  'identityPhoto',
+  'identityDocument',
+  'signature',
+  'form075',
+  'noCriminalRecord',
+  'narcology',
+  'psychiatry',
+  'marriageDocument',
+  'familyMemberDocuments',
+  'educationDocuments',
+  'bankRequisites',
+] as const;
+const EXTRA_FIELD_SECTIONS = ['identity', 'documents', 'contacts', 'education', 'medical', 'family', 'work', 'bank'] as const;
+const EXTRA_FIELD_TYPES = ['text', 'textarea', 'date', 'select', 'checkbox', 'file'] as const;
+
+type OnboardingSettings = {
+  documentRequirements: Record<string, boolean>;
+  extraFields: Array<{
+    id: string;
+    section: string;
+    label: string;
+    type: string;
+    required: boolean;
+    placeholder?: string;
+    options?: string[];
+  }>;
+};
+
+function defaultOnboardingSettings(): OnboardingSettings {
+  return {
+    documentRequirements: Object.fromEntries(DOCUMENT_REQUIREMENT_KEYS.map((key) => [key, false])),
+    extraFields: [],
+  };
+}
+
+function normalizeOnboardingSettings(value: any): OnboardingSettings {
+  const defaults = defaultOnboardingSettings();
+  const requirements = value?.documentRequirements || {};
+  const extraFields = (Array.isArray(value?.extraFields) ? value.extraFields : [])
+    .slice(0, 50)
+    .map((field: any, index: number) => {
+      const id = cleanString(field?.id).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80) || `extra-${index + 1}`;
+      const section = EXTRA_FIELD_SECTIONS.includes(field?.section) ? field.section : 'documents';
+      const type = EXTRA_FIELD_TYPES.includes(field?.type) ? field.type : 'text';
+      const options = Array.isArray(field?.options)
+        ? field.options.map(cleanString).filter(Boolean).slice(0, 100)
+        : [];
+      return {
+        id,
+        section,
+        label: cleanString(field?.label).slice(0, 160),
+        type,
+        required: field?.required === true,
+        placeholder: cleanString(field?.placeholder).slice(0, 200),
+        options,
+      };
+    })
+    .filter((field: any, index: number, fields: any[]) => field.label && fields.findIndex((item) => item.id === field.id) === index);
+
+  return {
+    documentRequirements: Object.fromEntries(
+      DOCUMENT_REQUIREMENT_KEYS.map((key) => [key, requirements[key] === true || defaults.documentRequirements[key]])
+    ),
+    extraFields,
+  };
+}
+
+async function getOnboardingSettings(strapi: any): Promise<OnboardingSettings> {
+  const item = await strapi.db.query(SETTINGS_UID).findOne({});
+  return normalizeOnboardingSettings(item?.config);
+}
 
 function cleanString(value: any): string {
   return String(value ?? '').trim();
@@ -95,19 +170,20 @@ function hasUploadedFiles(value: any): boolean {
   );
 }
 
-function validateSubmissionDraft(draft: any): string[] {
+function validateSubmissionDraft(draft: any, settings: OnboardingSettings): string[] {
   const errors: string[] = [];
   const identity = draft?.identity || {};
   const documents = draft?.documents || {};
   const contacts = draft?.contacts || {};
   const medical = draft?.medical || {};
   const family = draft?.family || {};
+  const work = draft?.work || {};
   const namePattern = /^[A-Za-zА-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі' -]+$/;
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const today = new Date().toISOString().slice(0, 10);
 
   if (draft?.legal?.accepted !== true) errors.push('Не подтверждено согласие на обработку персональных данных');
-  if (!hasUploadedFiles(identity.photo)) errors.push('Не загружена фотография 3x4');
+  if (settings.documentRequirements.identityPhoto && !hasUploadedFiles(identity.photo)) errors.push('Не загружена фотография 3x4');
   for (const [key, label] of [['lastName', 'фамилия'], ['firstName', 'имя']] as const) {
     const value = cleanString(identity[key]);
     if (!value || !namePattern.test(value)) errors.push(`Некорректно заполнено поле «${label}»`);
@@ -136,7 +212,7 @@ function validateSubmissionDraft(draft: any): string[] {
   } else if (documents.issueDate > today || documents.expiryDate < documents.issueDate) {
     errors.push('Проверьте дату выдачи и срок действия удостоверяющего документа');
   }
-  if (!hasUploadedFiles(documents.identityFiles)) errors.push('Не загружен PDF удостоверяющего документа');
+  if (settings.documentRequirements.identityDocument && !hasUploadedFiles(documents.identityFiles)) errors.push('Не загружен PDF удостоверяющего документа');
 
   for (const address of [contacts.registration, contacts.living]) {
     if (!address?.country || !address?.region || !address?.city || !address?.details) {
@@ -146,7 +222,7 @@ function validateSubmissionDraft(draft: any): string[] {
   }
   if (cleanString(contacts.mobilePhone).replace(/\D/g, '').length !== 11) errors.push('Некорректный мобильный телефон');
   if (contacts.email && !emailPattern.test(cleanString(contacts.email))) errors.push('Некорректный email');
-  if (!hasUploadedFiles(contacts.signatureFile)) errors.push('Не загружен образец личной подписи');
+  if (settings.documentRequirements.signature && !hasUploadedFiles(contacts.signatureFile)) errors.push('Не загружен образец личной подписи');
 
   for (const [key, label] of [
     ['form075', 'форма 075'],
@@ -154,29 +230,40 @@ function validateSubmissionDraft(draft: any): string[] {
     ['narcology', 'справка из наркологического диспансера'],
     ['psychiatry', 'справка из психиатрического диспансера'],
   ]) {
-    if (!hasUploadedFiles(medical[key])) errors.push(`Не загружен обязательный документ: ${label}`);
+    if (settings.documentRequirements[key] && !hasUploadedFiles(medical[key])) errors.push(`Не загружен обязательный документ: ${label}`);
   }
   if (!medical.emergencyContactName || !medical.emergencyContactRelation || cleanString(medical.emergencyContactPhone).replace(/\D/g, '').length !== 11) {
     errors.push('Не заполнено контактное лицо для экстренного случая');
   }
 
   if (!family.maritalStatus) errors.push('Не заполнено семейное положение');
-  if (family.maritalStatus === 'Состоит в зарегистрированном браке' && !hasUploadedFiles(family.marriageFiles)) {
+  if (settings.documentRequirements.marriageDocument && family.maritalStatus === 'Состоит в зарегистрированном браке' && !hasUploadedFiles(family.marriageFiles)) {
     errors.push('Не загружено свидетельство о браке');
   }
   for (const member of family.members || []) {
-    if (!member?.relation || !member?.fio || !member?.birthDate || !hasUploadedFiles(member?.files)) {
+    if (!member?.relation || !member?.fio || !member?.birthDate || (settings.documentRequirements.familyMemberDocuments && !hasUploadedFiles(member?.files))) {
       errors.push('Не полностью заполнены сведения и документы члена семьи');
       break;
     }
   }
   for (const education of draft?.education?.items || []) {
-    if (!education?.institution || !education?.degree || !hasUploadedFiles(education?.files)) {
+    if (!education?.institution || !education?.degree || (settings.documentRequirements.educationDocuments && !hasUploadedFiles(education?.files))) {
       errors.push('Не полностью заполнены сведения и документы об образовании');
       break;
     }
   }
-  if (!hasUploadedFiles(draft?.bank?.halykRequisites)) errors.push('Не загружен PDF банковских реквизитов Halyk Bank');
+  if (!cleanString(work.targetPosition)) errors.push('Не выбрана должность, на которую принимается сотрудник');
+  if (settings.documentRequirements.bankRequisites && !hasUploadedFiles(draft?.bank?.halykRequisites)) errors.push('Не загружен PDF банковских реквизитов Halyk Bank');
+  for (const field of settings.extraFields) {
+    if (!field.required) continue;
+    const value = draft?.extraFields?.[field.id];
+    const missing = field.type === 'file'
+      ? !hasUploadedFiles(value)
+      : field.type === 'checkbox'
+        ? value !== true
+        : !cleanString(value);
+    if (missing) errors.push(`Не заполнено обязательное поле «${field.label}»`);
+  }
   if (draft?.safety?.introReviewed !== true || draft?.safety?.hospitalSafetyReviewed !== true) {
     errors.push('Не подтвержден просмотр двух видео по безопасности');
   }
@@ -256,6 +343,35 @@ async function ensureInvitationForPublic(ctx: Context, strapi: any, token: strin
 }
 
 export default {
+  async publicSettings(ctx: Context) {
+    const strapi = (global as any).strapi;
+    const invitation = await findByToken(strapi, cleanString(ctx.params.token));
+    if (!invitation) ctx.throw(404, 'Приглашение не найдено');
+    if (isExpired(invitation) || invitation.status === 'EXPIRED') ctx.throw(410, 'Срок приглашения истек');
+    ctx.body = { data: await getOnboardingSettings(strapi) };
+  },
+
+  async settings(ctx: Context) {
+    const strapi = (global as any).strapi;
+    const user = await loadCurrentUser(ctx, strapi);
+    if (!canManageOnboarding(user)) ctx.throw(403, 'Only HR or SuperAdmin can view onboarding settings');
+    ctx.body = { data: await getOnboardingSettings(strapi) };
+  },
+
+  async updateSettings(ctx: Context) {
+    const strapi = (global as any).strapi;
+    const user = await loadCurrentUser(ctx, strapi);
+    if (user?.isSuperAdmin !== true) ctx.throw(403, 'Only SuperAdmin can update onboarding settings');
+    const config = normalizeOnboardingSettings((ctx.request.body as any)?.config ?? ctx.request.body);
+    const existing = await strapi.db.query(SETTINGS_UID).findOne({});
+    if (existing) {
+      await strapi.entityService.update(SETTINGS_UID, existing.id, { data: { config } } as any);
+    } else {
+      await strapi.entityService.create(SETTINGS_UID, { data: { config } } as any);
+    }
+    ctx.body = { data: config };
+  },
+
   async publicStatus(ctx: Context) {
     const strapi = (global as any).strapi;
     const token = cleanString(ctx.params.token);
@@ -269,6 +385,30 @@ export default {
       return;
     }
     ctx.body = { data: safePublicInvitation(item) };
+  },
+
+  async positions(ctx: Context) {
+    const strapi = (global as any).strapi;
+    const token = cleanString(ctx.params.token);
+    const invitation = await findByToken(strapi, token);
+    if (!invitation) ctx.throw(404, 'Приглашение не найдено');
+    if (isExpired(invitation) || invitation.status === 'EXPIRED') {
+      ctx.throw(410, 'Срок приглашения истек. Обратитесь в отдел кадров.');
+    }
+
+    const cards = await strapi.db.query(EMPLOYEE_CARD_UID).findMany({
+      where: { active: true },
+      select: ['workplaces'],
+      limit: 10000,
+    });
+    const positions = new Set<string>();
+    for (const card of cards || []) {
+      for (const workplace of Array.isArray(card?.workplaces) ? card.workplaces : []) {
+        const position = cleanString(workplace?.position);
+        if (position) positions.add(position);
+      }
+    }
+    ctx.body = { data: Array.from(positions).sort((left, right) => left.localeCompare(right, 'ru')) };
   },
 
   async verify(ctx: Context) {
@@ -380,7 +520,8 @@ export default {
     const iin = normalizeIin(body.iin);
     const item = await ensureInvitationForPublic(ctx, strapi, token, iin);
     const draft = item.draft || {};
-    const validationErrors = validateSubmissionDraft(draft);
+    const settings = await getOnboardingSettings(strapi);
+    const validationErrors = validateSubmissionDraft(draft, settings);
     if (validationErrors.length > 0) ctx.throw(400, validationErrors[0], { details: { errors: validationErrors } });
 
     const now = new Date().toISOString();

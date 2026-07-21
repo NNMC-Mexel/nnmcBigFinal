@@ -45,9 +45,37 @@ export interface OnboardingUploadedFile {
   size: number;
 }
 
+export type OnboardingExtraFieldSection = 'identity' | 'documents' | 'contacts' | 'education' | 'medical' | 'family' | 'work' | 'bank';
+export type OnboardingExtraFieldType = 'text' | 'textarea' | 'date' | 'select' | 'checkbox' | 'file';
+
+export interface OnboardingExtraField {
+  id: string;
+  section: OnboardingExtraFieldSection;
+  label: string;
+  type: OnboardingExtraFieldType;
+  required: boolean;
+  placeholder?: string;
+  options?: string[];
+}
+
+export interface OnboardingSettings {
+  documentRequirements: Record<string, boolean>;
+  extraFields: OnboardingExtraField[];
+}
+
 export const onboardingApi = {
   async publicStatus(token: string): Promise<OnboardingInvitation> {
     const response = await bpmClient.get(`/onboarding/public/${token}`);
+    return response.data.data;
+  },
+
+  async positions(token: string): Promise<string[]> {
+    const response = await bpmClient.get(`/onboarding/public/${token}/positions`);
+    return response.data.data || [];
+  },
+
+  async publicSettings(token: string): Promise<OnboardingSettings> {
+    const response = await bpmClient.get(`/onboarding/public/${token}/settings`);
     return response.data.data;
   },
 
@@ -79,6 +107,16 @@ export const onboardingApi = {
   async list(): Promise<OnboardingInvitation[]> {
     const response = await bpmClient.get('/onboarding/invitations');
     return response.data.data || [];
+  },
+
+  async settings(): Promise<OnboardingSettings> {
+    const response = await bpmClient.get('/onboarding/settings');
+    return response.data.data;
+  },
+
+  async updateSettings(config: OnboardingSettings): Promise<OnboardingSettings> {
+    const response = await bpmClient.put('/onboarding/settings', { config });
+    return response.data.data;
   },
 
   async createInvitation(data: { iin: string; phone: string }): Promise<OnboardingInvitation> {

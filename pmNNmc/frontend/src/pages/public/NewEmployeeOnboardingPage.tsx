@@ -23,7 +23,12 @@ import Button from '../../components/ui/Button';
 import ComboboxSelect, { type ComboboxOption } from '../../components/ui/ComboboxSelect';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
-import { onboardingApi, type OnboardingInvitation } from '../../api/onboarding';
+import {
+  onboardingApi,
+  type OnboardingExtraField,
+  type OnboardingSettings,
+  type OnboardingInvitation,
+} from '../../api/onboarding';
 import {
   cityOptionsFor,
   countryOptions,
@@ -91,6 +96,7 @@ const inputClass = 'w-full px-3 py-2 rounded-lg border border-slate-300 focus:ou
 const today = new Date().toISOString().slice(0, 10);
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const namePattern = /^[A-Za-zА-Яа-яЁёӘәҒғҚқҢңӨөҰұҮүҺһІі' -]+$/;
+const defaultSettings: OnboardingSettings = { documentRequirements: {}, extraFields: [] };
 
 function toYoutubeEmbed(url: string) {
   const id = url.match(/[?&]v=([^&]+)/)?.[1] || url.split('/').pop()?.split('?')[0] || '';
@@ -268,6 +274,8 @@ export default function NewEmployeeOnboardingPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [positionOptions, setPositionOptions] = useState<ComboboxOption[]>([]);
+  const [settings, setSettings] = useState<OnboardingSettings>(defaultSettings);
 
   const activeStep = steps[step];
   const isSubmitted = invitation?.status === 'SUBMITTED' || invitation?.status === 'APPROVED' || invitation?.status === 'SENT_ONEC';
@@ -284,6 +292,16 @@ export default function NewEmployeeOnboardingPage() {
       .catch((requestError: any) => setError(requestError?.response?.data?.error?.message || 'Приглашение не найдено'))
       .finally(() => setIsLoading(false));
   }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    Promise.allSettled([onboardingApi.positions(token), onboardingApi.publicSettings(token)]).then(([positionsResult, settingsResult]) => {
+      setPositionOptions(positionsResult.status === 'fulfilled' ? positionsResult.value.map((position) => ({ value: position, label: position })) : []);
+      if (settingsResult.status === 'fulfilled') setSettings(settingsResult.value);
+    });
+  }, [token]);
+
+  const documentRequired = (key: string) => settings.documentRequirements[key] === true;
 
   const updateSection = (section: string, key: string, value: any) => {
     setDraft((current) => ({
@@ -311,12 +329,13 @@ export default function NewEmployeeOnboardingPage() {
     const contacts = data.contacts || {};
     const medical = data.medical || {};
     const family = data.family || {};
+    const work = data.work || {};
 
     if (stepKey === 'law' && data.legal?.accepted !== true) {
       errors.push('Подтвердите согласие на обработку персональных данных');
     }
     if (stepKey === 'identity') {
-      if (!hasFiles(identity.photo)) errors.push('Загрузите фотографию 3x4');
+      if (documentRequired('identityPhoto') && !hasFiles(identity.photo)) errors.push('Загрузите фотографию 3x4');
       for (const [field, label] of [['lastName', 'фамилию'], ['firstName', 'имя']] as const) {
         const value = String(identity[field] || '').trim();
         if (!value) errors.push(`Укажите ${label} как в документе`);
@@ -342,7 +361,7 @@ export default function NewEmployeeOnboardingPage() {
       if (documents.documentType === 'Удостоверение личности' && !/^\d{9}$/.test(documents.documentNumber || '')) errors.push('Номер удостоверения личности должен содержать ровно 9 цифр');
       if (!documents.issuedBy) errors.push('Укажите, кем выдан документ');
       if (!documents.issueDate || !documents.expiryDate) errors.push('Укажите дату выдачи и срок действия документа');
-      if (!hasFiles(documents.identityFiles)) errors.push('Загрузите PDF документа, удостоверяющего личность');
+      if (documentRequired('identityDocument') && !hasFiles(documents.identityFiles)) errors.push('Загрузите PDF документа, удостоверяющего личность');
     }
     if (stepKey === 'contacts') {
       for (const [address, label] of [[contacts.registration, 'адрес по прописке'], [contacts.living, 'адрес проживания']] as const) {
@@ -350,11 +369,11 @@ export default function NewEmployeeOnboardingPage() {
       }
       if (String(contacts.mobilePhone || '').replace(/\D/g, '').length !== 11) errors.push('Укажите мобильный телефон в формате +7 700 000 00 00');
       if (contacts.email && !emailPattern.test(contacts.email)) errors.push('Укажите корректный email, например name@example.com');
-      if (!hasFiles(contacts.signatureFile)) errors.push('Загрузите образец личной подписи');
+      if (documentRequired('signature') && !hasFiles(contacts.signatureFile)) errors.push('Загрузите образец личной подписи');
     }
     if (stepKey === 'education') {
       for (const [index, item] of (data.education?.items || []).entries()) {
-        if (!item.institution || !item.degree || !hasFiles(item.files)) errors.push(`Заполните образование №${index + 1} и загрузите диплом/сертификат`);
+        if (!item.institution || !item.degree || (documentRequired('educationDocuments') && !hasFiles(item.files))) errors.push(`Заполните сведения об образовании №${index + 1}${documentRequired('educationDocuments') ? ' и загрузите диплом/сертификат' : ''}`);
       }
     }
     if (stepKey === 'medical') {
@@ -364,21 +383,29 @@ export default function NewEmployeeOnboardingPage() {
         ['narcology', 'справку из наркологического диспансера'],
         ['psychiatry', 'справку из психиатрического диспансера'],
       ];
-      for (const [key, label] of requiredMedical) if (!hasFiles(medical[key])) errors.push(`Загрузите ${label}`);
+      for (const [key, label] of requiredMedical) if (documentRequired(key) && !hasFiles(medical[key])) errors.push(`Загрузите ${label}`);
       if (!medical.emergencyContactName || !medical.emergencyContactRelation || String(medical.emergencyContactPhone || '').replace(/\D/g, '').length !== 11) {
         errors.push('Заполните ФИО, степень родства и телефон контактного лица');
       }
     }
     if (stepKey === 'family') {
       if (!family.maritalStatus) errors.push('Выберите семейное положение');
-      if (family.maritalStatus === 'Состоит в зарегистрированном браке' && !hasFiles(family.marriageFiles)) errors.push('Загрузите свидетельство о браке');
+      if (documentRequired('marriageDocument') && family.maritalStatus === 'Состоит в зарегистрированном браке' && !hasFiles(family.marriageFiles)) errors.push('Загрузите свидетельство о браке');
       for (const [index, member] of (family.members || []).entries()) {
-        if (!member.relation || !member.fio || !member.birthDate || !hasFiles(member.files)) errors.push(`Заполните члена семьи №${index + 1} и загрузите подтверждающий документ`);
+        if (!member.relation || !member.fio || !member.birthDate || (documentRequired('familyMemberDocuments') && !hasFiles(member.files))) errors.push(`Заполните сведения о члене семьи №${index + 1}${documentRequired('familyMemberDocuments') ? ' и загрузите документ' : ''}`);
       }
     }
-    if (stepKey === 'bank' && !hasFiles(data.bank?.halykRequisites)) errors.push('Загрузите PDF с банковскими реквизитами Halyk Bank');
+    if (stepKey === 'work' && !String(work.targetPosition || '').trim()) {
+      errors.push('Выберите должность, на которую вас принимают');
+    }
+    if (stepKey === 'bank' && documentRequired('bankRequisites') && !hasFiles(data.bank?.halykRequisites)) errors.push('Загрузите PDF с банковскими реквизитами Halyk Bank');
     if (stepKey === 'safety-medical' && data.safety?.introReviewed !== true) errors.push('Подтвердите просмотр первого видео');
     if (stepKey === 'safety-fire' && data.safety?.hospitalSafetyReviewed !== true) errors.push('Подтвердите просмотр второго видео');
+    for (const field of settings.extraFields.filter((item) => item.section === stepKey && item.required)) {
+      const value = data.extraFields?.[field.id];
+      const missing = field.type === 'file' ? !hasFiles(value) : field.type === 'checkbox' ? value !== true : !String(value || '').trim();
+      if (missing) errors.push(`Заполните обязательное поле «${field.label}»`);
+    }
     return errors;
   };
 
@@ -463,6 +490,48 @@ export default function NewEmployeeOnboardingPage() {
     }
   };
 
+  const updateExtraField = (field: OnboardingExtraField, value: any) => {
+    setDraft((current) => ({
+      ...current,
+      extraFields: { ...(current.extraFields || {}), [field.id]: value },
+    }));
+  };
+
+  const renderExtraFields = (section: string) => {
+    const fields = settings.extraFields.filter((field) => field.section === section);
+    if (fields.length === 0) return null;
+    return (
+      <div className="mt-6 space-y-4 border-t border-slate-100 pt-6">
+        <h2 className="text-lg font-semibold text-slate-900">Дополнительные сведения</h2>
+        {fields.map((field) => {
+          const value = draft.extraFields?.[field.id];
+          if (field.type === 'file') {
+            return <FileInput key={field.id} label={field.label} accept="application/pdf,image/png,image/jpeg" multiple required={field.required} value={value} uploadFiles={uploadFiles} onChange={(files) => updateExtraField(field, files)} />;
+          }
+          if (field.type === 'checkbox') {
+            return (
+              <label key={field.id} className="flex items-start gap-3 rounded-lg border border-slate-200 p-4 text-sm text-slate-700">
+                <input type="checkbox" checked={value === true} onChange={(event) => updateExtraField(field, event.target.checked)} className="mt-0.5 h-5 w-5 rounded border-slate-300 text-primary-600" />
+                <span>{field.label}{field.required && <span className="ml-1 text-red-500">*</span>}</span>
+              </label>
+            );
+          }
+          if (field.type === 'select') {
+            return <Select key={field.id} label={`${field.label}${field.required ? ' *' : ''}`} value={value || ''} options={(field.options || []).map((option) => ({ value: option, label: option }))} placeholder={field.placeholder || 'Выберите значение'} onChange={(event) => updateExtraField(field, event.target.value)} />;
+          }
+          if (field.type === 'textarea') {
+            return (
+              <Field key={field.id} label={`${field.label}${field.required ? ' *' : ''}`}>
+                <textarea className={`${inputClass} min-h-28 resize-y`} value={value || ''} placeholder={field.placeholder} onChange={(event) => updateExtraField(field, event.target.value)} />
+              </Field>
+            );
+          }
+          return <Input key={field.id} type={field.type === 'date' ? 'date' : 'text'} label={`${field.label}${field.required ? ' *' : ''}`} value={value || ''} placeholder={field.placeholder} onChange={(event) => updateExtraField(field, event.target.value)} />;
+        })}
+      </div>
+    );
+  };
+
   const renderStep = () => {
     if (activeStep.key === 'intro') {
       return (
@@ -514,7 +583,7 @@ export default function NewEmployeeOnboardingPage() {
       const section = draft.identity || {};
       return (
         <div className="grid gap-4 lg:grid-cols-2">
-          <FileInput label="Фото 3x4" accept="image/png,image/jpeg" required value={section.photo} uploadFiles={uploadFiles} onChange={(files) => updateSection('identity', 'photo', files)} />
+          <FileInput label="Фото 3x4" accept="image/png,image/jpeg" required={documentRequired('identityPhoto')} value={section.photo} uploadFiles={uploadFiles} onChange={(files) => updateSection('identity', 'photo', files)} />
           <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">Фото нужно для личного дела. Обычно отдел кадров предупреждает требования заранее.</div>
           <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-900 lg:col-span-2">
             Внесите ФИО строго так, как оно указано в удостоверении личности или паспорте. Не используйте сокращения.
@@ -556,7 +625,7 @@ export default function NewEmployeeOnboardingPage() {
           <Input label="Кем выдан *" value={section.issuedBy || ''} onChange={(event) => updateSection('documents', 'issuedBy', event.target.value)} />
           <Input label="Дата выдачи *" type="date" min="1900-01-01" max={today} value={section.issueDate || ''} onChange={(event) => updateSection('documents', 'issueDate', normalizeDateInput(event.target.value))} />
           <Input label="Срок действия *" type="date" min="1900-01-01" value={section.expiryDate || ''} onChange={(event) => updateSection('documents', 'expiryDate', normalizeDateInput(event.target.value))} />
-          <FileInput label="PDF документа, максимум 2 файла" accept="application/pdf" multiple required value={section.identityFiles} uploadFiles={uploadFiles} onChange={(files) => updateSection('documents', 'identityFiles', files.slice(0, 2))} />
+          <FileInput label="PDF документа, максимум 2 файла" accept="application/pdf" multiple required={documentRequired('identityDocument')} value={section.identityFiles} uploadFiles={uploadFiles} onChange={(files) => updateSection('documents', 'identityFiles', files.slice(0, 2))} />
         </div>
       );
     }
@@ -570,7 +639,7 @@ export default function NewEmployeeOnboardingPage() {
           <Input label="Мобильный телефон *" inputMode="tel" value={section.mobilePhone || ''} onChange={(event) => updateSection('contacts', 'mobilePhone', normalizePhoneInput(event.target.value))} placeholder="+7 700 000 00 00" />
           <Input label="Домашний телефон" value={section.homePhone || ''} onChange={(event) => updateSection('contacts', 'homePhone', event.target.value)} />
           <Input label="Email, если есть" type="email" inputMode="email" placeholder="name@example.com" value={section.email || ''} onChange={(event) => updateSection('contacts', 'email', event.target.value.trim())} />
-          <FileInput label="Образец личной подписи" accept="application/pdf,image/png,image/jpeg" required value={section.signatureFile} uploadFiles={uploadFiles} onChange={(files) => updateSection('contacts', 'signatureFile', files.slice(0, 1))} />
+          <FileInput label="Образец личной подписи" accept="application/pdf,image/png,image/jpeg" required={documentRequired('signature')} value={section.signatureFile} uploadFiles={uploadFiles} onChange={(files) => updateSection('contacts', 'signatureFile', files.slice(0, 1))} />
         </div>
       );
     }
@@ -605,7 +674,7 @@ export default function NewEmployeeOnboardingPage() {
                 const nextRows = [...rows]; nextRows[index] = { ...row, diplomaNumber: event.target.value }; setSection('education', { ...(draft.education || {}), items: nextRows });
               }} />
               <div className="lg:col-span-3">
-                <FileInput label="Диплом / сертификаты" accept="application/pdf,image/png,image/jpeg" multiple required value={row.files} uploadFiles={uploadFiles} onChange={(files) => {
+                <FileInput label="Диплом / сертификаты" accept="application/pdf,image/png,image/jpeg" multiple required={documentRequired('educationDocuments')} value={row.files} uploadFiles={uploadFiles} onChange={(files) => {
                   const nextRows = [...rows]; nextRows[index] = { ...row, files }; setSection('education', { ...(draft.education || {}), items: nextRows });
                 }} />
               </div>
@@ -634,10 +703,10 @@ export default function NewEmployeeOnboardingPage() {
       const section = draft.medical || {};
       return (
         <div className="grid gap-4 lg:grid-cols-2">
-          <FileInput label="Медицинская справка форма 075" accept="application/pdf" required value={section.form075} uploadFiles={uploadFiles} onChange={(files) => updateSection('medical', 'form075', files.slice(0, 1))} />
-          <FileInput label="Справка о несудимости" accept="application/pdf" required value={section.noCriminalRecord} uploadFiles={uploadFiles} onChange={(files) => updateSection('medical', 'noCriminalRecord', files.slice(0, 1))} />
-          <FileInput label="Справка с наркологического диспансера" accept="application/pdf" required value={section.narcology} uploadFiles={uploadFiles} onChange={(files) => updateSection('medical', 'narcology', files.slice(0, 1))} />
-          <FileInput label="Справка с психиатрического диспансера" accept="application/pdf" required value={section.psychiatry} uploadFiles={uploadFiles} onChange={(files) => updateSection('medical', 'psychiatry', files.slice(0, 1))} />
+          <FileInput label="Медицинская справка форма 075" accept="application/pdf" required={documentRequired('form075')} value={section.form075} uploadFiles={uploadFiles} onChange={(files) => updateSection('medical', 'form075', files.slice(0, 1))} />
+          <FileInput label="Справка о несудимости" accept="application/pdf" required={documentRequired('noCriminalRecord')} value={section.noCriminalRecord} uploadFiles={uploadFiles} onChange={(files) => updateSection('medical', 'noCriminalRecord', files.slice(0, 1))} />
+          <FileInput label="Справка с наркологического диспансера" accept="application/pdf" required={documentRequired('narcology')} value={section.narcology} uploadFiles={uploadFiles} onChange={(files) => updateSection('medical', 'narcology', files.slice(0, 1))} />
+          <FileInput label="Справка с психиатрического диспансера" accept="application/pdf" required={documentRequired('psychiatry')} value={section.psychiatry} uploadFiles={uploadFiles} onChange={(files) => updateSection('medical', 'psychiatry', files.slice(0, 1))} />
           <Input label="Группа крови" value={section.bloodType || ''} onChange={(event) => updateSection('medical', 'bloodType', event.target.value)} />
           <Input label="Контактное лицо при экстренном случае" value={section.emergencyContactName || ''} onChange={(event) => updateSection('medical', 'emergencyContactName', event.target.value)} />
           <Input label="Степень родства" value={section.emergencyContactRelation || ''} onChange={(event) => updateSection('medical', 'emergencyContactRelation', event.target.value)} />
@@ -651,7 +720,7 @@ export default function NewEmployeeOnboardingPage() {
       return (
         <div className="space-y-5">
           <Select label="Семейное положение" options={sectionOptions.maritalStatus} value={draft.family?.maritalStatus || ''} onChange={(event) => updateSection('family', 'maritalStatus', event.target.value)} />
-          <FileInput label="Свидетельство о браке / расторжении брака" accept="application/pdf,image/png,image/jpeg" required={draft.family?.maritalStatus === 'Состоит в зарегистрированном браке'} value={draft.family?.marriageFiles} uploadFiles={uploadFiles} onChange={(files) => updateSection('family', 'marriageFiles', files)} />
+          <FileInput label="Свидетельство о браке / расторжении брака" accept="application/pdf,image/png,image/jpeg" required={documentRequired('marriageDocument') && draft.family?.maritalStatus === 'Состоит в зарегистрированном браке'} value={draft.family?.marriageFiles} uploadFiles={uploadFiles} onChange={(files) => updateSection('family', 'marriageFiles', files)} />
           <div className="flex justify-between gap-3">
             <h3 className="font-semibold text-slate-800">Состав семьи</h3>
             <Button type="button" size="sm" onClick={() => setSection('family', { ...(draft.family || {}), members: [...rows, {}] })}>Добавить</Button>
@@ -672,7 +741,7 @@ export default function NewEmployeeOnboardingPage() {
                 />
               ))}
               <div className="lg:col-span-4">
-                <FileInput label="Свидетельство о рождении / документ" accept="application/pdf,image/png,image/jpeg" required value={row.files} uploadFiles={uploadFiles} onChange={(files) => {
+                <FileInput label="Свидетельство о рождении / документ" accept="application/pdf,image/png,image/jpeg" required={documentRequired('familyMemberDocuments')} value={row.files} uploadFiles={uploadFiles} onChange={(files) => {
                   const nextRows = [...rows]; nextRows[index] = { ...row, files }; setSection('family', { ...(draft.family || {}), members: nextRows });
                 }} />
               </div>
@@ -686,6 +755,19 @@ export default function NewEmployeeOnboardingPage() {
       const rows = Array.isArray(draft.work?.items) ? draft.work.items : [];
       return (
         <div className="space-y-5">
+          <div className="rounded-xl border border-primary-100 bg-primary-50/50 p-4">
+            <SearchableField
+              label="Должность, на которую вас принимают *"
+              value={draft.work?.targetPosition || ''}
+              options={positionOptions}
+              onChange={(value) => updateSection('work', 'targetPosition', value)}
+              placeholder="Найдите или укажите должность"
+              allowCustom
+            />
+            <p className="mt-2 text-xs text-slate-500">
+              Выберите должность из данных 1С. Если нужной должности нет, введите точное название по приглашению отдела кадров.
+            </p>
+          </div>
           <div className="flex justify-between gap-3">
             <h3 className="font-semibold text-slate-800">Предыдущие места работы</h3>
             <Button type="button" size="sm" onClick={() => setSection('work', { ...(draft.work || {}), items: [...rows, {}] })}>Добавить</Button>
@@ -713,7 +795,7 @@ export default function NewEmployeeOnboardingPage() {
     if (activeStep.key === 'bank') {
       return (
         <div className="space-y-4">
-          <FileInput label="PDF с банковскими реквизитами Halyk Bank" accept="application/pdf" required value={draft.bank?.halykRequisites} uploadFiles={uploadFiles} onChange={(files) => updateSection('bank', 'halykRequisites', files.slice(0, 1))} />
+          <FileInput label="PDF с банковскими реквизитами Halyk Bank" accept="application/pdf" required={documentRequired('bankRequisites')} value={draft.bank?.halykRequisites} uploadFiles={uploadFiles} onChange={(files) => updateSection('bank', 'halykRequisites', files.slice(0, 1))} />
           <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
             Пока реквизиты принимаются файлом. Если позже понадобится ручной ввод IBAN/BIC, добавим отдельные поля.
           </div>
@@ -868,6 +950,7 @@ export default function NewEmployeeOnboardingPage() {
               {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
               {renderStep()}
+              {renderExtraFields(activeStep.key)}
 
               <div className="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <Button type="button" variant="secondary" onClick={previous} disabled={step === 0 || isSaving} icon={<ArrowLeft className="h-4 w-4" />}>Назад</Button>

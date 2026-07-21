@@ -6,16 +6,29 @@ import {
   Copy,
   ExternalLink,
   Loader2,
+  Plus,
   RefreshCw,
   RotateCcw,
+  Save,
   Send,
+  Settings2,
   ShieldCheck,
+  Trash2,
   UserPlus,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
-import { onboardingApi, type OnboardingInvitation, type OnboardingStatus } from '../../api/onboarding';
+import {
+  onboardingApi,
+  type OnboardingExtraField,
+  type OnboardingExtraFieldSection,
+  type OnboardingExtraFieldType,
+  type OnboardingInvitation,
+  type OnboardingSettings,
+  type OnboardingStatus,
+} from '../../api/onboarding';
+import { useUserRole } from '../../store/authStore';
 
 const statusLabels: Record<OnboardingStatus, string> = {
   CREATED: 'Создано',
@@ -53,6 +66,42 @@ const correctionSections = [
   { value: 'Трудовая деятельность', label: 'Трудовая деятельность' },
   { value: 'Реквизиты', label: 'Реквизиты' },
 ];
+
+const documentRequirementOptions = [
+  ['identityPhoto', 'Фото 3x4'],
+  ['identityDocument', 'Удостоверяющий документ'],
+  ['signature', 'Образец личной подписи'],
+  ['form075', 'Медицинская справка 075'],
+  ['noCriminalRecord', 'Справка о несудимости'],
+  ['narcology', 'Справка из наркологии'],
+  ['psychiatry', 'Справка из психиатрии'],
+  ['marriageDocument', 'Свидетельство о браке'],
+  ['familyMemberDocuments', 'Документы членов семьи'],
+  ['educationDocuments', 'Дипломы и сертификаты'],
+  ['bankRequisites', 'Банковские реквизиты Halyk Bank'],
+] as const;
+
+const extraFieldSections: Array<{ value: OnboardingExtraFieldSection; label: string }> = [
+  { value: 'identity', label: 'Личные данные' },
+  { value: 'documents', label: 'Документы' },
+  { value: 'contacts', label: 'Адреса и контакты' },
+  { value: 'education', label: 'Образование' },
+  { value: 'medical', label: 'Медицинские данные' },
+  { value: 'family', label: 'Семья' },
+  { value: 'work', label: 'Трудовая деятельность' },
+  { value: 'bank', label: 'Реквизиты' },
+];
+
+const extraFieldTypes: Array<{ value: OnboardingExtraFieldType; label: string }> = [
+  { value: 'text', label: 'Одна строка' },
+  { value: 'textarea', label: 'Многострочный текст' },
+  { value: 'date', label: 'Дата' },
+  { value: 'select', label: 'Выпадающий список' },
+  { value: 'checkbox', label: 'Галочка' },
+  { value: 'file', label: 'Файл' },
+];
+
+const emptySettings: OnboardingSettings = { documentRequirements: {}, extraFields: [] };
 
 function normalizeIin(value: string) {
   return value.replace(/\D/g, '').slice(0, 12);
@@ -106,6 +155,7 @@ function FileLink({ files, empty = '-' }: { files?: Array<{ id?: number; name?: 
 }
 
 export default function NewEmployeesPage() {
+  const { isSuperAdmin } = useUserRole();
   const [items, setItems] = useState<OnboardingInvitation[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [form, setForm] = useState({ iin: '', phone: '' });
@@ -114,6 +164,8 @@ export default function NewEmployeesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [settingsMode, setSettingsMode] = useState(false);
+  const [settings, setSettings] = useState<OnboardingSettings>(emptySettings);
 
   const selected = useMemo(() => items.find((item) => item.id === selectedId) || items[0] || null, [items, selectedId]);
 
@@ -121,8 +173,9 @@ export default function NewEmployeesPage() {
     setIsLoading(true);
     setError('');
     try {
-      const data = await onboardingApi.list();
+      const [data, settingsData] = await Promise.all([onboardingApi.list(), onboardingApi.settings()]);
       setItems(data);
+      setSettings(settingsData);
       if (!selectedId && data[0]?.id) setSelectedId(data[0].id);
     } catch (requestError: any) {
       setError(requestError?.response?.data?.error?.message || requestError?.message || 'Не удалось загрузить анкеты');
@@ -183,12 +236,98 @@ export default function NewEmployeesPage() {
     setSuccess('Ссылка скопирована');
   };
 
+  const addExtraField = () => {
+    setSettings((current) => ({
+      ...current,
+      extraFields: [...current.extraFields, {
+        id: `extra-${Date.now()}`,
+        section: 'documents',
+        label: '',
+        type: 'text',
+        required: false,
+        options: [],
+      }],
+    }));
+  };
+
+  const updateExtraField = (id: string, patch: Partial<OnboardingExtraField>) => {
+    setSettings((current) => ({ ...current, extraFields: current.extraFields.map((field) => field.id === id ? { ...field, ...patch } : field) }));
+  };
+
+  const saveSettings = async () => {
+    setError('');
+    setSuccess('');
+    if (settings.extraFields.some((field) => !field.label.trim())) {
+      setError('Укажите название для каждого дополнительного поля');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      setSettings(await onboardingApi.updateSettings(settings));
+      setSuccess('Настройки анкеты сохранены');
+    } catch (requestError: any) {
+      setError(requestError?.response?.data?.error?.message || 'Не удалось сохранить настройки');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const draft = selected?.draft || {};
   const identity = draft.identity || {};
   const contacts = draft.contacts || {};
   const documents = draft.documents || {};
   const medical = draft.medical || {};
   const bank = draft.bank || {};
+
+  if (settingsMode && isSuperAdmin) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase text-primary-600">BPM onboarding</p>
+            <h1 className="text-3xl font-display font-bold text-slate-800">Настройка анкеты</h1>
+            <p className="text-slate-500">Обязательные документы и дополнительные поля для новых сотрудников.</p>
+          </div>
+          <Button type="button" variant="secondary" onClick={() => setSettingsMode(false)}>К анкетам</Button>
+        </div>
+        {error && <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+        {success && <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700">{success}</div>}
+        <section className="rounded-2xl border border-white/70 bg-white/90 p-5 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Обязательность стандартных документов</h2>
+          <p className="mt-1 text-sm text-slate-500">Снятая галочка означает, что файл можно добавить, но без него анкета тоже отправится.</p>
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {documentRequirementOptions.map(([key, label]) => (
+              <label key={key} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+                <input type="checkbox" checked={settings.documentRequirements[key] === true} onChange={(event) => setSettings((current) => ({ ...current, documentRequirements: { ...current.documentRequirements, [key]: event.target.checked } }))} className="h-5 w-5 rounded border-slate-300 text-primary-600" />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </section>
+        <section className="rounded-2xl border border-white/70 bg-white/90 p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div><h2 className="text-lg font-semibold text-slate-900">Дополнительные поля</h2><p className="text-sm text-slate-500">Поля появятся на выбранном этапе анкеты.</p></div>
+            <Button type="button" variant="secondary" onClick={addExtraField} icon={<Plus className="h-4 w-4" />}>Добавить поле</Button>
+          </div>
+          <div className="mt-5 space-y-4">
+            {settings.extraFields.length === 0 && <div className="rounded-lg bg-slate-50 p-5 text-center text-sm text-slate-500">Дополнительных полей пока нет</div>}
+            {settings.extraFields.map((field) => (
+              <div key={field.id} className="grid gap-3 rounded-xl border border-slate-200 p-4 lg:grid-cols-[1.3fr_1fr_1fr_auto]">
+                <Input label="Название" value={field.label} onChange={(event) => updateExtraField(field.id, { label: event.target.value })} placeholder="Например: Размер халата" />
+                <Select label="Раздел" value={field.section} options={extraFieldSections} onChange={(event) => updateExtraField(field.id, { section: event.target.value as OnboardingExtraFieldSection })} />
+                <Select label="Тип поля" value={field.type} options={extraFieldTypes} onChange={(event) => updateExtraField(field.id, { type: event.target.value as OnboardingExtraFieldType })} />
+                <button type="button" title="Удалить поле" onClick={() => setSettings((current) => ({ ...current, extraFields: current.extraFields.filter((item) => item.id !== field.id) }))} className="mt-6 inline-flex h-10 w-10 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"><Trash2 className="h-5 w-5" /></button>
+                <Input label="Подсказка" value={field.placeholder || ''} onChange={(event) => updateExtraField(field.id, { placeholder: event.target.value })} placeholder="Текст внутри поля" />
+                {field.type === 'select' && <Input label="Варианты через запятую" value={(field.options || []).join(', ')} onChange={(event) => updateExtraField(field.id, { options: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} />}
+                <label className="flex items-center gap-3 pt-6 text-sm text-slate-700"><input type="checkbox" checked={field.required} onChange={(event) => updateExtraField(field.id, { required: event.target.checked })} className="h-5 w-5 rounded border-slate-300 text-primary-600" />Обязательно</label>
+              </div>
+            ))}
+          </div>
+        </section>
+        <div className="flex justify-end"><Button type="button" loading={isSubmitting} onClick={saveSettings} icon={<Save className="h-4 w-4" />}>Сохранить настройки</Button></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -198,7 +337,10 @@ export default function NewEmployeesPage() {
           <h1 className="text-3xl font-display font-bold text-slate-800">Новые сотрудники</h1>
           <p className="text-slate-500">Приглашения, проверка анкет и передача утвержденных данных в 1С.</p>
         </div>
-        <Button type="button" variant="secondary" onClick={loadData} icon={<RefreshCw className="h-4 w-4" />}>Обновить</Button>
+        <div className="flex flex-wrap gap-2">
+          {isSuperAdmin && <Button type="button" variant="secondary" onClick={() => setSettingsMode(true)} icon={<Settings2 className="h-4 w-4" />}>Настройки анкеты</Button>}
+          <Button type="button" variant="secondary" onClick={loadData} icon={<RefreshCw className="h-4 w-4" />}>Обновить</Button>
+        </div>
       </div>
 
       {error && <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</div>}
@@ -277,6 +419,7 @@ export default function NewEmployeesPage() {
                 <SummaryRow label="Дата рождения" value={identity.birthDate} />
                 <SummaryRow label="Документ" value={documents.documentNumber} />
                 <SummaryRow label="Email" value={contacts.email} />
+                <SummaryRow label="Должность приема" value={draft.work?.targetPosition} />
               </div>
 
               <div className="grid gap-4 lg:grid-cols-2">
@@ -319,6 +462,14 @@ export default function NewEmployeesPage() {
                   </div>
                 </div>
                 <div className="rounded-xl border border-slate-200 p-4">
+                  <h3 className="font-semibold text-slate-900">Трудоустройство</h3>
+                  <div className="mt-3 grid gap-2 text-sm text-slate-600">
+                    <p>Должность приема: {draft.work?.targetPosition || '-'}</p>
+                    <p>Предыдущих мест работы: {Array.isArray(draft.work?.items) ? draft.work.items.length : 0}</p>
+                    <p>Дополнительные сведения: {draft.work?.awards || '-'}</p>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-4">
                   <h3 className="font-semibold text-slate-900">Банк и финал</h3>
                   <div className="mt-3 grid gap-2 text-sm text-slate-600">
                     <p>Halyk PDF: <FileLink files={bank.halykRequisites} /></p>
@@ -327,6 +478,25 @@ export default function NewEmployeesPage() {
                   </div>
                 </div>
               </div>
+
+              {settings.extraFields.length > 0 && (
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <h3 className="font-semibold text-slate-900">Дополнительные сведения</h3>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    {settings.extraFields.map((field) => {
+                      const value = draft.extraFields?.[field.id];
+                      return (
+                        <div key={field.id} className="rounded-lg bg-slate-50 p-3 text-sm">
+                          <p className="text-xs uppercase text-slate-400">{field.label}</p>
+                          <div className="mt-1 font-medium text-slate-800">
+                            {field.type === 'file' ? <FileLink files={value} /> : field.type === 'checkbox' ? (value ? 'Да' : 'Нет') : (value || '-')}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               <details className="rounded-xl border border-slate-200">
                 <summary className="cursor-pointer px-4 py-3 font-medium text-slate-800">Полный черновик анкеты</summary>

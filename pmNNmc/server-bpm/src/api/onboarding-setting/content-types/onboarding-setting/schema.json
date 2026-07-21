@@ -1,0 +1,19 @@
+{
+  "kind": "singleType",
+  "collectionName": "onboarding_settings",
+  "info": {
+    "singularName": "onboarding-setting",
+    "pluralName": "onboarding-settings",
+    "displayName": "Onboarding Settings",
+    "description": "Configurable requirements and extra fields for employee onboarding"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "config": {
+      "type": "json"
+    }
+  }
+}

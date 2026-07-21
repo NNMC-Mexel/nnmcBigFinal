@@ -15,6 +15,12 @@
       "type": "string",
       "required": true
     },
+    "shortDescription": {
+      "type": "string"
+    },
+    "description": {
+      "type": "text"
+    },
     "deadline": {
       "type": "date"
     },

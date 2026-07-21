@@ -68,6 +68,8 @@ function sanitizeTasks(tasks: any): any[] {
     .map((task, index) => ({
       order: Number(task?.order ?? index + 1),
       title: String(task?.title || '').trim(),
+      shortDescription: String(task?.shortDescription || '').trim() || null,
+      description: String(task?.description || '').trim() || null,
       deadline: task?.deadline || null,
       responsibleId:
         task?.responsibleId == null || task?.responsibleId === ''
@@ -76,6 +78,16 @@ function sanitizeTasks(tasks: any): any[] {
       fact: String(task?.fact || '').trim() || null,
     }))
     .filter((t) => t.title.length > 0);
+}
+
+function restrictTasksToAttendees(tasks: any[], attendeeIds: number[]): any[] {
+  const allowed = new Set(attendeeIds.map(Number));
+  return tasks.map((task) => ({
+    ...task,
+    responsibleId: task.responsibleId != null && allowed.has(Number(task.responsibleId))
+      ? Number(task.responsibleId)
+      : null,
+  }));
 }
 
 function describeChanges(before: any, after: any): string[] {
@@ -132,6 +144,8 @@ async function buildPdfDataFromProtocol(strapiInstance: any, protocol: any): Pro
     tasks: (protocol.tasks || []).map((t: any, index: number) => ({
       order: t.order ?? index + 1,
       title: t.title,
+      shortDescription: t.shortDescription,
+      description: t.description,
       deadline: t.deadline,
       responsibleId: t.responsibleId,
       responsibleName: t.responsibleId ? userLabel(respMap.get(Number(t.responsibleId))) : '',
@@ -314,7 +328,7 @@ export default {
 
     const fullUser = await loadFullUser(strapi, user.id);
     const attendees = uniqIds(body.attendees || []);
-    const tasks = sanitizeTasks(body.tasks);
+    const tasks = restrictTasksToAttendees(sanitizeTasks(body.tasks), attendees);
     const responsibles = extractResponsibleIds(tasks);
 
     try {
@@ -378,6 +392,7 @@ export default {
 
     const body: any = (ctx.request.body as any)?.data || (ctx.request.body as any) || {};
     const wasPublished = protocol.status === 'published';
+    const isAutosave = body.autosave === true && !wasPublished;
 
     const beforeSnapshot = {
       theme: protocol.theme,
@@ -392,13 +407,16 @@ export default {
     if (!theme) return ctx.badRequest('Тема обязательна');
 
     const newAttendees = body.attendees != null ? uniqIds(body.attendees) : (protocol.attendees || []).map((a: any) => Number(a.id));
-    const newTasks = body.tasks != null ? sanitizeTasks(body.tasks) : (protocol.tasks || []).map((t: any) => ({
+    const newTasksRaw = body.tasks != null ? sanitizeTasks(body.tasks) : (protocol.tasks || []).map((t: any) => ({
       order: t.order,
       title: t.title,
+      shortDescription: t.shortDescription,
+      description: t.description,
       deadline: t.deadline,
       responsibleId: t.responsibleId,
       fact: t.fact,
     }));
+    const newTasks = restrictTasksToAttendees(newTasksRaw, newAttendees);
     const responsibles = extractResponsibleIds(newTasks);
 
     const afterSnapshot = {
@@ -414,7 +432,7 @@ export default {
     const willBumpVersion = wasPublished && changes.length > 0;
     const newVersion = willBumpVersion ? (protocol.version || 1) + 1 : protocol.version || 1;
 
-    const historyEntry = changes.length > 0
+    const historyEntry = changes.length > 0 && !isAutosave
       ? {
           timestamp: new Date().toISOString(),
           userId: user.id,
@@ -447,7 +465,7 @@ export default {
       await regeneratePdf(strapi, Number(ctx.params.id));
     }
 
-    if (wasPublished && addedAttendees.length > 0) {
+    if (wasPublished && addedAttendees.length > 0 && !isAutosave) {
       await notifyUsers(
         strapi,
         addedAttendees,
