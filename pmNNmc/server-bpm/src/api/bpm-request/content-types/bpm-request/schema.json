@@ -66,6 +66,7 @@
         "ACCOUNTING_REVIEW",
         "ONEC_PENDING",
         "ONEC_SENT",
+        "RETURNED",
         "COMPLETED",
         "REJECTED",
         "CANCELLED"
@@ -75,6 +76,35 @@
     },
     "workflowStage": {
       "type": "string"
+    },
+    "workflowVersion": {
+      "type": "string",
+      "default": "2.0"
+    },
+    "workflowSnapshot": {
+      "type": "json",
+      "default": []
+    },
+    "currentStepIndex": {
+      "type": "integer",
+      "default": 0
+    },
+    "currentStepKey": {
+      "type": "string"
+    },
+    "currentActorRole": {
+      "type": "string"
+    },
+    "returnedFromStatus": {
+      "type": "string"
+    },
+    "lastDecisionComment": {
+      "type": "text"
+    },
+    "revision": {
+      "type": "integer",
+      "default": 1,
+      "min": 1
     },
     "employeeIin": {
       "type": "string",
@@ -110,6 +140,11 @@
     },
     "managerDepartment": {
       "type": "string"
+    },
+    "managerUser": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
     },
     "signingDirectorName": {
       "type": "string"
@@ -164,6 +199,14 @@
     },
     "onecError": {
       "type": "text"
+    },
+    "integrationAttemptCount": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "lastIntegrationAttemptAt": {
+      "type": "datetime"
     },
     "submittedAt": {
       "type": "datetime"

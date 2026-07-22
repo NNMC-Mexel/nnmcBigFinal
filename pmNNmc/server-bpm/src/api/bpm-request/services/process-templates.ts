@@ -32,6 +32,58 @@ export type BpmProcessTemplate = {
   fields: BpmProcessField[];
 };
 
+export type BpmWorkflowRole = 'MANAGER' | 'HR' | 'ACCOUNTING' | 'ONEC';
+
+export type BpmWorkflowStep = {
+  key: string;
+  status: 'MANAGER_REVIEW' | 'HR_REVIEW' | 'ACCOUNTING_REVIEW' | 'ONEC_PENDING';
+  title: string;
+  role: BpmWorkflowRole;
+};
+
+export const BPM_WORKFLOW_VERSION = '2.0';
+
+const MANAGER_STEP: BpmWorkflowStep = {
+  key: 'manager-review',
+  status: 'MANAGER_REVIEW',
+  title: 'Согласование руководителем',
+  role: 'MANAGER',
+};
+const HR_STEP: BpmWorkflowStep = {
+  key: 'hr-review',
+  status: 'HR_REVIEW',
+  title: 'Проверка отделом кадров',
+  role: 'HR',
+};
+const ACCOUNTING_STEP: BpmWorkflowStep = {
+  key: 'accounting-review',
+  status: 'ACCOUNTING_REVIEW',
+  title: 'Проверка бухгалтерией',
+  role: 'ACCOUNTING',
+};
+const ONEC_STEP: BpmWorkflowStep = {
+  key: 'onec-transfer',
+  status: 'ONEC_PENDING',
+  title: 'Готово к передаче в 1С',
+  role: 'ONEC',
+};
+
+function cloneSteps(steps: BpmWorkflowStep[]): BpmWorkflowStep[] {
+  return steps.map((step) => ({ ...step }));
+}
+
+export function getProcessWorkflow(templateOrCode: BpmProcessTemplate | string): BpmWorkflowStep[] {
+  const code = typeof templateOrCode === 'string' ? templateOrCode : templateOrCode.code;
+  if (code === 'PHYSICAL_PERSON') return cloneSteps([HR_STEP, ONEC_STEP]);
+  if (code === 'HIRING' || code === 'CHILDCARE_RETURN') {
+    return cloneSteps([HR_STEP, ACCOUNTING_STEP, ONEC_STEP]);
+  }
+  if (code === 'TIMESHEET' || code === 'SCHEDULE_CHANGE') {
+    return cloneSteps([MANAGER_STEP, HR_STEP, ONEC_STEP]);
+  }
+  return cloneSteps([MANAGER_STEP, HR_STEP, ACCOUNTING_STEP, ONEC_STEP]);
+}
+
 const dateRangeFields: BpmProcessField[] = [
   { key: 'datestart', label: 'Дата начала', type: 'date', required: true },
   { key: 'dateend', label: 'Дата окончания', type: 'date', required: true },

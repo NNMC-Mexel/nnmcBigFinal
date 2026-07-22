@@ -4,6 +4,7 @@ import {
   BPM_PROCESS_TEMPLATES,
   ONEC_REFERENCE_TYPES,
   buildOneCPayload,
+  getProcessWorkflow,
   getProcessTemplate,
   validateProcessData,
 } from '../src/api/bpm-request/services/process-templates';
@@ -20,6 +21,27 @@ test('contains all 17 document integration types without duplicates', () => {
 test('keeps reference type namespace separate from document types', () => {
   assert.deepEqual(ONEC_REFERENCE_TYPES.map((item) => item.type), [1, 2, 3, 4, 5]);
   assert.equal(ONEC_REFERENCE_TYPES[0].code, 'DEPARTMENT');
+});
+
+test('uses process-specific approval routes before 1C', () => {
+  assert.deepEqual(
+    getProcessWorkflow('PHYSICAL_PERSON').map((step) => step.role),
+    ['HR', 'ONEC']
+  );
+  assert.deepEqual(
+    getProcessWorkflow('TIMESHEET').map((step) => step.role),
+    ['MANAGER', 'HR', 'ONEC']
+  );
+  assert.deepEqual(
+    getProcessWorkflow('VACATION').map((step) => step.role),
+    ['MANAGER', 'HR', 'ACCOUNTING', 'ONEC']
+  );
+});
+
+test('returns a detached workflow snapshot for every request', () => {
+  const first = getProcessWorkflow('VACATION');
+  first[0].title = 'changed locally';
+  assert.equal(getProcessWorkflow('VACATION')[0].title, 'Согласование руководителем');
 });
 
 test('builds vacation payload using the exact 1C field names and date format', () => {

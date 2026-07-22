@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ArrowRight,
   ArrowRightLeft,
+  Ban,
   Briefcase,
   CalendarDays,
   CheckCircle2,
@@ -14,6 +15,7 @@ import {
   Loader2,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   Send,
   Timer,
@@ -22,6 +24,8 @@ import {
   UserPlus,
   UserRound,
   Users,
+  X,
+  XCircle,
 } from 'lucide-react';
 import {
   bpmRequestsApi,
@@ -42,6 +46,7 @@ const statusLabels: Record<BpmRequestStatus, string> = {
   ACCOUNTING_REVIEW: 'В бухгалтерии',
   ONEC_PENDING: 'Ожидает 1С',
   ONEC_SENT: 'Передано в 1С',
+  RETURNED: 'На исправлении',
   COMPLETED: 'Завершено',
   REJECTED: 'Отклонено',
   CANCELLED: 'Отозвано',
@@ -55,6 +60,7 @@ const statusClass: Record<BpmRequestStatus, string> = {
   ACCOUNTING_REVIEW: 'bg-cyan-100 text-cyan-700',
   ONEC_PENDING: 'bg-orange-100 text-orange-700',
   ONEC_SENT: 'bg-teal-100 text-teal-700',
+  RETURNED: 'bg-amber-100 text-amber-800',
   COMPLETED: 'bg-emerald-100 text-emerald-700',
   REJECTED: 'bg-red-100 text-red-700',
   CANCELLED: 'bg-slate-100 text-slate-500',
@@ -62,9 +68,17 @@ const statusClass: Record<BpmRequestStatus, string> = {
 
 const categoryLabels = { ALL: 'Все', EMPLOYEE: 'Сотруднику', HR: 'Кадры', TIME: 'Рабочее время' } as const;
 type CategoryFilter = keyof typeof categoryLabels;
-const terminalStatuses = new Set<BpmRequestStatus>(['COMPLETED', 'REJECTED', 'CANCELLED']);
-const advanceableStatuses = new Set<BpmRequestStatus>(['DRAFT', 'SUBMITTED', 'MANAGER_REVIEW', 'HR_REVIEW', 'ACCOUNTING_REVIEW', 'ONEC_SENT']);
-const historyFilters: Array<'ALL' | BpmRequestStatus> = ['ALL', 'SUBMITTED', 'MANAGER_REVIEW', 'HR_REVIEW', 'ACCOUNTING_REVIEW', 'ONEC_PENDING', 'ONEC_SENT', 'COMPLETED', 'REJECTED'];
+const historyFilters: Array<'ALL' | BpmRequestStatus> = ['ALL', 'MANAGER_REVIEW', 'HR_REVIEW', 'ACCOUNTING_REVIEW', 'RETURNED', 'ONEC_PENDING', 'ONEC_SENT', 'COMPLETED', 'REJECTED'];
+
+const roleLabels = {
+  MANAGER: 'Руководитель',
+  HR: 'Отдел кадров',
+  ACCOUNTING: 'Бухгалтерия',
+  ONEC: 'Передача в 1С',
+} as const;
+
+type DecisionKind = 'return' | 'reject' | 'cancel';
+type PendingDecision = { request: BpmRequest; kind: DecisionKind } | null;
 
 const typeIcons: Partial<Record<BpmRequestType, LucideIcon>> = {
   PHYSICAL_PERSON: UserRound,
@@ -204,11 +218,17 @@ export default function BpmMyRequestsPage() {
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [comment, setComment] = useState('');
   const [canReview, setCanReview] = useState(false);
-  const [canAdvance, setCanAdvance] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [advancingId, setAdvancingId] = useState<number | null>(null);
   const [sendingOneCId, setSendingOneCId] = useState<number | null>(null);
+  const [pendingDecision, setPendingDecision] = useState<PendingDecision>(null);
+  const [decisionReason, setDecisionReason] = useState('');
+  const [decisionLoading, setDecisionLoading] = useState(false);
+  const [correctionRequest, setCorrectionRequest] = useState<BpmRequest | null>(null);
+  const [correctionData, setCorrectionData] = useState<Record<string, unknown>>({});
+  const [correctionComment, setCorrectionComment] = useState('');
+  const [correctionLoading, setCorrectionLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [activeStatus, setActiveStatus] = useState<'ALL' | BpmRequestStatus>('ALL');
@@ -222,6 +242,7 @@ export default function BpmMyRequestsPage() {
   }, [activeCard, selectedPersonnelNumber, workplaces]);
   const visibleTemplates = useMemo(() => templates.filter((item) => category === 'ALL' || item.category === category), [category, templates]);
   const filteredRequests = useMemo(() => activeStatus === 'ALL' ? requests : requests.filter((request) => request.status === activeStatus), [activeStatus, requests]);
+  const hasManagerInbox = useMemo(() => requests.some((request) => request.availableActions?.actorRole === 'MANAGER' && request.availableActions.advance), [requests]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -235,7 +256,6 @@ export default function BpmMyRequestsPage() {
       setTemplates(types);
       setRequests(list.data);
       setCanReview(list.canReview);
-      setCanAdvance(list.canAdvance);
       setSelfCard(card);
       const current = types.find((item) => item.code === selectedType && item.enabled) || types.find((item) => item.enabled) || null;
       if (current) {
@@ -348,10 +368,60 @@ export default function BpmMyRequestsPage() {
     } finally { setSendingOneCId(null); }
   };
 
-  const canSendRequestToOneC = (request: BpmRequest) => canReview && (
-    request.status === 'ACCOUNTING_REVIEW' || request.status === 'ONEC_PENDING' ||
-    (canAdvance && (request.status === 'ONEC_SENT' || request.status === 'COMPLETED') && !request.onecDocumentNumber)
-  );
+  const openDecision = (request: BpmRequest, kind: DecisionKind) => {
+    setPendingDecision({ request, kind });
+    setDecisionReason('');
+  };
+
+  const submitDecision = async () => {
+    if (!pendingDecision || decisionReason.trim().length < 3) return;
+    setDecisionLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const { request, kind } = pendingDecision;
+      const updated = kind === 'return'
+        ? await bpmRequestsApi.returnForCorrection(request.id, decisionReason.trim())
+        : kind === 'reject'
+          ? await bpmRequestsApi.reject(request.id, decisionReason.trim())
+          : await bpmRequestsApi.cancel(request.id, decisionReason.trim());
+      replaceRequest(updated);
+      setPendingDecision(null);
+      setSuccess(`Заявка ${updated.requestNumber}: ${statusLabels[updated.status]}`);
+    } catch (requestError: any) {
+      setError(requestError?.response?.data?.error?.message || requestError?.message || 'Не удалось выполнить действие');
+    } finally {
+      setDecisionLoading(false);
+    }
+  };
+
+  const openCorrection = (request: BpmRequest) => {
+    const template = templates.find((item) => item.code === request.type);
+    setCorrectionRequest(request);
+    setCorrectionData({ ...initialData(template), ...(request.processData || {}) });
+    setCorrectionComment('');
+  };
+
+  const submitCorrection = async () => {
+    if (!correctionRequest) return;
+    setCorrectionLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const updated = await bpmRequestsApi.resubmit(correctionRequest.id, correctionData, correctionComment.trim());
+      replaceRequest(updated);
+      setCorrectionRequest(null);
+      setSuccess(`Заявка ${updated.requestNumber} исправлена и повторно отправлена`);
+    } catch (requestError: any) {
+      setError(requestError?.response?.data?.error?.message || requestError?.message || 'Не удалось повторно отправить заявку');
+    } finally {
+      setCorrectionLoading(false);
+    }
+  };
+
+  const correctionTemplate = correctionRequest
+    ? templates.find((item) => item.code === correctionRequest.type) || null
+    : null;
 
   if (isLoading) return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-teal-600" /></div>;
 
@@ -360,8 +430,8 @@ export default function BpmMyRequestsPage() {
       <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="mb-1 text-xs font-semibold uppercase text-teal-600">BPM</p>
-          <h1 className="text-2xl font-bold text-slate-900">{canReview ? 'Центр бизнес-процессов' : 'Мои заявки'}</h1>
-          <p className="mt-1 text-sm text-slate-500">{canReview ? 'Кадровые документы, рабочее время и передача в 1С.' : 'Создание заявок и контроль маршрута согласования.'}</p>
+          <h1 className="text-2xl font-bold text-slate-900">{canReview ? 'Центр бизнес-процессов' : hasManagerInbox ? 'Мои и назначенные заявки' : 'Мои заявки'}</h1>
+          <p className="mt-1 text-sm text-slate-500">{canReview ? 'Кадровые документы, рабочее время и передача в 1С.' : hasManagerInbox ? 'Ваши заявки и документы, где вы назначены согласующим.' : 'Создание заявок и контроль маршрута согласования.'}</p>
         </div>
         <button type="button" onClick={() => void loadData()} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
           <RefreshCw className="h-4 w-4" /> Обновить
@@ -441,18 +511,112 @@ export default function BpmMyRequestsPage() {
         <aside className="rounded-lg border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 p-4"><h2 className="text-lg font-bold text-slate-900">История заявок</h2><p className="text-sm text-slate-500">{canReview ? 'Все BPM заявки и текущий маршрут' : 'Ваши заявки и текущий маршрут'}</p><div className="mt-3 flex flex-wrap gap-2">{historyFilters.map((status) => <button key={status} type="button" onClick={() => setActiveStatus(status)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${activeStatus === status ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>{status === 'ALL' ? 'Все' : statusLabels[status]}</button>)}</div></div>
           <div className="max-h-[760px] divide-y divide-slate-100 overflow-auto">
-            {filteredRequests.length === 0 ? <div className="p-6 text-center text-sm text-slate-500">Заявок пока нет</div> : filteredRequests.map((request) => (
-              <div key={request.id} className="p-4">
-                <div className="mb-2 flex items-start justify-between gap-3"><div><p className="font-mono text-sm font-bold text-teal-700">{request.requestNumber}</p><p className="font-semibold text-slate-900">{request.title}</p></div><span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold ${statusClass[request.status]}`}>{statusLabels[request.status] || request.status}</span></div>
-                <div className="space-y-1 text-sm text-slate-600">{canReview ? <p><span className="font-semibold text-slate-700">{request.employeeName || 'Без сотрудника'}</span>{request.employeeDepartment ? ` · ${request.employeeDepartment}` : ''}</p> : null}{request.startDate ? <p>{formatDate(request.startDate)}{request.endDate ? ` - ${formatDate(request.endDate)}` : ''}{request.days ? ` · ${request.days} дн.` : ''}</p> : <p>Тип интеграции 1С: {request.integrationType || '—'}</p>}<p>{request.workflowStage || 'Маршрут формируется'}</p><p className="text-xs text-slate-400">Создано: {formatDate(request.createdAt || request.submittedAt)}</p></div>
-                {canReview && (request.onecError || request.onecDocumentNumber) ? <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{request.onecDocumentNumber ? <p>Документ 1С: {request.onecDocumentNumber}</p> : null}{request.onecError ? <p className="text-red-600">1С: {request.onecError}</p> : null}</div> : null}
-                {canReview && request.history?.length ? <div className="mt-3 space-y-1 border-l border-slate-200 pl-3 text-xs text-slate-500">{request.history.slice(-3).map((item, index) => <p key={`${item.at}-${index}`}><span className="font-medium text-slate-600">{item.label || item.action}</span>{item.at ? ` · ${formatDate(item.at)}` : ''}</p>)}</div> : null}
-                {canReview ? <div className="mt-3 flex flex-wrap gap-2">{canSendRequestToOneC(request) ? <button type="button" onClick={() => void sendRequestToOneC(request)} disabled={sendingOneCId === request.id} className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-60">{sendingOneCId === request.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}Передать в 1С</button> : null}{canAdvance && !terminalStatuses.has(request.status) && advanceableStatuses.has(request.status) ? <button type="button" onClick={() => void advanceRequest(request)} disabled={advancingId === request.id} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60">{advancingId === request.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}Далее</button> : null}</div> : null}
-              </div>
-            ))}
+            {filteredRequests.length === 0 ? <div className="p-6 text-center text-sm text-slate-500">Заявок пока нет</div> : filteredRequests.map((request) => {
+              const actions = request.availableActions;
+              return (
+                <div key={request.id} className="p-4">
+                  <div className="mb-2 flex items-start justify-between gap-3">
+                    <div><p className="font-mono text-sm font-bold text-teal-700">{request.requestNumber}</p><p className="font-semibold text-slate-900">{request.title}</p></div>
+                    <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold ${statusClass[request.status]}`}>{statusLabels[request.status] || request.status}</span>
+                  </div>
+                  <div className="space-y-1 text-sm text-slate-600">
+                    {request.employeeName ? <p><span className="font-semibold text-slate-700">{request.employeeName}</span>{request.employeeDepartment ? ` · ${request.employeeDepartment}` : ''}</p> : null}
+                    {request.startDate ? <p>{formatDate(request.startDate)}{request.endDate ? ` - ${formatDate(request.endDate)}` : ''}{request.days ? ` · ${request.days} дн.` : ''}</p> : <p>Тип интеграции 1С: {request.integrationType || '—'}</p>}
+                    <p>{request.workflowStage || 'Маршрут формируется'}</p>
+                    <p className="text-xs text-slate-400">Ревизия {request.revision || 1} · создано {formatDate(request.createdAt || request.submittedAt)}</p>
+                  </div>
+
+                  {canReview && request.currentActorRole === 'MANAGER' && !request.managerUserId ? (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      У подразделения не назначен BPM-руководитель. До назначения этап может обработать супер-администратор.
+                    </div>
+                  ) : null}
+
+                  {request.workflowSnapshot?.length ? (
+                    <div className="mt-3 space-y-1.5 rounded-lg bg-slate-50 p-3">
+                      {request.workflowSnapshot.map((step, index) => {
+                        const current = index === request.currentStepIndex && !['ONEC_SENT', 'COMPLETED', 'REJECTED', 'CANCELLED'].includes(request.status);
+                        const passed = index < (request.currentStepIndex ?? 0) || request.status === 'ONEC_SENT' || request.status === 'COMPLETED';
+                        return (
+                          <div key={step.key} className="flex items-center gap-2 text-xs">
+                            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${current ? 'bg-amber-500 ring-2 ring-amber-200' : passed ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                            <span className={current ? 'font-semibold text-slate-800' : 'text-slate-500'}>{step.title}</span>
+                            <span className="ml-auto text-[10px] text-slate-400">{roleLabels[step.role]}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
+                  {(request.onecError || request.onecDocumentNumber) ? <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">{request.onecDocumentNumber ? <p>Документ 1С: {request.onecDocumentNumber}</p> : null}{request.onecError ? <p className="text-red-600">1С: {request.onecError}</p> : null}{request.integrationAttemptCount ? <p className="mt-1 text-slate-400">Попыток передачи: {request.integrationAttemptCount}</p> : null}</div> : null}
+                  {request.lastDecisionComment ? <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"><span className="font-semibold">Комментарий: </span>{request.lastDecisionComment}</div> : null}
+                  {request.history?.length ? <div className="mt-3 space-y-2 border-l border-slate-200 pl-3 text-xs text-slate-500">{request.history.slice(-5).map((item, index) => <div key={`${item.at}-${index}`}><p><span className="font-medium text-slate-600">{item.label || item.action}</span>{item.by ? ` · ${item.by}` : ''}{item.at ? ` · ${formatDate(item.at)}` : ''}</p>{item.comment ? <p className="mt-0.5 text-slate-600">{item.comment}</p> : null}</div>)}</div> : null}
+
+                  {actions && Object.entries(actions).some(([key, value]) => key !== 'actorRole' && value === true) ? (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+                      {actions.sendToOneC ? <button type="button" onClick={() => void sendRequestToOneC(request)} disabled={sendingOneCId === request.id} className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-60">{sendingOneCId === request.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}Передать в 1С</button> : null}
+                      {actions.advance ? <button type="button" onClick={() => void advanceRequest(request)} disabled={advancingId === request.id} className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60">{advancingId === request.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}Согласовать и далее</button> : null}
+                      {actions.returnForCorrection ? <button type="button" onClick={() => openDecision(request, 'return')} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-50"><RotateCcw className="h-3.5 w-3.5" />На исправление</button> : null}
+                      {actions.reject ? <button type="button" onClick={() => openDecision(request, 'reject')} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"><XCircle className="h-3.5 w-3.5" />Отклонить</button> : null}
+                      {actions.cancel ? <button type="button" onClick={() => openDecision(request, 'cancel')} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"><Ban className="h-3.5 w-3.5" />Отозвать</button> : null}
+                      {actions.resubmit ? <button type="button" onClick={() => openCorrection(request)} className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-700"><RotateCcw className="h-3.5 w-3.5" />Исправить и отправить</button> : null}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
         </aside>
       </section>
+
+      {pendingDecision ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
+            <div className="flex items-start justify-between border-b border-slate-100 p-4">
+              <div>
+                <h2 className="font-bold text-slate-900">
+                  {pendingDecision.kind === 'return' ? 'Возврат на исправление' : pendingDecision.kind === 'reject' ? 'Отклонение заявки' : 'Отзыв заявки'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">{pendingDecision.request.requestNumber}</p>
+              </div>
+              <button type="button" title="Закрыть" onClick={() => setPendingDecision(null)} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="p-4">
+              <label className="space-y-1.5"><span className="text-sm font-medium text-slate-700">Причина *</span><textarea autoFocus rows={5} value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} placeholder="Опишите решение, чтобы оно сохранилось в истории" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100" /></label>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-slate-100 p-4">
+              <button type="button" onClick={() => setPendingDecision(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Отмена</button>
+              <button type="button" onClick={() => void submitDecision()} disabled={decisionReason.trim().length < 3 || decisionLoading} className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${pendingDecision.kind === 'reject' ? 'bg-red-600 hover:bg-red-700' : pendingDecision.kind === 'return' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-slate-700 hover:bg-slate-800'}`}>{decisionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Подтвердить</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {correctionRequest && correctionTemplate ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="dialog" aria-modal="true">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-auto rounded-lg bg-white shadow-xl">
+            <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-100 bg-white p-4">
+              <div><h2 className="font-bold text-slate-900">Исправление заявки</h2><p className="mt-1 text-sm text-slate-500">{correctionRequest.requestNumber} · {correctionTemplate.title}</p></div>
+              <button type="button" title="Закрыть" onClick={() => setCorrectionRequest(null)} className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="p-5">
+              {correctionRequest.lastDecisionComment ? <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"><span className="font-semibold">Причина возврата: </span>{correctionRequest.lastDecisionComment}</div> : null}
+              <div className="grid gap-4 md:grid-cols-2">
+                {correctionTemplate.fields.map((field) => {
+                  if (field.key === 'AdditionalVacation' && correctionData.additional !== true) return null;
+                  if (field.type === 'repeater') return <RepeaterField key={field.key} field={field} value={correctionData[field.key]} onChange={(value) => setCorrectionData((current) => ({ ...current, [field.key]: value }))} />;
+                  return <label key={field.key} className={`space-y-1.5 ${field.type === 'textarea' ? 'md:col-span-2' : ''}`}><span className="text-sm font-medium text-slate-700">{field.label}{field.required ? ' *' : ''}</span><FieldControl field={field} value={correctionData[field.key]} onChange={(value) => setCorrectionData((current) => ({ ...current, [field.key]: value }))} /></label>;
+                })}
+                <label className="space-y-1.5 md:col-span-2"><span className="text-sm font-medium text-slate-700">Комментарий к исправлению</span><textarea rows={3} value={correctionComment} onChange={(event) => setCorrectionComment(event.target.value)} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100" /></label>
+              </div>
+            </div>
+            <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-100 bg-white p-4">
+              <button type="button" onClick={() => setCorrectionRequest(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">Отмена</button>
+              <button type="button" onClick={() => void submitCorrection()} disabled={correctionLoading} className="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50">{correctionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Отправить повторно</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

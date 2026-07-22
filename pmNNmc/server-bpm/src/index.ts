@@ -16,6 +16,10 @@ const AUTHENTICATED_PERMISSIONS: Record<string, string[]> = {
     'syncReference',
     'vacationBalance',
     'advance',
+    'returnForCorrection',
+    'reject',
+    'cancel',
+    'resubmit',
   ],
   'api::employee-card.employee-card': ['find', 'findOne', 'me', 'sync', 'syncStatus'],
   'api::onboarding.onboarding': [

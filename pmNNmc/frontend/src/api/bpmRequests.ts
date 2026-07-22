@@ -30,6 +30,7 @@ export type BpmRequestStatus =
   | 'ACCOUNTING_REVIEW'
   | 'ONEC_PENDING'
   | 'ONEC_SENT'
+  | 'RETURNED'
   | 'COMPLETED'
   | 'REJECTED'
   | 'CANCELLED';
@@ -70,6 +71,19 @@ export interface BpmRequest {
   title: string;
   status: BpmRequestStatus;
   workflowStage?: string;
+  workflowVersion?: string;
+  workflowSnapshot?: Array<{
+    key: string;
+    status: 'MANAGER_REVIEW' | 'HR_REVIEW' | 'ACCOUNTING_REVIEW' | 'ONEC_PENDING';
+    title: string;
+    role: 'MANAGER' | 'HR' | 'ACCOUNTING' | 'ONEC';
+  }>;
+  currentStepIndex?: number;
+  currentStepKey?: string;
+  currentActorRole?: 'MANAGER' | 'HR' | 'ACCOUNTING' | 'ONEC';
+  returnedFromStatus?: string;
+  lastDecisionComment?: string;
+  revision?: number;
   employeeIin?: string;
   employeeName?: string;
   employeePosition?: string;
@@ -78,6 +92,7 @@ export interface BpmRequest {
   employeePersonnelNumber?: string;
   managerName?: string;
   managerPosition?: string;
+  managerUserId?: number | null;
   vacationType?: string;
   startDate?: string;
   endDate?: string;
@@ -89,11 +104,30 @@ export interface BpmRequest {
   onecDocumentNumber?: string | null;
   onecResponse?: Record<string, unknown> | null;
   onecError?: string | null;
+  integrationAttemptCount?: number;
+  lastIntegrationAttemptAt?: string | null;
   submittedAt?: string;
   completedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
-  history?: Array<{ at?: string; by?: string; action?: string; label?: string }>;
+  history?: Array<{
+    at?: string;
+    by?: string;
+    action?: string;
+    label?: string;
+    fromStatus?: string | null;
+    toStatus?: string | null;
+    comment?: string;
+  }>;
+  availableActions?: {
+    advance: boolean;
+    returnForCorrection: boolean;
+    reject: boolean;
+    cancel: boolean;
+    resubmit: boolean;
+    sendToOneC: boolean;
+    actorRole?: 'MANAGER' | 'HR' | 'ACCOUNTING' | 'ONEC' | null;
+  };
 }
 
 export const bpmRequestsApi = {
@@ -136,8 +170,28 @@ export const bpmRequestsApi = {
     return response.data.data;
   },
 
-  advance: async (id: number | string): Promise<BpmRequest> => {
-    const response = await bpmClient.post(`/bpm-requests/${id}/advance`);
+  advance: async (id: number | string, comment?: string): Promise<BpmRequest> => {
+    const response = await bpmClient.post(`/bpm-requests/${id}/advance`, { comment });
+    return response.data.data;
+  },
+
+  returnForCorrection: async (id: number | string, reason: string): Promise<BpmRequest> => {
+    const response = await bpmClient.post(`/bpm-requests/${id}/return`, { reason });
+    return response.data.data;
+  },
+
+  reject: async (id: number | string, reason: string): Promise<BpmRequest> => {
+    const response = await bpmClient.post(`/bpm-requests/${id}/reject`, { reason });
+    return response.data.data;
+  },
+
+  cancel: async (id: number | string, reason: string): Promise<BpmRequest> => {
+    const response = await bpmClient.post(`/bpm-requests/${id}/cancel`, { reason });
+    return response.data.data;
+  },
+
+  resubmit: async (id: number | string, data: Record<string, unknown>, comment?: string): Promise<BpmRequest> => {
+    const response = await bpmClient.post(`/bpm-requests/${id}/resubmit`, { data, comment });
     return response.data.data;
   },
 

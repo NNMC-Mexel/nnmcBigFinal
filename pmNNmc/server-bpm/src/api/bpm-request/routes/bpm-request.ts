@@ -53,6 +53,30 @@ export default {
       path: '/bpm-requests/:id/advance',
       handler: 'bpm-request.advance',
       config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/bpm-requests/:id/return',
+      handler: 'bpm-request.returnForCorrection',
+      config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/bpm-requests/:id/reject',
+      handler: 'bpm-request.reject',
+      config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/bpm-requests/:id/cancel',
+      handler: 'bpm-request.cancel',
+      config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/bpm-requests/:id/resubmit',
+      handler: 'bpm-request.resubmit',
+      config: { policies: [] },
     }
   ]
 };

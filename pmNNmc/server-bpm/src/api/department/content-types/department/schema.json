@@ -39,6 +39,11 @@
     "canApproveNewEmployees": {
       "type": "boolean",
       "default": false
+    },
+    "bpmManager": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
     }
   }
 }
