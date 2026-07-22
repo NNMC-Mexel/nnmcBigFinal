@@ -24,6 +24,8 @@ const AUTHENTICATED_PERMISSIONS: Record<string, string[]> = {
   'api::employee-card.employee-card': ['find', 'findOne', 'me', 'sync', 'syncStatus'],
   'api::onboarding.onboarding': [
     'list',
+    'settings',
+    'updateSettings',
     'createInvitation',
     'extend',
     'unblock',
