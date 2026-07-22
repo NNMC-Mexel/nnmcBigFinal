@@ -20,14 +20,37 @@
     "type": {
       "type": "enumeration",
       "enum": [
+        "PHYSICAL_PERSON",
+        "HIRING",
+        "PERSONNEL_TRANSFER",
+        "DISMISSAL",
         "VACATION",
         "SICK_LEAVE",
+        "DAY_OFF",
+        "WEEKEND_WORK",
+        "OVERTIME",
+        "POSITION_COMBINATION",
+        "TIMESHEET",
+        "CHILDCARE_LEAVE",
+        "CHILDCARE_RETURN",
+        "VACATION_RECALL",
+        "UNPAID_LEAVE",
         "BUSINESS_TRIP",
+        "SCHEDULE_CHANGE",
         "MEMO",
         "TRAINING",
         "CERTIFICATE"
       ],
       "required": true
+    },
+    "integrationType": {
+      "type": "integer",
+      "min": 1,
+      "max": 17
+    },
+    "templateVersion": {
+      "type": "string",
+      "default": "1.0"
     },
     "title": {
       "type": "string",
@@ -116,6 +139,10 @@
       "type": "json",
       "default": []
     },
+    "processData": {
+      "type": "json",
+      "default": {}
+    },
     "onecPayload": {
       "type": "json"
     },
@@ -131,6 +158,9 @@
     },
     "onecDocumentNumber": {
       "type": "string"
+    },
+    "onecResponse": {
+      "type": "json"
     },
     "onecError": {
       "type": "text"

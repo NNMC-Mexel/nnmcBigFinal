@@ -14,6 +14,12 @@ export default {
     },
     {
       method: 'GET',
+      path: '/bpm-requests/vacation-balance',
+      handler: 'bpm-request.vacationBalance',
+      config: { policies: [] },
+    },
+    {
+      method: 'GET',
       path: '/bpm-requests/:id',
       handler: 'bpm-request.findOne',
       config: { policies: [] },
@@ -22,6 +28,18 @@ export default {
       method: 'POST',
       path: '/bpm-requests/vacation',
       handler: 'bpm-request.createVacation',
+      config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/bpm-requests/process',
+      handler: 'bpm-request.createProcess',
+      config: { policies: [] },
+    },
+    {
+      method: 'POST',
+      path: '/bpm-requests/reference-data/sync',
+      handler: 'bpm-request.syncReference',
       config: { policies: [] },
     },
     {
