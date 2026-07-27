@@ -15,6 +15,10 @@
       "type": "string",
       "required": true
     },
+    "personnelNumber": {
+      "type": "string",
+      "unique": true
+    },
     "kpiSum": {
       "type": "decimal",
       "required": true

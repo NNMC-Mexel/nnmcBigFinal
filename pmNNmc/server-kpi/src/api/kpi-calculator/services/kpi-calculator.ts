@@ -1,6 +1,7 @@
-interface Employee {
+  interface Employee {
     id: number;
     fio: string;
+    personnelNumber?: string;
     kpiSum: number;
     scheduleType: string;
     department: string;
@@ -54,6 +55,25 @@ interface Employee {
     fio: string;
     type: string;
     details: string;
+  }
+
+  export interface ArtTimesheetDay {
+    date: string;
+    plannedCode: string;
+    plannedHours: number;
+    actualCode: string;
+    actualHours: number;
+    nightHours?: number;
+    overtimeHours?: number;
+    holidayHours?: number;
+  }
+
+  export interface ArtTimesheetEmployee {
+    personnelNumber: string;
+    fio: string;
+    department?: string;
+    scheduleKind?: string;
+    days: ArtTimesheetDay[];
   }
   
   export function mergeEmployees(
@@ -251,5 +271,138 @@ interface Employee {
   
   return { results, errors };
 }
+
+  const ART_WORK_CODES = new Set([
+    'WORK',
+    'SHIFT_24',
+    'BUSINESS_TRIP',
+    'WEEKEND_WORK',
+    'OVERTIME',
+  ]);
+
+  function artIsWork(code: unknown, hours: unknown): boolean {
+    return ART_WORK_CODES.has(String(code || '').trim().toUpperCase()) && Number(hours || 0) > 0;
+  }
+
+  function normalizedKey(value: unknown): string {
+    return String(value || '').trim().toLocaleLowerCase('ru-RU').replace(/\s+/g, ' ');
+  }
+
+  /**
+   * Calculates KPI directly from an approved ART revision.
+   *
+   * Unlike the legacy Excel import, the plan is derived per employee. This is
+   * important for mixed departments where five-day and shift schedules coexist.
+   * The personnel number is the primary identity; FIO is only a compatibility
+   * fallback for old KPI records that do not yet have personnelNumber.
+   */
+  export function calculateKPIFromArt(
+    employees: ArtTimesheetEmployee[],
+    kpiTable: Employee[]
+  ): { results: Array<KPIResult & Record<string, any>>; errors: KPIError[] } {
+    const byPersonnelNumber = new Map<string, Employee>();
+    const byFio = new Map<string, Employee>();
+    for (const item of kpiTable || []) {
+      const personnelNumber = String(item.personnelNumber || '').trim();
+      if (personnelNumber) byPersonnelNumber.set(personnelNumber, item);
+      const fio = normalizedKey(item.fio);
+      if (fio) byFio.set(fio, item);
+    }
+
+    const results: Array<KPIResult & Record<string, any>> = [];
+    const errors: KPIError[] = [];
+    const seen = new Set<string>();
+
+    for (const employee of employees || []) {
+      const personnelNumber = String(employee.personnelNumber || '').trim();
+      const fio = String(employee.fio || '').trim();
+      if (!personnelNumber || !fio) {
+        errors.push({
+          fio,
+          type: 'INVALID_EMPLOYEE',
+          details: 'В утверждённом табеле отсутствует ФИО или табельный номер',
+        });
+        continue;
+      }
+      if (seen.has(personnelNumber)) {
+        errors.push({
+          fio,
+          type: 'DUPLICATE_PERSONNEL_NUMBER',
+          details: `Табельный номер ${personnelNumber} повторяется`,
+        });
+        continue;
+      }
+      seen.add(personnelNumber);
+
+      const byPersonnel = byPersonnelNumber.get(personnelNumber);
+      const kpiInfo = byPersonnel || byFio.get(normalizedKey(fio));
+      if (!kpiInfo) {
+        errors.push({
+          fio,
+          type: 'NO_KPI_MAPPING',
+          details: `Нет записи KPI для табельного номера ${personnelNumber}`,
+        });
+        continue;
+      }
+      if (String(kpiInfo.categoryCode || '').trim() === '4') {
+        errors.push({ fio, type: 'STUDENT', details: 'CategoryCode = 4 (студент), KPI не считается' });
+        continue;
+      }
+
+      const scheduleType = String(kpiInfo.scheduleType || '').trim().toLowerCase() === 'day'
+        ? 'day'
+        : 'shift';
+      const plannedDays = (employee.days || []).filter((day) =>
+        artIsWork(day.plannedCode, day.plannedHours)
+      );
+      const daysAssigned = plannedDays.length;
+      if (daysAssigned <= 0) {
+        errors.push({
+          fio,
+          type: 'INVALID_PLAN',
+          details: `В утверждённом графике нет рабочих ${scheduleType === 'day' ? 'дней' : 'смен'}`,
+        });
+        continue;
+      }
+
+      const workedDates = new Set(
+        (employee.days || [])
+          .filter((day) => artIsWork(day.actualCode, day.actualHours))
+          .map((day) => String(day.date || '').slice(0, 10))
+      );
+      const daysWorked = Math.min(
+        daysAssigned,
+        plannedDays.reduce((sum, day) => sum + (workedDates.has(String(day.date).slice(0, 10)) ? 1 : 0), 0)
+      );
+      const notWorked = Math.max(daysAssigned - daysWorked, 0);
+      const workPercent = Math.max(0, Math.min(100, (daysWorked / daysAssigned) * 100));
+      const kpiSum = Number(kpiInfo.kpiSum || 0);
+      const kpiFinal = (workPercent / 100) * kpiSum;
+
+      results.push({
+        fio,
+        personnelNumber,
+        matchMethod: byPersonnel ? 'personnelNumber' : 'fioFallback',
+        scheduleType,
+        department: kpiInfo.department || employee.department || '',
+        daysAssigned,
+        daysWorked,
+        notWorked,
+        lettersWeekday: 0,
+        lettersSat: 0,
+        lettersSun: 0,
+        lettersHoliday: 0,
+        numbersWeekday: 0,
+        numbersSat: 0,
+        numbersSun: 0,
+        numbersHoliday: 0,
+        workPercent: Math.round(workPercent * 100) / 100,
+        kpiSum,
+        kpiFinal: Math.round(kpiFinal * 100) / 100,
+      });
+    }
+
+    return { results, errors };
+  }
 
 export type { Employee, ParsedEmployee, KPIResult, KPIError };

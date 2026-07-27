@@ -209,6 +209,11 @@ export default function AppLayout() {
             icon: Workflow,
             label: "BPM",
         },
+        {
+            to: "/app/art-timesheet",
+            icon: CalendarRange,
+            label: "АРТ Табель",
+        },
         ...(canViewEmployeeDirectory ? [{
             to: "/app/bpm",
             icon: Users,

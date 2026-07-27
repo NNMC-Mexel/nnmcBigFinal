@@ -61,6 +61,19 @@
     "edited": {
       "type": "boolean",
       "default": false
+    },
+    "sourceSystem": {
+      "type": "string"
+    },
+    "sourcePeriodKey": {
+      "type": "string"
+    },
+    "sourceRevision": {
+      "type": "integer"
+    },
+    "sourceHash": {
+      "type": "string",
+      "unique": true
     }
   }
 }

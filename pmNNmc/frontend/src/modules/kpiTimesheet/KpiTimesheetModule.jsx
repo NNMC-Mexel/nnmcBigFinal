@@ -249,6 +249,7 @@ function DeleteConfirmModal({ employee, onCancel, onConfirm }) {
 
 function EmployeeFormModal({ initial, mode, departments, onCancel, onSave }) {
   const [fio, setFio] = useState(initial?.fio || "");
+  const [personnelNumber, setPersonnelNumber] = useState(initial?.personnelNumber || "");
   const [kpiSum, setKpiSum] = useState(initial?.kpiSum || 11000);
   const [scheduleType, setScheduleType] = useState(initial?.scheduleType || "day");
   const [department, setDepartment] = useState(initial?.department || "");
@@ -257,6 +258,7 @@ function EmployeeFormModal({ initial, mode, departments, onCancel, onSave }) {
   useEffect(() => {
     if (!initial) return;
     setFio(initial.fio || "");
+    setPersonnelNumber(initial.personnelNumber || "");
     setKpiSum(initial.kpiSum || 11000);
     setScheduleType(initial.scheduleType || "day");
     setDepartment(initial.department || "");
@@ -268,7 +270,7 @@ function EmployeeFormModal({ initial, mode, departments, onCancel, onSave }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave({ id: initial?.id, fio: fio.trim(), kpiSum: Number(kpiSum), scheduleType, department: department.trim(), categoryCode: categoryCode.trim() });
+    onSave({ id: initial?.id, fio: fio.trim(), personnelNumber: personnelNumber.trim(), kpiSum: Number(kpiSum), scheduleType, department: department.trim(), categoryCode: categoryCode.trim() });
   };
 
   return (
@@ -280,6 +282,10 @@ function EmployeeFormModal({ initial, mode, departments, onCancel, onSave }) {
           <label className="modal-label">
             ФИО *
             <input className="modal-input" value={fio} onChange={(e) => setFio(e.target.value)} placeholder="Фамилия Имя Отчество" required />
+          </label>
+          <label className="modal-label">
+            Табельный номер
+            <input className="modal-input" value={personnelNumber} onChange={(e) => setPersonnelNumber(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="Например, 000009870" />
           </label>
           <label className="modal-label">
             KPI сумм (тенге) *
@@ -1536,7 +1542,7 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
   const handleRestore = async (row) => {
     try {
       await apiRestoreEmployee({
-        fio: row.fio, kpiSum: row.kpiSum, scheduleType: row.scheduleType,
+        fio: row.fio, personnelNumber: row.personnelNumber, kpiSum: row.kpiSum, scheduleType: row.scheduleType,
         department: row.department, categoryCode: row.categoryCode,
         deleted_timestamp: row.timestamp || row.deleted_timestamp,
         deleted_by: row.user || row.deleted_by,
@@ -2081,13 +2087,13 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                 <div className="table-wrapper">
                   <table>
                     <thead>
-                      <tr><th>#</th><th>ID</th><th>ФИО</th><th>KPI сумм</th><th>График</th><th>Отдел</th><th>Категория</th><th>Действия</th></tr>
+                      <tr><th>#</th><th>ID</th><th>Таб. №</th><th>ФИО</th><th>KPI сумм</th><th>График</th><th>Отдел</th><th>Категория</th><th>Действия</th></tr>
                     </thead>
                     <tbody>
-                      {filteredKpiItems.length === 0 && <tr><td colSpan={8} style={{ textAlign: "center" }}>Сотрудников не найдено.</td></tr>}
+                      {filteredKpiItems.length === 0 && <tr><td colSpan={9} style={{ textAlign: "center" }}>Сотрудников не найдено.</td></tr>}
                       {filteredKpiItems.map((emp, idx) => (
                         <tr key={emp.id}>
-                          <td>{idx + 1}</td><td>{emp.id}</td><td>{emp.fio}</td><td>{emp.kpiSum}</td>
+                          <td>{idx + 1}</td><td>{emp.id}</td><td>{emp.personnelNumber || "—"}</td><td>{emp.fio}</td><td>{emp.kpiSum}</td>
                           <td>{formatScheduleType(emp.scheduleType)}</td><td>{emp.department}</td><td>{emp.categoryCode}</td>
                           <td>
                             <button className="btn btn-small" onClick={() => openEditForm(emp)}>Редактировать</button>
@@ -2105,13 +2111,13 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
               <div className="table-wrapper">
                 <table>
                   <thead>
-                    <tr><th>ФИО</th><th>KPI сумм</th><th>График</th><th>Отдел</th><th>Категория</th><th>Когда удалён</th><th>Кем</th><th>Причина</th><th>Действия</th></tr>
+                    <tr><th>Таб. №</th><th>ФИО</th><th>KPI сумм</th><th>График</th><th>Отдел</th><th>Категория</th><th>Когда удалён</th><th>Кем</th><th>Причина</th><th>Действия</th></tr>
                   </thead>
                   <tbody>
-                    {(!deletedItems || deletedItems.length === 0) && <tr><td colSpan={9} style={{ textAlign: "center" }}>Удалённых сотрудников нет.</td></tr>}
+                    {(!deletedItems || deletedItems.length === 0) && <tr><td colSpan={10} style={{ textAlign: "center" }}>Удалённых сотрудников нет.</td></tr>}
                     {deletedItems && deletedItems.map((row, idx) => (
                       <tr key={idx}>
-                        <td>{row.fio}</td><td>{row.kpiSum}</td><td>{formatScheduleType(row.scheduleType)}</td>
+                        <td>{row.personnelNumber || "—"}</td><td>{row.fio}</td><td>{row.kpiSum}</td><td>{formatScheduleType(row.scheduleType)}</td>
                         <td>{row.department}</td><td>{row.categoryCode}</td>
                         <td>{row.timestamp || row.deleted_timestamp}</td><td>{row.user || row.deleted_by}</td><td>{row.reason || row.deleted_reason}</td>
                         <td><button className="btn btn-small btn-primary" onClick={() => handleRestore(row)}>Вернуть</button></td>
@@ -2128,12 +2134,13 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                   <h3>Редактирования</h3>
                   <div className="table-wrapper small">
                     <table>
-                      <thead><tr><th>Когда</th><th>Кто</th><th>ФИО</th><th>Отдел</th><th>График</th><th>Категория</th><th>KPI сумм</th></tr></thead>
+                      <thead><tr><th>Когда</th><th>Кто</th><th>Таб. №</th><th>ФИО</th><th>Отдел</th><th>График</th><th>Категория</th><th>KPI сумм</th></tr></thead>
                       <tbody>
-                        {(!editedItems || editedItems.length === 0) && <tr><td colSpan={7} style={{ textAlign: "center" }}>Нет записей.</td></tr>}
+                        {(!editedItems || editedItems.length === 0) && <tr><td colSpan={8} style={{ textAlign: "center" }}>Нет записей.</td></tr>}
                         {editedItems && editedItems.map((row, idx) => (
                           <tr key={idx}>
                             <td>{row.timestamp}</td><td>{row.user}</td>
+                            <td>{formatChange(row.personnelNumber_old, row.personnelNumber_new)}</td>
                             <td>{formatChange(row.fio_old, row.fio_new)}</td>
                             <td>{formatChange(row.department_old, row.department_new)}</td>
                             <td>{formatChange(formatScheduleType(row.scheduleType_old), formatScheduleType(row.scheduleType_new))}</td>
@@ -2149,11 +2156,11 @@ export default function KpiTimesheetModule({ user, onKpiLogout }) {
                   <h3>Восстановления</h3>
                   <div className="table-wrapper small">
                     <table>
-                      <thead><tr><th>Когда</th><th>Кто</th><th>ФИО</th><th>Отдел</th><th>График</th><th>KPI сумм</th></tr></thead>
+                      <thead><tr><th>Когда</th><th>Кто</th><th>Таб. №</th><th>ФИО</th><th>Отдел</th><th>График</th><th>KPI сумм</th></tr></thead>
                       <tbody>
-                        {(!restoredItems || restoredItems.length === 0) && <tr><td colSpan={6} style={{ textAlign: "center" }}>Нет записей.</td></tr>}
+                        {(!restoredItems || restoredItems.length === 0) && <tr><td colSpan={7} style={{ textAlign: "center" }}>Нет записей.</td></tr>}
                         {restoredItems && restoredItems.map((row, idx) => (
-                          <tr key={idx}><td>{row.timestamp}</td><td>{row.user}</td><td>{row.fio}</td><td>{row.department}</td><td>{formatScheduleType(row.scheduleType)}</td><td>{row.kpiSum}</td></tr>
+                          <tr key={idx}><td>{row.timestamp}</td><td>{row.user}</td><td>{row.personnelNumber || "—"}</td><td>{row.fio}</td><td>{row.department}</td><td>{formatScheduleType(row.scheduleType)}</td><td>{row.kpiSum}</td></tr>
                         ))}
                       </tbody>
                     </table>

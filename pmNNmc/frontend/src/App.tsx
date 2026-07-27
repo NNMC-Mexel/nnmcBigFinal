@@ -35,6 +35,7 @@ const BpmMyRequestsPage = lazy(() => import('./pages/app/BpmMyRequestsPage'));
 const NewEmployeesPage = lazy(() => import('./pages/app/NewEmployeesPage'));
 const EmployeeDirectoryPage = lazy(() => import('./pages/app/EmployeeDirectoryPage'));
 const EmployeeCardPage = lazy(() => import('./pages/app/EmployeeCardPage'));
+const ArtTimesheetPage = lazy(() => import('./pages/app/ArtTimesheetPage'));
 const HelpdeskPage = lazy(() => import('./pages/app/HelpdeskPage'));
 const MyRequestsPage = lazy(() => import('./pages/app/MyRequestsPage'));
 const TicketDetailPage = lazy(() => import('./pages/app/TicketDetailPage'));
@@ -273,6 +274,7 @@ function App() {
         />
         <Route path="employees" element={<Navigate to="/app/bpm/employees" replace />} />
         <Route path="bpm-requests" element={withSuspense(<BpmMyRequestsPage />)} />
+        <Route path="art-timesheet" element={withSuspense(<ArtTimesheetPage />)} />
         <Route
           path="onboarding/new-employees"
           element={

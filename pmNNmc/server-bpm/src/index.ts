@@ -4,6 +4,7 @@ const PERMISSION_UID = 'plugin::users-permissions.permission' as any;
 const ROLE_UID = 'plugin::users-permissions.role' as any;
 const USER_UID = 'plugin::users-permissions.user' as any;
 const DEPARTMENT_UID = 'api::department.department' as any;
+const ART_POLICY_UID = 'api::art-policy.art-policy' as any;
 
 const AUTHENTICATED_PERMISSIONS: Record<string, string[]> = {
   'api::bpm-request.bpm-request': [
@@ -34,6 +35,21 @@ const AUTHENTICATED_PERMISSIONS: Record<string, string[]> = {
     'sendToOneC',
   ],
   'api::department.department': ['find', 'findOne'],
+  'api::art-period.art-period': [
+    'departments',
+    'find',
+    'create',
+    'findOne',
+    'updateDays',
+    'applyPattern',
+    'generateActual',
+    'transition',
+    'sendToOneC',
+    'sendToKpi',
+    'myCalendar',
+    'policy',
+    'updatePolicy',
+  ],
   'plugin::users-permissions.user': ['me'],
   'plugin::users-permissions.auth': ['callback', 'connect', 'changePassword'],
 };
@@ -157,12 +173,25 @@ async function promoteConfiguredSuperAdmins(strapi: any) {
   }
 }
 
+async function seedArtPolicy(strapi: any) {
+  const existing = await strapi.db.query(ART_POLICY_UID).findOne({
+    where: { policyKey: 'NNMC_ART_DEFAULT' },
+  });
+  if (existing) return;
+
+  const { DEFAULT_ART_POLICY } = await import('./api/art-period/services/art-engine');
+  await strapi.db.query(ART_POLICY_UID).create({
+    data: DEFAULT_ART_POLICY,
+  });
+}
+
 export default {
   register() {},
 
   async bootstrap({ strapi }) {
     await setupPermissions(strapi);
     await seedAccessDepartments(strapi);
+    await seedArtPolicy(strapi);
     await promoteConfiguredSuperAdmins(strapi);
     startEmployeeSyncScheduler(strapi);
   },

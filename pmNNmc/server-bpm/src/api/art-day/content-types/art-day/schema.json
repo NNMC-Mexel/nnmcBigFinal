@@ -1,0 +1,138 @@
+{
+  "kind": "collectionType",
+  "collectionName": "art_days",
+  "info": {
+    "singularName": "art-day",
+    "pluralName": "art-days",
+    "displayName": "ART Day",
+    "description": "Planned and actual work data for one employee day"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "dayKey": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "period": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::art-period.art-period",
+      "required": true
+    },
+    "employeeCard": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::employee-card.employee-card"
+    },
+    "employeeIin": {
+      "type": "string"
+    },
+    "physicalPersonId": {
+      "type": "string"
+    },
+    "personnelNumber": {
+      "type": "string",
+      "required": true
+    },
+    "employeeName": {
+      "type": "string",
+      "required": true
+    },
+    "positionName": {
+      "type": "string"
+    },
+    "scheduleName": {
+      "type": "string"
+    },
+    "scheduleKind": {
+      "type": "enumeration",
+      "enum": [
+        "FIVE_DAY",
+        "SIX_DAY",
+        "SHIFT",
+        "CUSTOM"
+      ],
+      "default": "CUSTOM"
+    },
+    "date": {
+      "type": "date",
+      "required": true
+    },
+    "plannedCode": {
+      "type": "string",
+      "required": true
+    },
+    "plannedStart": {
+      "type": "time"
+    },
+    "plannedEnd": {
+      "type": "time"
+    },
+    "plannedHours": {
+      "type": "decimal",
+      "default": 0
+    },
+    "actualCode": {
+      "type": "string"
+    },
+    "actualHours": {
+      "type": "decimal",
+      "default": 0
+    },
+    "nightHours": {
+      "type": "decimal",
+      "default": 0
+    },
+    "overtimeHours": {
+      "type": "decimal",
+      "default": 0
+    },
+    "holidayHours": {
+      "type": "decimal",
+      "default": 0
+    },
+    "sourceType": {
+      "type": "enumeration",
+      "enum": [
+        "SCHEDULE",
+        "BPM_EVENT",
+        "MANUAL",
+        "SYSTEM"
+      ],
+      "default": "SCHEDULE"
+    },
+    "sourceRequestNumber": {
+      "type": "string"
+    },
+    "eventType": {
+      "type": "string"
+    },
+    "manualOverride": {
+      "type": "boolean",
+      "default": false
+    },
+    "plannedManualOverride": {
+      "type": "boolean",
+      "default": false
+    },
+    "actualManualOverride": {
+      "type": "boolean",
+      "default": false
+    },
+    "overrideReason": {
+      "type": "text"
+    },
+    "version": {
+      "type": "integer",
+      "default": 1,
+      "min": 1
+    },
+    "editedByName": {
+      "type": "string"
+    }
+  }
+}

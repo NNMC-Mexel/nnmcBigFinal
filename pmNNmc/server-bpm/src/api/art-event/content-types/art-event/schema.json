@@ -1,0 +1,88 @@
+{
+  "kind": "collectionType",
+  "collectionName": "art_events",
+  "info": {
+    "singularName": "art-event",
+    "pluralName": "art-events",
+    "displayName": "ART Event",
+    "description": "Approved absence or attendance event applied to a timesheet"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "eventKey": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "period": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::art-period.art-period",
+      "required": true
+    },
+    "type": {
+      "type": "enumeration",
+      "enum": [
+        "VACATION",
+        "SICK_LEAVE",
+        "DAY_OFF",
+        "WEEKEND_WORK",
+        "OVERTIME",
+        "CHILDCARE_LEAVE",
+        "CHILDCARE_RETURN",
+        "UNPAID_LEAVE",
+        "BUSINESS_TRIP",
+        "VACATION_RECALL",
+        "SCHEDULE_CHANGE"
+      ],
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "APPLIED",
+        "SUPERSEDED",
+        "CANCELLED",
+        "CONFLICT"
+      ],
+      "default": "APPLIED"
+    },
+    "personnelNumber": {
+      "type": "string",
+      "required": true
+    },
+    "employeeName": {
+      "type": "string"
+    },
+    "startDate": {
+      "type": "date",
+      "required": true
+    },
+    "endDate": {
+      "type": "date",
+      "required": true
+    },
+    "dayCode": {
+      "type": "string",
+      "required": true
+    },
+    "sourceRequestId": {
+      "type": "integer"
+    },
+    "sourceRequestNumber": {
+      "type": "string",
+      "required": true
+    },
+    "documentAttached": {
+      "type": "boolean",
+      "default": false
+    },
+    "metadata": {
+      "type": "json",
+      "default": {}
+    }
+  }
+}

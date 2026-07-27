@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import fs from 'fs/promises';
+import { timingSafeEqual } from 'node:crypto';
 import type { Context } from 'koa';
 import { parseTimesheet } from '../services/timesheet-parser';
 import * as kpiCalculator from '../services/kpi-calculator';
@@ -477,6 +478,63 @@ function aggregateDayValues(dayValues: any[]): {
   return out;
 }
 
+function requireInternalToken(ctx: Context) {
+  const expected = String(process.env.INTERNAL_SYNC_TOKEN || '');
+  const supplied = String(ctx.get('X-Internal-Token') || '');
+  if (!expected) ctx.throw(503, 'INTERNAL_SYNC_TOKEN не настроен в server-kpi');
+  const left = Buffer.from(expected);
+  const right = Buffer.from(supplied);
+  if (left.length !== right.length || !timingSafeEqual(left, right)) {
+    ctx.throw(403, 'Forbidden');
+  }
+}
+
+function artDayType(dateValue: unknown, holidays: Set<string>) {
+  const date = String(dateValue || '').slice(0, 10);
+  if (holidays.has(date)) return 'holiday';
+  const day = new Date(`${date}T00:00:00.000Z`).getUTCDay();
+  if (day === 6) return 'sat';
+  if (day === 0) return 'sun';
+  return 'weekday';
+}
+
+const ART_ABSENCE_SHORT_CODES: Record<string, string> = {
+  VACATION: 'О',
+  SICK_LEAVE: 'Б',
+  DAY_OFF_GRANTED: 'ОВ',
+  UNPAID_LEAVE: 'ДО',
+  CHILDCARE_LEAVE: 'ОЖ',
+};
+
+function artParsedDetails(employees: any[], holidays: string[]) {
+  const holidaySet = new Set((holidays || []).map((date) => String(date).slice(0, 10)));
+  return (employees || []).map((employee: any) => {
+    const dayValues = (employee.days || []).map((day: any) => {
+      const code = String(day.actualCode || '').trim().toUpperCase();
+      const hours = Number(day.actualHours || 0);
+      const isWork = hours > 0 && !ART_ABSENCE_SHORT_CODES[code] && code !== 'DAY_OFF';
+      return {
+        day: Number(String(day.date || '').slice(8, 10)),
+        month: Number(String(day.date || '').slice(5, 7)),
+        year: Number(String(day.date || '').slice(0, 4)),
+        value: isWork ? String(hours) : ART_ABSENCE_SHORT_CODES[code] || '',
+        dayType: artDayType(day.date, holidaySet),
+        isNumber: isWork,
+        plannedCode: day.plannedCode,
+        actualCode: day.actualCode,
+        personnelNumber: employee.personnelNumber,
+      };
+    });
+    return {
+      fio: String(employee.fio || '').trim(),
+      personnelNumber: String(employee.personnelNumber || '').trim(),
+      department: String(employee.department || '').trim(),
+      dayValues,
+      ...aggregateDayValues(dayValues),
+    };
+  });
+}
+
 async function calcCore(ctx: Context) {
   const body: any = (ctx.request as any).body || {};
   const access = await getUserAccess(ctx);
@@ -701,6 +759,110 @@ async function calcCore(ctx: Context) {
 }
 
 export default {
+  /**
+   * Internal import of an HR-approved ART revision.
+   * Identity is based on personnelNumber; sourceHash makes retries idempotent.
+   */
+  async importArt(ctx: Context) {
+    try {
+      requireInternalToken(ctx);
+      const body: any = (ctx.request as any).body?.data || (ctx.request as any).body || {};
+      const source = body.source || {};
+      const year = Number.parseInt(String(body.year || ''), 10);
+      const month = Number.parseInt(String(body.month || ''), 10);
+      const department = String(body.department || '').trim();
+      const employees = Array.isArray(body.employees) ? body.employees : [];
+      const sourceHash = String(source.hash || '').trim();
+      const sourcePeriodKey = String(source.periodKey || '').trim();
+      const sourceRevision = Number.parseInt(String(source.revision || '0'), 10);
+
+      if (!year || month < 1 || month > 12 || !department || !sourceHash || !sourcePeriodKey) {
+        ctx.throw(400, 'Неполный контракт ART: период, подразделение и контрольная сумма обязательны');
+      }
+      if (employees.length === 0) ctx.throw(400, 'В утверждённом табеле нет сотрудников');
+
+      const duplicates: any = await strapi.entityService.findMany(
+        'api::calculation-archive.calculation-archive',
+        {
+          filters: { sourceSystem: 'BPM_ART', sourceHash },
+          pagination: { page: 1, pageSize: 1 },
+        }
+      );
+      const existing = Array.isArray(duplicates) ? duplicates[0] : null;
+      if (existing) {
+        ctx.body = {
+          data: {
+            archiveId: String(existing.documentId || existing.id),
+            sourceHash,
+            resultCount: Array.isArray(existing.results)
+              ? existing.results.length
+              : existing.employeeCount || 0,
+            duplicate: true,
+          },
+        };
+        return;
+      }
+
+      const kpiTable: any = await strapi.entityService.findMany('api::employee.employee', {
+        fields: ['id', 'fio', 'personnelNumber', 'kpiSum', 'scheduleType', 'department', 'categoryCode'],
+        publicationState: 'live',
+        pagination: { pageSize: 10000 },
+      });
+      const { results, errors } = kpiCalculator.calculateKPIFromArt(employees, kpiTable || []);
+      const blockingErrors = errors.filter((error: any) => error.type !== 'STUDENT');
+      if (results.length === 0 || blockingErrors.length > 0) {
+        ctx.status = 422;
+        ctx.body = {
+          error: 'Утверждённый табель не прошёл проверку KPI',
+          details: blockingErrors,
+          warnings: errors.filter((error: any) => error.type === 'STUDENT'),
+        };
+        return;
+      }
+
+      const holidays = Array.isArray(body.holidays)
+        ? body.holidays.map((value: any) => String(value).slice(0, 10)).filter(Boolean)
+        : [];
+      const parsedDetails = artParsedDetails(employees, holidays);
+      const archive: any = await strapi.entityService.create(
+        'api::calculation-archive.calculation-archive',
+        {
+          data: {
+            year,
+            month,
+            department,
+            nchDay: 0,
+            ndShift: 0,
+            calculatedBy: `BPM_ART:${sourcePeriodKey}`,
+            results,
+            parsedDetails,
+            errors,
+            employeeCount: results.length,
+            sourceSystem: 'BPM_ART',
+            sourcePeriodKey,
+            sourceRevision: sourceRevision || 1,
+            sourceHash,
+          },
+        }
+      );
+
+      ctx.status = 201;
+      ctx.body = {
+        data: {
+          archiveId: String(archive.documentId || archive.id),
+          sourceHash,
+          resultCount: results.length,
+          warningCount: errors.length,
+          duplicate: false,
+        },
+      };
+    } catch (error: any) {
+      if (error?.status) throw error;
+      ctx.status = 400;
+      ctx.body = { error: error?.message || 'Ошибка импорта утверждённого табеля ART' };
+    }
+  },
+
   async calculate(ctx: Context) {
     try {
       const payload = await calcCore(ctx);

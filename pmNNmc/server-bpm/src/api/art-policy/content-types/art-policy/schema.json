@@ -1,0 +1,56 @@
+{
+  "kind": "collectionType",
+  "collectionName": "art_policies",
+  "info": {
+    "singularName": "art-policy",
+    "pluralName": "art-policies",
+    "displayName": "ART Policy",
+    "description": "Versioned timesheet codes and schedule calculation policy"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "policyKey": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    },
+    "effectiveFrom": {
+      "type": "date"
+    },
+    "effectiveTo": {
+      "type": "date"
+    },
+    "dayCodes": {
+      "type": "json",
+      "default": {}
+    },
+    "scheduleRules": {
+      "type": "json",
+      "default": {}
+    },
+    "holidayDates": {
+      "type": "json",
+      "default": []
+    },
+    "onecMappings": {
+      "type": "json",
+      "default": {}
+    },
+    "version": {
+      "type": "integer",
+      "default": 1,
+      "min": 1
+    }
+  }
+}

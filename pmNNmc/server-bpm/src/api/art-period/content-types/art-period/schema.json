@@ -1,0 +1,202 @@
+{
+  "kind": "collectionType",
+  "collectionName": "art_periods",
+  "info": {
+    "singularName": "art-period",
+    "pluralName": "art-periods",
+    "displayName": "ART Period",
+    "description": "Planning and actual timesheet period for a department"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "periodKey": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "year": {
+      "type": "integer",
+      "required": true,
+      "min": 2020,
+      "max": 2100
+    },
+    "month": {
+      "type": "integer",
+      "required": true,
+      "min": 1,
+      "max": 12
+    },
+    "organizationId": {
+      "type": "string"
+    },
+    "organizationName": {
+      "type": "string",
+      "required": true
+    },
+    "departmentId": {
+      "type": "string"
+    },
+    "departmentName": {
+      "type": "string",
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": [
+        "DRAFT",
+        "MANAGER_REVIEW",
+        "HR_REVIEW",
+        "ACTIVE",
+        "FINAL_HR_REVIEW",
+        "APPROVED",
+        "ONEC_PENDING",
+        "ONEC_SENT",
+        "KPI_READY",
+        "CLOSED",
+        "RETURNED"
+      ],
+      "default": "DRAFT",
+      "required": true
+    },
+    "phase": {
+      "type": "enumeration",
+      "enum": [
+        "PLAN",
+        "ACTUAL",
+        "CLOSED"
+      ],
+      "default": "PLAN",
+      "required": true
+    },
+    "revision": {
+      "type": "integer",
+      "default": 1,
+      "min": 1
+    },
+    "employeeCount": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "plannedHours": {
+      "type": "decimal",
+      "default": 0
+    },
+    "actualHours": {
+      "type": "decimal",
+      "default": 0
+    },
+    "unresolvedDays": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "locked": {
+      "type": "boolean",
+      "default": false
+    },
+    "returnedToStatus": {
+      "type": "string"
+    },
+    "lastDecisionComment": {
+      "type": "text"
+    },
+    "history": {
+      "type": "json",
+      "default": []
+    },
+    "sourceHash": {
+      "type": "string"
+    },
+    "finalSnapshot": {
+      "type": "json"
+    },
+    "onecStatus": {
+      "type": "enumeration",
+      "enum": [
+        "not_ready",
+        "pending",
+        "sent",
+        "error"
+      ],
+      "default": "not_ready"
+    },
+    "onecDocumentNumber": {
+      "type": "string"
+    },
+    "onecResponse": {
+      "type": "json"
+    },
+    "onecError": {
+      "type": "text"
+    },
+    "integrationAttemptCount": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "lastIntegrationAttemptAt": {
+      "type": "datetime"
+    },
+    "kpiStatus": {
+      "type": "enumeration",
+      "enum": [
+        "not_ready",
+        "pending",
+        "sent",
+        "error"
+      ],
+      "default": "not_ready"
+    },
+    "kpiArchiveId": {
+      "type": "string"
+    },
+    "kpiResponse": {
+      "type": "json"
+    },
+    "kpiError": {
+      "type": "text"
+    },
+    "kpiAttemptCount": {
+      "type": "integer",
+      "default": 0,
+      "min": 0
+    },
+    "lastKpiAttemptAt": {
+      "type": "datetime"
+    },
+    "planSubmittedAt": {
+      "type": "datetime"
+    },
+    "planApprovedAt": {
+      "type": "datetime"
+    },
+    "actualSubmittedAt": {
+      "type": "datetime"
+    },
+    "approvedAt": {
+      "type": "datetime"
+    },
+    "closedAt": {
+      "type": "datetime"
+    },
+    "ownerUser": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "responsibleUser": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "managerUser": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    }
+  }
+}

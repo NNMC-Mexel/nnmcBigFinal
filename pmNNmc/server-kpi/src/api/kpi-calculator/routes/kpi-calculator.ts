@@ -2,6 +2,15 @@
   routes: [
     {
       method: 'POST',
+      path: '/kpi-calculator/import-art',
+      handler: 'kpi-calculator.importArt',
+      config: {
+        auth: false,
+        policies: [],
+      },
+    },
+    {
+      method: 'POST',
       path: '/kpi-calculator/calculate',
       handler: 'kpi-calculator.calculate',
       config: {
@@ -66,4 +75,3 @@
     },
   ],
 };
-

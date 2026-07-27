@@ -63,6 +63,7 @@ export default {
     const items = (employees || []).map((e: any) => ({
       id: e.id,
       fio: e.fio,
+      personnelNumber: e.personnelNumber,
       kpiSum: e.kpiSum,
       scheduleType: e.scheduleType,
       department: e.department,
@@ -94,6 +95,7 @@ export default {
       // Нормализуем scheduleType: приводим к нижнему регистру и проверяем валидность
       const scheduleType = (scheduleTypeRaw.toLowerCase() === 'shift' ? 'shift' : 'day');
       const department = String(body.department || '').trim();
+      const personnelNumber = String(body.personnelNumber || '').trim();
       // categoryCode может быть пустой строкой - преобразуем в null
       const categoryCodeRaw = String(body.categoryCode || '').trim();
       const categoryCode = categoryCodeRaw || null;
@@ -111,11 +113,9 @@ export default {
       }
 
       const existing = await strapi.entityService.findMany('api::employee.employee', {
-        filters: {
-          fio: {
-            $eqi: fio,
-          },
-        },
+        filters: personnelNumber
+          ? { $or: [{ fio: { $eqi: fio } }, { personnelNumber }] }
+          : { fio: { $eqi: fio } },
       });
 
       if ((existing || []).length > 0) {
@@ -124,6 +124,7 @@ export default {
 
       const employeeData: any = {
         fio,
+        personnelNumber: personnelNumber || null,
         kpiSum: Number(kpiSum), // Явно преобразуем в число
         scheduleType,
         department,
@@ -148,6 +149,7 @@ export default {
             newData: {
               id: created.id,
               fio: created.fio,
+              personnelNumber: created.personnelNumber,
               kpiSum: created.kpiSum,
               scheduleType: created.scheduleType,
               department: created.department,
@@ -203,6 +205,18 @@ export default {
         updates.fio = fio;
       }
 
+      if (body.personnelNumber !== undefined) {
+        const personnelNumber = String(body.personnelNumber || '').trim();
+        if (personnelNumber) {
+          const matches = await strapi.entityService.findMany('api::employee.employee', {
+            filters: { personnelNumber, id: { $ne: empId } },
+            pagination: { pageSize: 1 },
+          });
+          if ((matches || []).length > 0) ctx.throw(400, 'Этот табельный номер уже назначен другому сотруднику');
+        }
+        updates.personnelNumber = personnelNumber || null;
+      }
+
       if (body.department !== undefined) {
         const department = String(body.department || '').trim();
         if (!department) {
@@ -247,6 +261,7 @@ export default {
             oldData: {
               id: existing.id,
               fio: existing.fio,
+              personnelNumber: existing.personnelNumber,
               kpiSum: existing.kpiSum,
               scheduleType: existing.scheduleType,
               department: existing.department,
@@ -255,6 +270,7 @@ export default {
             newData: {
               id: updated.id,
               fio: updated.fio,
+              personnelNumber: updated.personnelNumber,
               kpiSum: updated.kpiSum,
               scheduleType: updated.scheduleType,
               department: updated.department,
@@ -311,6 +327,7 @@ export default {
             oldData: {
               id: existing.id,
               fio: existing.fio,
+              personnelNumber: existing.personnelNumber,
               kpiSum: existing.kpiSum,
               scheduleType: existing.scheduleType,
               department: existing.department,
@@ -328,6 +345,7 @@ export default {
         item: {
           id: existing.id,
           fio: existing.fio,
+          personnelNumber: existing.personnelNumber,
           kpiSum: existing.kpiSum,
           scheduleType: existing.scheduleType,
           department: existing.department,
@@ -380,6 +398,7 @@ export default {
         fio: isCorruptedText(l?.oldData?.fio)
           ? `Сотрудник #${l.employeeId || l.employee_id || l?.oldData?.id || 'N/A'}`
           : l.oldData?.fio,
+        personnelNumber: l.oldData?.personnelNumber,
         kpiSum: l.oldData?.kpiSum,
         scheduleType: l.oldData?.scheduleType,
         department: isCorruptedText(l?.oldData?.department) ? '' : l.oldData?.department,
@@ -423,11 +442,13 @@ export default {
         timestamp: l.timestamp,
         user: l.user,
         fio_old: l.oldData?.fio,
+        personnelNumber_old: l.oldData?.personnelNumber,
         department_old: l.oldData?.department,
         scheduleType_old: l.oldData?.scheduleType,
         categoryCode_old: l.oldData?.categoryCode,
         kpiSum_old: l.oldData?.kpiSum,
         fio_new: l.newData?.fio,
+        personnelNumber_new: l.newData?.personnelNumber,
         department_new: l.newData?.department,
         scheduleType_new: l.newData?.scheduleType,
         categoryCode_new: l.newData?.categoryCode,
@@ -470,6 +491,7 @@ export default {
         timestamp: l.timestamp,
         user: l.user,
         fio: l.newData?.fio,
+        personnelNumber: l.newData?.personnelNumber,
         kpiSum: l.newData?.kpiSum,
         scheduleType: l.newData?.scheduleType,
         department: l.newData?.department,
@@ -504,6 +526,7 @@ export default {
       const scheduleType = String(body.scheduleType || '').trim() || 'day';
       const department = String(body.department || '').trim();
       const categoryCode = String(body.categoryCode || '').trim();
+      const personnelNumber = String(body.personnelNumber || '').trim();
 
       if (!department) {
         ctx.throw(400, 'Укажите отделение');
@@ -520,6 +543,7 @@ export default {
       const created = await strapi.entityService.create('api::employee.employee', {
         data: {
           fio,
+          personnelNumber: personnelNumber || null,
           kpiSum,
           scheduleType,
           department,
@@ -544,6 +568,7 @@ export default {
             newData: {
               id: created.id,
               fio: created.fio,
+              personnelNumber: created.personnelNumber,
               kpiSum: created.kpiSum,
               scheduleType: created.scheduleType,
               department: created.department,
@@ -564,4 +589,3 @@ export default {
     }
   },
 };
-
