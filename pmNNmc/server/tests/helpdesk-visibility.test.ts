@@ -1,100 +1,127 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  getHelpdeskAssignmentScope,
-  parseHelpdeskSupervision,
+  buildHelpdeskVisibilityFilter,
+  normalizeHelpdeskVisibilityRules,
+  resolveHelpdeskCategoryVisibilityRules,
+  type HelpdeskVisibilityScope,
 } from '../src/utils/helpdesk-visibility';
 import { userCanManageTicket, userCanViewTicket } from '../src/api/ticket/controllers/ticket';
 
-const supervision = 'zhandos=ernar;lead=user1,user2';
+const ernar = {
+  id: 21,
+  username: 'ernar',
+  department: { key: 'IT', canManageTickets: true },
+};
+const zhandos = {
+  id: 20,
+  username: 'zhandos',
+  department: { key: 'IT', canManageTickets: true },
+};
+const ernarScope: HelpdeskVisibilityScope = {
+  viewerUserId: 21,
+  categoryTargetUserIds: { 5: [20] },
+  isConfigured: true,
+};
+const zhandosScope: HelpdeskVisibilityScope = {
+  viewerUserId: 20,
+  categoryTargetUserIds: { 5: [21] },
+  isConfigured: true,
+};
 
-test('parses configurable HelpDesk supervisor assignments', () => {
-  assert.deepEqual(Array.from(parseHelpdeskSupervision(supervision).entries()), [
-    ['zhandos', ['ernar']],
-    ['lead', ['user1', 'user2']],
+test('normalizes visibility rules and preserves an explicit empty rule', () => {
+  assert.deepEqual(
+    normalizeHelpdeskVisibilityRules([
+      { viewerId: 20, targetUserIds: [21, 21, 20] },
+      { viewerId: 21, targetUserIds: [] },
+    ]),
+    [
+      { viewerId: 20, targetUserIds: [21] },
+      { viewerId: 21, targetUserIds: [] },
+    ]
+  );
+});
+
+test('existing Ernar and Zhandos categories receive mutual visibility defaults', () => {
+  const rules = resolveHelpdeskCategoryVisibilityRules(
+    {
+      defaultAssignee: [
+        { id: 21, username: 'ernar' },
+        { id: 20, username: 'zhandos' },
+      ],
+    },
+    []
+  );
+
+  assert.deepEqual(rules, [
+    { viewerId: 21, targetUserIds: [20] },
+    { viewerId: 20, targetUserIds: [21] },
   ]);
 });
 
-test('supervisor sees own and direct subordinate assignments', () => {
-  assert.deepEqual(getHelpdeskAssignmentScope({ username: 'ZHANDOS' }, supervision), {
-    viewerUsername: 'zhandos',
-    assigneeUsernames: ['zhandos', 'ernar'],
-    isSupervisor: true,
-  });
-});
-
-test('subordinate is restricted to own assignments', () => {
-  assert.deepEqual(getHelpdeskAssignmentScope({ username: 'ernar' }, supervision), {
-    viewerUsername: 'ernar',
-    assigneeUsernames: ['ernar'],
-    isSupervisor: false,
-  });
-});
-
-test('users outside configured hierarchy retain existing access rules', () => {
-  assert.equal(getHelpdeskAssignmentScope({ username: 'said' }, supervision), null);
-});
-
-test('default hierarchy lets Zhandos manage Ernar tickets but not other IT tickets', () => {
-  const zhandos = {
-    id: 20,
-    username: 'zhandos',
-    department: { key: 'IT', canManageTickets: true },
-  };
-
-  assert.equal(
-    userCanManageTicket(zhandos, { assignee: [{ id: 21, username: 'ernar' }] }, false),
-    true
-  );
-  assert.equal(
-    userCanManageTicket(zhandos, { assignee: [{ id: 22, username: 'said' }] }, false),
-    false
+test('an explicit category configuration disables the mutual default', () => {
+  assert.deepEqual(
+    resolveHelpdeskCategoryVisibilityRules({
+      visibilityRules: [],
+      defaultAssignee: [
+        { id: 21, username: 'ernar' },
+        { id: 20, username: 'zhandos' },
+      ],
+    }),
+    []
   );
 });
 
-test('Ernar cannot manage Zhandos tickets despite department queue permission', () => {
-  const ernar = {
-    id: 21,
-    username: 'ernar',
-    department: { key: 'IT', canManageTickets: true },
-  };
-
-  assert.equal(
-    userCanManageTicket(ernar, { assignee: [{ id: 20, username: 'zhandos' }] }, false),
-    false
-  );
-  assert.equal(
-    userCanManageTicket(ernar, { assignee: [{ id: 21, username: 'ernar' }] }, false),
-    true
-  );
-});
-
-test('Zhandos can view a ticket completed by Ernar even if Ernar is no longer assigned', () => {
-  const zhandos = {
-    id: 20,
-    username: 'zhandos',
-    department: { key: 'IT', canManageTickets: true },
-  };
-  const completedTicket = {
-    assignee: [{ id: 22, username: 'said' }],
-    completedBy: { id: 21, username: 'ernar' },
-  };
-
-  assert.equal(userCanManageTicket(zhandos, completedTicket, false), false);
-  assert.equal(userCanViewTicket(zhandos, completedTicket, false), true);
-});
-
-test('Ernar cannot view tickets assigned to or completed by Zhandos', () => {
-  const ernar = {
-    id: 21,
-    username: 'ernar',
-    department: { key: 'IT', canManageTickets: true },
+test('Ernar and Zhandos can view each other tickets only in configured categories', () => {
+  const ernarTicket = {
+    category: { id: 5 },
+    assignee: [{ id: 21, username: 'ernar' }],
+    requester: { id: 99 },
   };
   const zhandosTicket = {
+    category: { id: 5 },
     assignee: [{ id: 20, username: 'zhandos' }],
-    completedBy: { id: 20, username: 'zhandos' },
-    requester: { id: 99, username: 'requester' },
+    requester: { id: 99 },
   };
 
-  assert.equal(userCanViewTicket(ernar, zhandosTicket, false), false);
+  assert.equal(userCanViewTicket(zhandos, ernarTicket, false, zhandosScope), true);
+  assert.equal(userCanViewTicket(ernar, zhandosTicket, false, ernarScope), true);
+  assert.equal(
+    userCanViewTicket(ernar, { ...zhandosTicket, category: { id: 6 } }, false, ernarScope),
+    false
+  );
+});
+
+test('visibility does not grant management rights over another user ticket', () => {
+  const zhandosTicket = {
+    category: { id: 5 },
+    assignee: [{ id: 20, username: 'zhandos' }],
+  };
+
+  assert.equal(userCanManageTicket(ernar, zhandosTicket, false, ernarScope), false);
+  assert.equal(
+    userCanManageTicket(ernar, { ...zhandosTicket, assignee: [{ id: 21 }] }, false, ernarScope),
+    true
+  );
+  assert.equal(userCanManageTicket(ernar, zhandosTicket, true, ernarScope), true);
+});
+
+test('visibility list filter includes own and category-scoped assignments', () => {
+  assert.deepEqual(buildHelpdeskVisibilityFilter(ernarScope), {
+    $or: [
+      { assignee: { id: 21 } },
+      { completedBy: { id: 21 } },
+      {
+        $and: [
+          { category: { id: 5 } },
+          {
+            $or: [
+              { assignee: { id: { $in: [20] } } },
+              { completedBy: { id: { $in: [20] } } },
+            ],
+          },
+        ],
+      },
+    ],
+  });
 });

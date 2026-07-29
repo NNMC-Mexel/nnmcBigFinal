@@ -1,4 +1,8 @@
 import { Context } from 'koa';
+import {
+  normalizeHelpdeskVisibilityRules,
+  resolveHelpdeskCategoryVisibilityRules,
+} from '../../../utils/helpdesk-visibility';
 // Allowlist полей для department CRUD
 const DEPT_FIELDS = ['key', 'name_ru', 'name_kz', 'description'];
 const DEPT_PERMISSION_FLAGS = [
@@ -84,6 +88,17 @@ async function loadHelpdeskRouting(strapi: any) {
       })) as any[])
     : [];
 
+  const defaultVisibilityUsers = (await strapi.entityService.findMany('plugin::users-permissions.user', {
+    filters: {
+      $or: [
+        { username: { $in: ['ernar', 'zhandos'] } },
+        { email: { $in: ['ernar@nnmc.kz', 'zhandos@nnmc.kz'] } },
+      ],
+    } as any,
+    fields: ['id', 'username', 'email'],
+    pagination: { pageSize: 10 },
+  })) as any[];
+
   const categoriesByGroup = new Map<number, any[]>();
   for (const category of categories || []) {
     const groupId = Number(category?.serviceGroup?.id);
@@ -97,6 +112,7 @@ async function loadHelpdeskRouting(strapi: any) {
       slug: category.slug,
       order: category.order,
       defaultAssignee: relationItems(category.defaultAssignee).map(formatHelpdeskUser),
+      visibilityRules: resolveHelpdeskCategoryVisibilityRules(category, defaultVisibilityUsers),
     });
     categoriesByGroup.set(groupId, list);
   }
@@ -772,6 +788,24 @@ export default {
             .filter((id: number) => Number.isFinite(id) && id > 0)
         )
       );
+      const requestedVisibilityUserIds = Array.from(
+        new Set(
+          categories
+            .flatMap((item: any) =>
+              Array.isArray(item?.visibilityRules)
+                ? item.visibilityRules.flatMap((rule: any) => [
+                    rule?.viewerId,
+                    ...(Array.isArray(rule?.targetUserIds) ? rule.targetUserIds : []),
+                  ])
+                : []
+            )
+            .map((id: any) => Number(id))
+            .filter((id: number) => Number.isFinite(id) && id > 0)
+        )
+      );
+      const requestedHelpdeskUserIds = Array.from(
+        new Set([...requestedAssigneeIds, ...requestedVisibilityUserIds])
+      );
 
       const allowedCategories = uniqueCategoryIds.length > 0
         ? ((await strapi.entityService.findMany('api::ticket-category.ticket-category', {
@@ -796,10 +830,10 @@ export default {
         return;
       }
 
-      const allowedAssigneeIds = requestedAssigneeIds.length > 0
+      const allowedHelpdeskUsers = requestedHelpdeskUserIds.length > 0
         ? ((await strapi.entityService.findMany('plugin::users-permissions.user', {
             filters: {
-              id: { $in: requestedAssigneeIds },
+              id: { $in: requestedHelpdeskUserIds },
               department: { key: { $in: HELPDESK_DEPARTMENT_KEYS } },
               blocked: false,
             } as any,
@@ -808,20 +842,26 @@ export default {
             pagination: { pageSize: 1000 },
           })) as any[])
         : [];
-      const allowedAssigneeIdSet = new Set((allowedAssigneeIds || []).map((user: any) => Number(user.id)));
-      const assigneeDepartmentById = new Map(
-        (allowedAssigneeIds || []).map((user: any) => [
+      const allowedHelpdeskUserIdSet = new Set(
+        (allowedHelpdeskUsers || []).map((user: any) => Number(user.id))
+      );
+      const userDepartmentById = new Map(
+        (allowedHelpdeskUsers || []).map((user: any) => [
           Number(user.id),
           user?.department?.key,
         ])
       );
 
-      if (allowedAssigneeIdSet.size !== requestedAssigneeIds.length) {
-        ctx.throw(400, 'One or more assignees are not active helpdesk users');
+      if (allowedHelpdeskUserIdSet.size !== requestedHelpdeskUserIds.length) {
+        ctx.throw(400, 'One or more users are not active helpdesk users');
         return;
       }
 
-      const updates: Array<{ categoryId: number; assigneeIds: number[] }> = [];
+      const updates: Array<{
+        categoryId: number;
+        assigneeIds: number[];
+        visibilityRules?: Array<{ viewerId: number; targetUserIds: number[] }>;
+      }> = [];
       for (const item of categories) {
         const categoryId = Number(item?.id);
         if (!allowedCategoryIds.has(categoryId)) continue;
@@ -831,26 +871,46 @@ export default {
           new Set(
             (Array.isArray(item?.assigneeIds) ? item.assigneeIds : [])
               .map((id: any) => Number(id))
-              .filter((id: number) => allowedAssigneeIdSet.has(id))
+              .filter((id: number) => allowedHelpdeskUserIdSet.has(id))
           )
         ) as number[];
 
-        const crossDepartmentAssigneeId = assigneeIds.find((id) => assigneeDepartmentById.get(id) !== categoryDepartmentKey);
+        const crossDepartmentAssigneeId = assigneeIds.find(
+          (id) => userDepartmentById.get(id) !== categoryDepartmentKey
+        );
         if (crossDepartmentAssigneeId) {
           ctx.throw(400, 'Assignee must belong to the same department as the ticket category');
           return;
         }
 
-        updates.push({ categoryId, assigneeIds });
+        const visibilityRules = Array.isArray(item?.visibilityRules)
+          ? normalizeHelpdeskVisibilityRules(item.visibilityRules)
+          : undefined;
+        const hasCrossDepartmentVisibility = (visibilityRules || []).some((rule) => {
+          if (userDepartmentById.get(rule.viewerId) !== categoryDepartmentKey) return true;
+          return rule.targetUserIds.some(
+            (targetId) => userDepartmentById.get(targetId) !== categoryDepartmentKey
+          );
+        });
+        if (hasCrossDepartmentVisibility) {
+          ctx.throw(400, 'Visibility users must belong to the same department as the ticket category');
+          return;
+        }
+
+        updates.push({ categoryId, assigneeIds, visibilityRules });
       }
 
       for (const update of updates) {
+        const data: any = {
+          defaultAssignee: {
+            set: update.assigneeIds.map((id: number) => ({ id })),
+          },
+        };
+        if (update.visibilityRules !== undefined) {
+          data.visibilityRules = update.visibilityRules;
+        }
         await strapi.entityService.update('api::ticket-category.ticket-category', update.categoryId, {
-          data: {
-            defaultAssignee: {
-              set: update.assigneeIds.map((id: number) => ({ id })),
-            },
-          } as any,
+          data,
         });
       }
 

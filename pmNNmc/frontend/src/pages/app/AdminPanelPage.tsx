@@ -20,7 +20,12 @@ import {
   Save,
   Headphones,
 } from 'lucide-react';
-import { adminUsersApi, AdminUser, HelpdeskRoutingData } from '../../api/adminUsers';
+import {
+  adminUsersApi,
+  AdminUser,
+  HelpdeskRoutingData,
+  HelpdeskRoutingCategory,
+} from '../../api/adminUsers';
 import { projectsApi } from '../../api/projects';
 import { departmentsApi } from '../../api/departments';
 import type { Project, Department } from '../../types';
@@ -97,6 +102,10 @@ export default function AdminPanelPage() {
 
   const [helpdeskRouting, setHelpdeskRouting] = useState<HelpdeskRoutingData | null>(null);
   const [helpdeskRoutingDraft, setHelpdeskRoutingDraft] = useState<Record<number, number[]>>({});
+  const [helpdeskVisibilityDraft, setHelpdeskVisibilityDraft] = useState<
+    Record<number, Record<number, number[]>>
+  >({});
+  const [visibilityCategoryId, setVisibilityCategoryId] = useState<number | null>(null);
   const [helpdeskRoutingLoading, setHelpdeskRoutingLoading] = useState(false);
   const [helpdeskRoutingSaving, setHelpdeskRoutingSaving] = useState(false);
   const [helpdeskRoutingDirty, setHelpdeskRoutingDirty] = useState(false);
@@ -241,13 +250,21 @@ export default function AdminPanelPage() {
 
   const applyHelpdeskRouting = (data: HelpdeskRoutingData) => {
     const draft: Record<number, number[]> = {};
+    const visibilityDraft: Record<number, Record<number, number[]>> = {};
     data.groups.forEach((group) => {
       group.categories.forEach((category) => {
         draft[category.id] = category.defaultAssignee.map((user) => user.id);
+        visibilityDraft[category.id] = Object.fromEntries(
+          (category.visibilityRules || []).map((rule) => [
+            rule.viewerId,
+            rule.targetUserIds,
+          ])
+        );
       });
     });
     setHelpdeskRouting(data);
     setHelpdeskRoutingDraft(draft);
+    setHelpdeskVisibilityDraft(visibilityDraft);
     setHelpdeskRoutingDirty(false);
   };
 
@@ -517,6 +534,29 @@ export default function AdminPanelPage() {
     setHelpdeskRoutingDirty(true);
   };
 
+  const toggleHelpdeskVisibility = (
+    categoryId: number,
+    viewerId: number,
+    targetUserId: number
+  ) => {
+    if (viewerId === targetUserId) return;
+    setHelpdeskVisibilityDraft((prev) => {
+      const categoryRules = prev[categoryId] || {};
+      const currentTargets = categoryRules[viewerId] || [];
+      const nextTargets = currentTargets.includes(targetUserId)
+        ? currentTargets.filter((id) => id !== targetUserId)
+        : [...currentTargets, targetUserId];
+      return {
+        ...prev,
+        [categoryId]: {
+          ...categoryRules,
+          [viewerId]: nextTargets,
+        },
+      };
+    });
+    setHelpdeskRoutingDirty(true);
+  };
+
   const saveHelpdeskRouting = async () => {
     if (!helpdeskRouting) return;
     setHelpdeskRoutingSaving(true);
@@ -525,6 +565,12 @@ export default function AdminPanelPage() {
         group.categories.map((category) => ({
           id: category.id,
           assigneeIds: helpdeskRoutingDraft[category.id] || [],
+          visibilityRules: Object.entries(helpdeskVisibilityDraft[category.id] || {}).map(
+            ([viewerId, targetUserIds]) => ({
+              viewerId: Number(viewerId),
+              targetUserIds,
+            })
+          ),
         }))
       );
       const result = await adminUsersApi.updateHelpdeskRouting(categories);
@@ -571,6 +617,19 @@ export default function AdminPanelPage() {
 
   const getHelpdeskUsersForDepartment = (departmentKey?: string) =>
     (helpdeskRouting?.users || []).filter((user) => user.department?.key === departmentKey);
+
+  const visibilityCategoryContext = helpdeskRouting?.groups
+    .flatMap((group) =>
+      group.categories.map((category) => ({
+        category,
+        group,
+      }))
+    )
+    .find(({ category }) => category.id === visibilityCategoryId);
+
+  const getVisibilityRuleCount = (category: HelpdeskRoutingCategory) =>
+    Object.values(helpdeskVisibilityDraft[category.id] || {})
+      .reduce((total, targetIds) => total + targetIds.length, 0);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString(i18n.language === 'kz' ? 'kk-KZ' : 'ru-RU', {
@@ -840,6 +899,7 @@ export default function AdminPanelPage() {
                         <tr className="bg-slate-50 border-b border-slate-200 text-left text-slate-500">
                           <th className="px-4 py-3 font-medium min-w-[240px]">Тип заявки</th>
                           <th className="px-4 py-3 font-medium min-w-[360px]">Исполнители</th>
+                          <th className="px-4 py-3 font-medium min-w-[210px]">Кто видит заявки</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -881,6 +941,19 @@ export default function AdminPanelPage() {
                                     })}
                                   </div>
                                 )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => setVisibilityCategoryId(category.id)}
+                                  icon={<Eye className="w-4 h-4" />}
+                                >
+                                  Настроить
+                                </Button>
+                                <div className="mt-1.5 text-xs text-slate-500">
+                                  {getVisibilityRuleCount(category)} связей просмотра
+                                </div>
                               </td>
                             </tr>
                           );
@@ -1074,6 +1147,100 @@ export default function AdminPanelPage() {
       )}
 
       {/* ═══ MODALS ═══════════════════════════════════════════ */}
+
+      <Modal
+        isOpen={Boolean(visibilityCategoryContext)}
+        onClose={() => setVisibilityCategoryId(null)}
+        title={
+          visibilityCategoryContext
+            ? `Доступ: ${
+                i18n.language === 'kz'
+                  ? visibilityCategoryContext.category.name_kz
+                  : visibilityCategoryContext.category.name_ru
+              }`
+            : 'Доступ к заявкам'
+        }
+        size="xl"
+      >
+        {visibilityCategoryContext && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Для каждого сотрудника отметьте, чьи заявки этой категории он может
+              просматривать. Свои назначенные заявки доступны всегда. Просмотр не даёт
+              права менять статус или исполнителя.
+            </p>
+            <div className="divide-y divide-slate-200 rounded-lg border border-slate-200">
+              {getHelpdeskUsersForDepartment(
+                visibilityCategoryContext.group.department?.key
+              ).map((viewer) => {
+                const departmentUsers = getHelpdeskUsersForDepartment(
+                  visibilityCategoryContext.group.department?.key
+                );
+                const selectedTargets =
+                  helpdeskVisibilityDraft[visibilityCategoryContext.category.id]?.[
+                    viewer.id
+                  ] || [];
+                return (
+                  <div key={viewer.id} className="p-3">
+                    <div className="mb-2 font-medium text-slate-800">
+                      {getAdminUserName(viewer)}
+                      <span className="ml-2 text-xs font-normal text-slate-400">
+                        видит заявки:
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {departmentUsers
+                        .filter((target) => target.id !== viewer.id)
+                        .map((target) => {
+                          const checked = selectedTargets.includes(target.id);
+                          return (
+                            <label
+                              key={`${viewer.id}-${target.id}`}
+                              className={`inline-flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-sm transition-colors ${
+                                checked
+                                  ? 'border-cyan-300 bg-cyan-50 text-cyan-800'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() =>
+                                  toggleHelpdeskVisibility(
+                                    visibilityCategoryContext.category.id,
+                                    viewer.id,
+                                    target.id
+                                  )
+                                }
+                                className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                              />
+                              <span>{getAdminUserName(target)}</span>
+                            </label>
+                          );
+                        })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setVisibilityCategoryId(null)}>
+                Закрыть
+              </Button>
+              <Button
+                onClick={() => {
+                  setVisibilityCategoryId(null);
+                  saveHelpdeskRouting();
+                }}
+                disabled={!helpdeskRoutingDirty || helpdeskRoutingSaving}
+                icon={<Save className="w-4 h-4" />}
+              >
+                Сохранить все настройки
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Create User Modal */}
       <Modal isOpen={showCreateUserModal} onClose={() => setShowCreateUserModal(false)} title="Создать аккаунт" size="md">

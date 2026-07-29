@@ -47,6 +47,10 @@ export interface HelpdeskRoutingCategory {
   slug: string;
   order?: number;
   defaultAssignee: HelpdeskRoutingUser[];
+  visibilityRules: Array<{
+    viewerId: number;
+    targetUserIds: number[];
+  }>;
 }
 
 export interface HelpdeskRoutingGroup {
@@ -170,7 +174,11 @@ export const adminUsersApi = {
   },
 
   updateHelpdeskRouting: async (
-    categories: Array<{ id: number; assigneeIds: number[] }>
+    categories: Array<{
+      id: number;
+      assigneeIds: number[];
+      visibilityRules: Array<{ viewerId: number; targetUserIds: number[] }>;
+    }>
   ): Promise<{ data: HelpdeskRoutingData; message: string }> => {
     const response = await client.put('/admin-users/helpdesk-routing', { categories });
     return response.data;
