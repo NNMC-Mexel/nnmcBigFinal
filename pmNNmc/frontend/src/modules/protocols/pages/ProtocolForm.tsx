@@ -16,6 +16,16 @@ type Attendee = {
   departmentName: string;
 };
 
+type StoredProtocolDraft = {
+  theme: string;
+  meetingDate: string;
+  attendees: Attendee[];
+  tasks: ProtocolTask[];
+  conclusion: string;
+  nextMeetingDate: string;
+  savedAt?: string;
+};
+
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -40,6 +50,7 @@ export default function ProtocolForm() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
   const [formReady, setFormReady] = useState(false);
   const [draftStatus, setDraftStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +68,9 @@ export default function ProtocolForm() {
   const [pickerUserId, setPickerUserId] = useState('');
   const lastServerSnapshot = useRef('');
   const restoredEditDraft = useRef(false);
+  const creatingServerDraft = useRef(false);
+  const failedCreateSnapshot = useRef('');
+  const latestDraft = useRef<StoredProtocolDraft | null>(null);
 
   useEffect(() => {
     protocolsApi.usersByDepartment().then(setDepartments).catch(() => {});
@@ -109,6 +123,28 @@ export default function ProtocolForm() {
     () => `nnmc-protocol-draft:${id || 'new'}:${user?.id || 'anonymous'}`,
     [id, user?.id]
   );
+
+  latestDraft.current = {
+    theme,
+    meetingDate,
+    attendees,
+    tasks,
+    conclusion,
+    nextMeetingDate,
+  };
+
+  const persistLocalDraft = useCallback((storageKey = draftStorageKey) => {
+    if (!latestDraft.current) return false;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify({
+        ...latestDraft.current,
+        savedAt: new Date().toISOString(),
+      }));
+      return true;
+    } catch {
+      return false;
+    }
+  }, [draftStorageKey]);
 
   useEffect(() => {
     if (isEdit) return;
@@ -264,20 +300,91 @@ export default function ProtocolForm() {
 
   useEffect(() => {
     if (!formReady) return;
+    setDraftStatus('Сохраняем черновик...');
     const timer = window.setTimeout(() => {
-      window.localStorage.setItem(draftStorageKey, JSON.stringify({
-        theme,
-        meetingDate,
-        attendees,
-        tasks,
-        conclusion,
-        nextMeetingDate,
-        savedAt: new Date().toISOString(),
-      }));
-      setDraftStatus(isEdit && protocol?.status === 'draft' ? 'Черновик сохранен локально' : 'Черновик сохранен');
-    }, 350);
+      const saved = persistLocalDraft();
+      setDraftStatus(saved ? 'Черновик сохранен' : 'Не удалось сохранить локальный черновик');
+    }, 250);
     return () => window.clearTimeout(timer);
-  }, [attendees, conclusion, draftStorageKey, formReady, isEdit, meetingDate, nextMeetingDate, protocol?.status, tasks, theme]);
+  }, [
+    attendees,
+    conclusion,
+    formReady,
+    meetingDate,
+    nextMeetingDate,
+    persistLocalDraft,
+    tasks,
+    theme,
+  ]);
+
+  useEffect(() => {
+    if (!formReady) return;
+    const flushDraft = () => {
+      persistLocalDraft();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushDraft();
+    };
+    window.addEventListener('pagehide', flushDraft);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('pagehide', flushDraft);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [formReady, persistLocalDraft]);
+
+  useEffect(() => {
+    if (
+      !formReady ||
+      isEdit ||
+      !theme.trim() ||
+      saving ||
+      publishing ||
+      creatingServerDraft.current
+    ) {
+      return;
+    }
+
+    const payload = buildPayload();
+    const snapshot = JSON.stringify(payload);
+    if (snapshot === failedCreateSnapshot.current) return;
+
+    const timer = window.setTimeout(async () => {
+      creatingServerDraft.current = true;
+      setAutoSaving(true);
+      setDraftStatus('Создаем серверный черновик...');
+      try {
+        const created = await protocolsApi.create({ ...payload, autosave: true });
+        const editStorageKey = `nnmc-protocol-draft:${created.id}:${user?.id || 'anonymous'}`;
+        persistLocalDraft(editStorageKey);
+        try {
+          window.localStorage.removeItem(draftStorageKey);
+        } catch {
+          // The server draft already exists; an unavailable local storage must not create a duplicate.
+        }
+        navigate(`/app/protocols/${created.id}/edit`, { replace: true });
+      } catch {
+        failedCreateSnapshot.current = snapshot;
+        creatingServerDraft.current = false;
+        setDraftStatus('Черновик сохранен локально. Сервер недоступен');
+      } finally {
+        setAutoSaving(false);
+      }
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    buildPayload,
+    draftStorageKey,
+    formReady,
+    isEdit,
+    navigate,
+    persistLocalDraft,
+    publishing,
+    saving,
+    theme,
+    user?.id,
+  ]);
 
   useEffect(() => {
     if (!formReady || !isEdit || !id || protocol?.status !== 'draft' || !theme.trim() || saving || publishing) return;
@@ -298,6 +405,7 @@ export default function ProtocolForm() {
   }, [buildPayload, formReady, id, isEdit, protocol?.status, publishing, saving, theme]);
 
   async function handleSave(publishAfter = false) {
+    if (autoSaving) return;
     if (!theme.trim()) {
       setError('Введите тему');
       return;
@@ -616,7 +724,7 @@ export default function ProtocolForm() {
           <button
             type="button"
             onClick={() => handleSave(false)}
-            disabled={saving || publishing}
+            disabled={saving || publishing || autoSaving}
             className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-sm disabled:opacity-50"
           >
             {saving && !publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -627,7 +735,7 @@ export default function ProtocolForm() {
             <button
               type="button"
               onClick={() => handleSave(true)}
-              disabled={saving || publishing}
+              disabled={saving || publishing || autoSaving}
               className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm disabled:opacity-50"
             >
               {publishing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
