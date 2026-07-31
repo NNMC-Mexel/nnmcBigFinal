@@ -1,37 +1,46 @@
-# NNMC IT Project Board - Frontend Dockerfile
-FROM node:22-alpine AS base
-
-# Install dependencies only when needed
-FROM base AS deps
-RUN apk add --no-cache libc6-compat
+FROM node:22-alpine AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm ci
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
-# Build the application
-FROM base AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Set build-time environment variables
-ARG VITE_API_URL=http://192.168.101.25:12005
-ARG VITE_FRONTEND_URL=http://192.168.101.25:13005
+ARG VITE_API_URL=http://192.168.101.25:12010
+ARG VITE_FRONTEND_URL=https://webportal.nnmc.kz
+ARG VITE_KEYCLOAK_ENABLED=true
+ARG VITE_KEYCLOAK_URL=http://192.168.101.25:12012
+ARG VITE_KEYCLOAK_REALM=nnmc
+ARG VITE_KPI_API_BASE=http://192.168.101.25:12011/api
+ARG VITE_CONF_API_URL=http://192.168.101.25:12013
+ARG VITE_JOURNAL_API_URL=http://192.168.101.25:12014
+ARG VITE_SIGNDOC_API_BASE=http://192.168.101.25:12015/api
+ARG VITE_BPM_API_URL=http://192.168.101.25:12016
+
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_FRONTEND_URL=$VITE_FRONTEND_URL
+ENV VITE_KEYCLOAK_ENABLED=$VITE_KEYCLOAK_ENABLED
+ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL
+ENV VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM
+ENV VITE_KPI_API_BASE=$VITE_KPI_API_BASE
+ENV VITE_CONF_API_URL=$VITE_CONF_API_URL
+ENV VITE_JOURNAL_API_URL=$VITE_JOURNAL_API_URL
+ENV VITE_SIGNDOC_API_BASE=$VITE_SIGNDOC_API_BASE
+ENV VITE_BPM_API_URL=$VITE_BPM_API_URL
 
 RUN npm run build
 
-# Production image with nginx
-FROM nginx:alpine AS runner
+FROM nginx:1.27-alpine AS runner
 
-# Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
-
-# Copy built static files
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-EXPOSE 13005
+EXPOSE 13010
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:13010/ >/dev/null || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
