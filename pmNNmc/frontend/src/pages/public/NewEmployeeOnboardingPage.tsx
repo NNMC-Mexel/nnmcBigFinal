@@ -694,9 +694,10 @@ export default function NewEmployeeOnboardingPage() {
       const data = await onboardingApi.verify(token, iin);
       const previousDraft = data.draft || {};
       const previousStep = Number(previousDraft.currentStep || 0);
-      const migratedStep = Number(previousDraft.flowVersion || 0) >= ONBOARDING_FLOW_VERSION
-        ? previousStep
-        : previousStep === 0 ? 0 : previousStep + 2;
+      const isCurrentFlow = Number(previousDraft.flowVersion || 0) >= ONBOARDING_FLOW_VERSION;
+      // Existing drafts must complete the newly inserted training before
+      // returning to personal data and the rest of the questionnaire.
+      const migratedStep = isCurrentFlow ? previousStep : previousStep === 0 ? 0 : 1;
       const initialDraft = {
         ...previousDraft,
         flowVersion: ONBOARDING_FLOW_VERSION,
