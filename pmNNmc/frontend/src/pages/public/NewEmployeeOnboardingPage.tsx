@@ -80,25 +80,25 @@ const orientationSlides = [
   {
     id: 'employment-photo',
     title: 'Порядок приема на работу',
-    image: '/onboarding/intro-slide-1.png',
+    image: '/onboarding/intro-slide-1.png?v=20260731',
     points: ['Этапы приема и необходимые документы', 'Режим рабочего времени и медицинский осмотр', 'Испытательный срок и адаптация'],
   },
   {
     id: 'employment',
     title: 'Порядок приема на работу: памятка',
-    image: '/onboarding/intro-slide-2.png',
+    image: '/onboarding/intro-slide-2.png?v=20260731',
     points: ['Вакансия, собеседование и проверка документов', 'Оформление трудового договора и приказа', 'Инструктаж и допуск к работе'],
   },
   {
     id: 'conduct',
     title: 'Права, обязанности и стандарты поведения',
-    image: '/onboarding/intro-slide-3.png',
+    image: '/onboarding/intro-slide-3.png?v=20260731',
     points: ['Уважение к пациентам и коллегам', 'Конфиденциальность и трудовая дисциплина', 'Профессионализм, ответственность и командная работа'],
   },
   {
     id: 'safety',
     title: 'Безопасность, здоровье и благополучие',
-    image: '/onboarding/intro-slide-4.png',
+    image: '/onboarding/intro-slide-4.png?v=20260731',
     points: ['Безопасность на рабочем месте', 'Действия в чрезвычайных ситуациях', 'Здоровье сотрудника и доступные ресурсы поддержки'],
   },
 ];
