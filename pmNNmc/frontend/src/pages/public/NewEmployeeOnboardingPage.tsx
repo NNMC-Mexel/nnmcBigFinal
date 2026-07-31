@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -12,9 +12,12 @@ import {
   GraduationCap,
   HeartPulse,
   Home,
+  Image as ImageIcon,
   Loader2,
   PlayCircle,
+  RotateCcw,
   ShieldCheck,
+  TimerReset,
   Upload,
   UserRound,
   Users,
@@ -55,7 +58,9 @@ type AddressValue = {
 
 const steps = [
   { key: 'intro', title: 'Знакомство с ННМЦ', icon: PlayCircle },
-  { key: 'law', title: 'Согласие и законность', icon: ShieldCheck },
+  { key: 'orientation', title: 'Введение в должность', icon: ImageIcon },
+  { key: 'orientation-quiz', title: 'Проверка знаний', icon: FileCheck2 },
+  { key: 'law', title: 'Персональные данные', icon: ShieldCheck },
   { key: 'identity', title: 'Личные данные', icon: UserRound },
   { key: 'documents', title: 'Документы', icon: FileCheck2 },
   { key: 'contacts', title: 'Адреса и контакты', icon: Home },
@@ -68,6 +73,93 @@ const steps = [
   { key: 'safety-fire', title: 'Пожарная безопасность', icon: ShieldCheck },
   { key: 'review', title: 'Проверка', icon: FileText },
 ];
+
+const ONBOARDING_FLOW_VERSION = 2;
+
+const orientationSlides = [
+  {
+    id: 'employment-photo',
+    title: 'Порядок приема на работу',
+    image: '/onboarding/intro-slide-1.png',
+    points: ['Этапы приема и необходимые документы', 'Режим рабочего времени и медицинский осмотр', 'Испытательный срок и адаптация'],
+  },
+  {
+    id: 'employment',
+    title: 'Порядок приема на работу: памятка',
+    image: '/onboarding/intro-slide-2.png',
+    points: ['Вакансия, собеседование и проверка документов', 'Оформление трудового договора и приказа', 'Инструктаж и допуск к работе'],
+  },
+  {
+    id: 'conduct',
+    title: 'Права, обязанности и стандарты поведения',
+    image: '/onboarding/intro-slide-3.png',
+    points: ['Уважение к пациентам и коллегам', 'Конфиденциальность и трудовая дисциплина', 'Профессионализм, ответственность и командная работа'],
+  },
+  {
+    id: 'safety',
+    title: 'Безопасность, здоровье и благополучие',
+    image: '/onboarding/intro-slide-4.png',
+    points: ['Безопасность на рабочем месте', 'Действия в чрезвычайных ситуациях', 'Здоровье сотрудника и доступные ресурсы поддержки'],
+  },
+];
+
+const orientationQuiz = [
+  {
+    id: 'mission',
+    question: 'Какова основная миссия АО «Национальный научный медицинский центр»?',
+    options: {
+      A: 'Получение прибыли и расширение рынка',
+      B: 'Оказание качественной, безопасной и современной медицинской помощи пациентам',
+      C: 'Продажа медицинского оборудования',
+      D: 'Организация научных конференций',
+    },
+    answer: 'B',
+  },
+  {
+    id: 'employment-stage',
+    question: 'Какой этап следует после проверки документов при приеме на работу?',
+    options: {
+      A: 'Допуск к работе',
+      B: 'Медицинский осмотр',
+      C: 'Оформление трудового договора и приказа',
+      D: 'Испытательный срок',
+    },
+    answer: 'C',
+  },
+  {
+    id: 'employee-duty',
+    question: 'Что обязан делать каждый сотрудник Центра?',
+    options: {
+      A: 'Соблюдать внутренние правила и сохранять конфиденциальность информации',
+      B: 'Передавать информацию о пациентах третьим лицам',
+      C: 'Использовать имущество Центра в личных целях',
+      D: 'Игнорировать требования охраны труда',
+    },
+    answer: 'A',
+  },
+  {
+    id: 'danger',
+    question: 'Как необходимо поступить при обнаружении опасной ситуации на рабочем месте?',
+    options: {
+      A: 'Ничего не предпринимать',
+      B: 'Сообщить руководителю или ответственному лицу и соблюдать инструкции по безопасности',
+      C: 'Покинуть рабочее место без уведомления',
+      D: 'Опубликовать информацию в социальных сетях',
+    },
+    answer: 'B',
+  },
+  {
+    id: 'value',
+    question: 'Что является одной из ключевых ценностей Центра?',
+    options: {
+      A: 'Конкуренция между сотрудниками',
+      B: 'Командная работа, уважение и ответственность',
+      C: 'Индивидуальные результаты любой ценой',
+      D: 'Минимизация общения с пациентами',
+    },
+    answer: 'B',
+  },
+] as const;
 
 const sectionOptions = {
   gender: [
@@ -122,6 +214,14 @@ function normalizeDateInput(value: string) {
 
 function formatAddress(value?: AddressValue) {
   return [value?.country, value?.region, value?.city, value?.details].filter(Boolean).join(', ');
+}
+
+function formatDuration(totalSeconds: number) {
+  const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+  return [hours, minutes, rest].map((part) => String(part).padStart(2, '0')).join(':');
 }
 
 function hasFiles(value: unknown): value is FileMeta[] {
@@ -263,6 +363,119 @@ function AddressFields({
   );
 }
 
+function OrientationSlideVisual({ slide }: { slide: (typeof orientationSlides)[number] }) {
+  const [imageUnavailable, setImageUnavailable] = useState(false);
+
+  if (!imageUnavailable) {
+    return (
+      <img
+        src={slide.image}
+        alt={slide.title}
+        className="h-full w-full object-contain"
+        onError={() => setImageUnavailable(true)}
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full flex-col justify-center bg-slate-50 p-6 sm:p-10">
+      <p className="text-xs font-semibold uppercase text-blue-700">Программа введения в должность</p>
+      <h2 className="mt-3 text-xl font-bold text-slate-900 sm:text-3xl">{slide.title}</h2>
+      <div className="mt-6 grid gap-3">
+        {slide.points.map((point) => (
+          <div key={point} className="flex items-start gap-3 rounded-lg border border-blue-100 bg-white p-4 text-sm text-slate-700 sm:text-base">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" />
+            <span>{point}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SignaturePad({ value, onChange }: { value?: string; onChange: (value: string) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const drawingRef = useRef(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext('2d');
+    if (!canvas || !context) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    if (!value) return;
+    const image = new Image();
+    image.onload = () => context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    image.src = value;
+  }, [value]);
+
+  const point = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    const canvas = event.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) / rect.width) * canvas.width,
+      y: ((event.clientY - rect.top) / rect.height) * canvas.height,
+    };
+  };
+
+  const startDrawing = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    const context = event.currentTarget.getContext('2d');
+    if (!context) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const current = point(event);
+    context.beginPath();
+    context.moveTo(current.x, current.y);
+    context.lineWidth = 3;
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.strokeStyle = '#0f172a';
+    drawingRef.current = true;
+  };
+
+  const draw = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (!drawingRef.current) return;
+    const context = event.currentTarget.getContext('2d');
+    if (!context) return;
+    const current = point(event);
+    context.lineTo(current.x, current.y);
+    context.stroke();
+  };
+
+  const finishDrawing = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    onChange(event.currentTarget.toDataURL('image/png'));
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    onChange('');
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="font-semibold text-slate-900">Собственноручная подпись</p>
+          <p className="text-xs text-slate-500">Распишитесь мышью, стилусом или пальцем.</p>
+        </div>
+        <Button type="button" size="sm" variant="secondary" onClick={clear} icon={<RotateCcw className="h-4 w-4" />}>Очистить</Button>
+      </div>
+      <canvas
+        ref={canvasRef}
+        width={900}
+        height={240}
+        onPointerDown={startDrawing}
+        onPointerMove={draw}
+        onPointerUp={finishDrawing}
+        onPointerCancel={finishDrawing}
+        className="h-44 w-full cursor-crosshair rounded-lg border border-slate-300 bg-white touch-none"
+      />
+      <p className="mt-2 text-xs text-slate-500">Подпись сохраняется в анкете. В будущем этот шаг можно заменить подписанием ЭЦП.</p>
+    </div>
+  );
+}
+
 export default function NewEmployeeOnboardingPage() {
   const { token = '' } = useParams();
   const [iin, setIin] = useState('');
@@ -276,6 +489,8 @@ export default function NewEmployeeOnboardingPage() {
   const [success, setSuccess] = useState('');
   const [positionOptions, setPositionOptions] = useState<ComboboxOption[]>([]);
   const [settings, setSettings] = useState<OnboardingSettings>(defaultSettings);
+  const [orientationSlide, setOrientationSlide] = useState(0);
+  const draftRef = useRef<Record<string, any>>({});
 
   const activeStep = steps[step];
   const isSubmitted = invitation?.status === 'SUBMITTED' || invitation?.status === 'APPROVED' || invitation?.status === 'SENT_ONEC';
@@ -300,6 +515,50 @@ export default function NewEmployeeOnboardingPage() {
       if (settingsResult.status === 'fulfilled') setSettings(settingsResult.value);
     });
   }, [token]);
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  useEffect(() => {
+    if (!verified || isSubmitted || activeStep.key !== 'orientation') return;
+    const interval = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      setDraft((current) => {
+        const training = current.orientationTraining || {};
+        const slideSeconds = orientationSlides.map((_, index) => Number(training.slideSeconds?.[index]) || 0);
+        slideSeconds[orientationSlide] += 1;
+        return {
+          ...current,
+          orientationTraining: { ...training, slideSeconds },
+        };
+      });
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [activeStep.key, isSubmitted, orientationSlide, verified]);
+
+  useEffect(() => {
+    if (!verified || isSubmitted || activeStep.key !== 'law') return;
+    const interval = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      setDraft((current) => ({
+        ...current,
+        legal: {
+          ...(current.legal || {}),
+          secondsSpent: (Number(current.legal?.secondsSpent) || 0) + 1,
+        },
+      }));
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, [activeStep.key, isSubmitted, verified]);
+
+  useEffect(() => {
+    if (!verified || isSubmitted || !['orientation', 'law'].includes(activeStep.key)) return;
+    const interval = window.setInterval(() => {
+      void onboardingApi.saveDraft(token, iin, draftRef.current, step).catch(() => {});
+    }, 10000);
+    return () => window.clearInterval(interval);
+  }, [activeStep.key, iin, isSubmitted, step, token, verified]);
 
   const documentRequired = (key: string) => settings.documentRequirements[key] === true;
 
@@ -331,8 +590,22 @@ export default function NewEmployeeOnboardingPage() {
     const family = data.family || {};
     const work = data.work || {};
 
-    if (stepKey === 'law' && data.legal?.accepted !== true) {
-      errors.push('Подтвердите согласие на обработку персональных данных');
+    if (stepKey === 'intro' && data.intro?.reviewed !== true) {
+      errors.push('Подтвердите просмотр приветственного видео');
+    }
+    if (stepKey === 'orientation') {
+      const viewedSlides = data.orientationTraining?.viewedSlides || [];
+      const slideSeconds = data.orientationTraining?.slideSeconds || [];
+      if (!orientationSlides.every((_, index) => viewedSlides[index] === true && Number(slideSeconds[index]) > 0)) {
+        errors.push('Просмотрите и отметьте все 4 материала программы введения в должность');
+      }
+    }
+    if (stepKey === 'orientation-quiz' && data.orientationTraining?.quizPassed !== true) {
+      errors.push('Пройдите тест по программе введения в должность без ошибок');
+    }
+    if (stepKey === 'law') {
+      if (data.legal?.accepted !== true) errors.push('Подтвердите согласие на обработку персональных данных');
+      if (!String(data.legal?.signatureDataUrl || '').startsWith('data:image/png;base64,')) errors.push('Поставьте собственноручную подпись');
     }
     if (stepKey === 'identity') {
       if (documentRequired('identityPhoto') && !hasFiles(identity.photo)) errors.push('Загрузите фотографию 3x4');
@@ -419,20 +692,26 @@ export default function NewEmployeeOnboardingPage() {
     setIsSaving(true);
     try {
       const data = await onboardingApi.verify(token, iin);
+      const previousDraft = data.draft || {};
+      const previousStep = Number(previousDraft.currentStep || 0);
+      const migratedStep = Number(previousDraft.flowVersion || 0) >= ONBOARDING_FLOW_VERSION
+        ? previousStep
+        : previousStep === 0 ? 0 : previousStep + 2;
       const initialDraft = {
-        ...(data.draft || {}),
+        ...previousDraft,
+        flowVersion: ONBOARDING_FLOW_VERSION,
         identity: {
-          ...(data.draft?.identity || {}),
-          citizenship: data.draft?.identity?.citizenship || 'Казахстан',
+          ...(previousDraft.identity || {}),
+          citizenship: previousDraft.identity?.citizenship || 'Казахстан',
         },
         documents: {
-          ...(data.draft?.documents || {}),
-          documentType: data.draft?.documents?.documentType || 'Удостоверение личности',
+          ...(previousDraft.documents || {}),
+          documentType: previousDraft.documents?.documentType || 'Удостоверение личности',
         },
       };
       setInvitation(data);
       setDraft(initialDraft);
-      setStep(Number(data.draft?.currentStep || 0));
+      setStep(Math.min(Math.max(migratedStep, 0), steps.length - 1));
       setVerified(true);
       setSuccess('ИИН подтвержден. Можно начинать заполнение анкеты.');
     } catch (requestError: any) {
@@ -468,6 +747,48 @@ export default function NewEmployeeOnboardingPage() {
     void save(Math.min(step + 1, steps.length - 1));
   };
   const previous = () => setStep((current) => Math.max(current - 1, 0));
+
+  const markOrientationSlideViewed = () => {
+    setDraft((current) => {
+      const training = current.orientationTraining || {};
+      const viewedSlides = orientationSlides.map((_, index) => training.viewedSlides?.[index] === true);
+      viewedSlides[orientationSlide] = true;
+      const complete = viewedSlides.every(Boolean);
+      return {
+        ...current,
+        orientationTraining: {
+          ...training,
+          viewedSlides,
+          ...(complete ? { slidesCompletedAt: training.slidesCompletedAt || new Date().toISOString() } : {}),
+        },
+      };
+    });
+    if (orientationSlide < orientationSlides.length - 1) setOrientationSlide((current) => current + 1);
+  };
+
+  const checkOrientationQuiz = () => {
+    const answers = draft.orientationTraining?.quizAnswers || {};
+    if (orientationQuiz.some((question) => !answers[question.id])) {
+      setError('Ответьте на все 5 вопросов');
+      return;
+    }
+    const score = orientationQuiz.filter((question) => answers[question.id] === question.answer).length;
+    const passed = score === orientationQuiz.length;
+    setDraft((current) => ({
+      ...current,
+      orientationTraining: {
+        ...(current.orientationTraining || {}),
+        quizScore: score,
+        quizPassed: passed,
+        quizAttempts: (Number(current.orientationTraining?.quizAttempts) || 0) + 1,
+        quizCheckedAt: new Date().toISOString(),
+        ...(passed ? { quizCompletedAt: new Date().toISOString() } : {}),
+      },
+    }));
+    setError(passed ? '' : `Правильных ответов: ${score} из 5. Исправьте ответы и попробуйте еще раз.`);
+    setSuccess(passed ? 'Тест пройден: 5 из 5' : '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const submit = async () => {
     setError('');
@@ -546,35 +867,157 @@ export default function NewEmployeeOnboardingPage() {
             />
           </div>
           <div className="rounded-xl bg-teal-50 p-4 text-sm text-teal-800">
-            Добро пожаловать в АО "ННМЦ". После просмотра видео нажмите "Далее" и заполните анкету. Черновик будет сохраняться после каждого этапа.
+            Добро пожаловать в АО "ННМЦ". После видео вас ждет программа введения в должность, короткий тест и ознакомление с положением о персональных данных.
           </div>
+          <label className="flex cursor-pointer items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-base font-medium text-slate-800">
+            <input type="checkbox" checked={draft.intro?.reviewed === true} onChange={(event) => updateSection('intro', 'reviewed', event.target.checked)} className="h-7 w-7 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+            Я посмотрел(а) приветственное видео
+          </label>
+        </div>
+      );
+    }
+
+    if (activeStep.key === 'orientation') {
+      const training = draft.orientationTraining || {};
+      const slide = orientationSlides[orientationSlide];
+      const viewedSlides = orientationSlides.map((_, index) => training.viewedSlides?.[index] === true);
+      const slideSeconds = orientationSlides.map((_, index) => Number(training.slideSeconds?.[index]) || 0);
+      const totalSeconds = slideSeconds.reduce((sum, seconds) => sum + seconds, 0);
+      return (
+        <div className="space-y-5">
+          <div className="flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold text-blue-950">Материал {orientationSlide + 1} из {orientationSlides.length}</p>
+              <p className="text-sm text-blue-700">Изучите каждый материал и отметьте его просмотренным.</p>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 font-mono text-sm font-semibold text-blue-900 shadow-sm">
+              <TimerReset className="h-4 w-4" />
+              {formatDuration(slideSeconds[orientationSlide])}
+              <span className="font-sans font-normal text-slate-400">· всего {formatDuration(totalSeconds)}</span>
+            </div>
+          </div>
+
+          <div className="aspect-[3/2] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <OrientationSlideVisual key={slide.id} slide={slide} />
+          </div>
+
+          <div className="grid grid-cols-4 gap-2">
+            {orientationSlides.map((item, index) => (
+              <button
+                key={item.id}
+                type="button"
+                title={`Материал ${index + 1}: ${item.title}`}
+                onClick={() => setOrientationSlide(index)}
+                className={`h-2 rounded-full transition-colors ${index === orientationSlide ? 'bg-blue-700' : viewedSlides[index] ? 'bg-emerald-400' : 'bg-slate-200'}`}
+              />
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Button type="button" variant="secondary" disabled={orientationSlide === 0} onClick={() => setOrientationSlide((current) => Math.max(0, current - 1))} icon={<ArrowLeft className="h-4 w-4" />}>Предыдущий материал</Button>
+            <Button type="button" onClick={markOrientationSlideViewed} icon={viewedSlides[orientationSlide] ? <CheckCircle2 className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}>
+              {orientationSlide === orientationSlides.length - 1 ? 'Отметить просмотренным' : 'Изучено, следующий материал'}
+            </Button>
+          </div>
+          {viewedSlides.every(Boolean) && (
+            <div className="rounded-xl bg-emerald-50 p-4 text-sm font-medium text-emerald-800">Все 4 материала просмотрены. Можно переходить к тесту.</div>
+          )}
+        </div>
+      );
+    }
+
+    if (activeStep.key === 'orientation-quiz') {
+      const training = draft.orientationTraining || {};
+      const answers = training.quizAnswers || {};
+      return (
+        <div className="space-y-5">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            Для завершения этапа нужно правильно ответить на все 5 вопросов. Количество попыток сохраняется и будет видно отделу кадров.
+          </div>
+          {orientationQuiz.map((question, questionIndex) => (
+            <fieldset key={question.id} className="rounded-xl border border-slate-200 p-4 sm:p-5">
+              <legend className="px-2 font-semibold text-slate-900">Вопрос {questionIndex + 1}</legend>
+              <p className="mb-4 text-sm font-medium text-slate-800 sm:text-base">{question.question}</p>
+              <div className="space-y-2">
+                {Object.entries(question.options).map(([key, label]) => (
+                  <label key={key} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm transition-colors ${answers[question.id] === key ? 'border-primary-300 bg-primary-50 text-primary-900' : 'border-slate-200 hover:bg-slate-50'}`}>
+                    <input
+                      type="radio"
+                      name={`quiz-${question.id}`}
+                      value={key}
+                      checked={answers[question.id] === key}
+                      onChange={() => setDraft((current) => ({
+                        ...current,
+                        orientationTraining: {
+                          ...(current.orientationTraining || {}),
+                          quizAnswers: { ...(current.orientationTraining?.quizAnswers || {}), [question.id]: key },
+                          quizPassed: false,
+                        },
+                      }))}
+                      className="mt-0.5 h-5 w-5 shrink-0 border-slate-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span><strong>{key})</strong> {label}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          ))}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50 p-4">
+            <p className="text-sm text-slate-600">Попыток: {Number(training.quizAttempts) || 0}{training.quizScore !== undefined ? ` · последний результат: ${training.quizScore}/5` : ''}</p>
+            <Button type="button" onClick={checkOrientationQuiz} icon={<FileCheck2 className="h-4 w-4" />}>Проверить ответы</Button>
+          </div>
+          {training.quizPassed === true && <div className="rounded-xl bg-emerald-50 p-4 text-sm font-medium text-emerald-800">Тест успешно пройден: 5 из 5.</div>}
         </div>
       );
     }
 
     if (activeStep.key === 'law') {
       return (
-        <div className="space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm leading-6 text-slate-700">
-            <p className="font-semibold text-slate-900">Согласие на сбор и обработку персональных данных</p>
-            <p className="mt-3">
-              АО "ННМЦ" собирает персональные данные кандидата/нового сотрудника для оформления трудовых отношений, ведения кадрового учета,
-              подготовки документов, соблюдения требований Трудового кодекса Республики Казахстан и внутренних процедур работодателя.
-            </p>
-            <p className="mt-3">
-              Передавая данные, вы подтверждаете их достоверность и соглашаетесь с использованием сведений и файлов для проверки отделом кадров,
-              формирования заявления о приеме на работу и последующей передачи структурированных данных в 1С после утверждения HR.
-            </p>
+        <div className="space-y-5">
+          <div className="flex flex-col gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold text-blue-950">Положение о сборе, обработке и защите персональных данных работников</p>
+              <a href="/onboarding/privacy-policy.html" target="_blank" rel="noreferrer" className="mt-1 inline-block text-sm font-medium text-blue-700 hover:underline">Открыть положение в новом окне</a>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 font-mono text-sm font-semibold text-blue-900 shadow-sm">
+              <TimerReset className="h-4 w-4" />
+              {formatDuration(Number(draft.legal?.secondsSpent) || 0)}
+            </div>
           </div>
-          <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+
+          <iframe
+            title="Положение о персональных данных"
+            src="/onboarding/privacy-policy.html"
+            className="h-[620px] w-full rounded-xl border border-slate-200 bg-white"
+          />
+
+          <label className="flex items-start gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
             <input
               type="checkbox"
               checked={draft.legal?.accepted === true}
-              onChange={(event) => updateSection('legal', 'accepted', event.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+              onChange={(event) => setDraft((current) => ({
+                ...current,
+                legal: {
+                  ...(current.legal || {}),
+                  accepted: event.target.checked,
+                  acceptedAt: event.target.checked ? new Date().toISOString() : undefined,
+                },
+              }))}
+              className="mt-0.5 h-7 w-7 shrink-0 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
             />
-            <span>Я ознакомлен(а) с уведомлением и даю согласие на обработку персональных данных.</span>
+            <span>
+              Я прочитал(а) положение, подтверждаю достоверность предоставляемых сведений и даю согласие АО "ННМЦ" на сбор, обработку и защиту моих персональных данных для оформления трудовых отношений и кадрового учета.
+            </span>
           </label>
+
+          <SignaturePad value={draft.legal?.signatureDataUrl} onChange={(signatureDataUrl) => setDraft((current) => ({
+            ...current,
+            legal: {
+              ...(current.legal || {}),
+              signatureDataUrl,
+              signatureCapturedAt: signatureDataUrl ? new Date().toISOString() : undefined,
+            },
+          }))} />
         </div>
       );
     }

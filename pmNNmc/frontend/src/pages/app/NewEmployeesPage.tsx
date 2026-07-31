@@ -57,6 +57,8 @@ const statusClass: Record<OnboardingStatus, string> = {
 };
 
 const correctionSections = [
+  { value: 'Программа введения в должность', label: 'Программа введения в должность' },
+  { value: 'Согласие на обработку персональных данных', label: 'Согласие на обработку персональных данных' },
   { value: 'Личные данные', label: 'Личные данные' },
   { value: 'Документы', label: 'Документы' },
   { value: 'Адреса и контакты', label: 'Адреса и контакты' },
@@ -102,6 +104,12 @@ const extraFieldTypes: Array<{ value: OnboardingExtraFieldType; label: string }>
 ];
 
 const emptySettings: OnboardingSettings = { documentRequirements: {}, extraFields: [] };
+const orientationMaterialLabels = [
+  'Порядок приема на работу (с фотографией)',
+  'Порядок приема на работу',
+  'Права, обязанности и стандарты поведения',
+  'Безопасность, здоровье и благополучие',
+];
 
 function normalizeIin(value: string) {
   return value.replace(/\D/g, '').slice(0, 12);
@@ -119,6 +127,14 @@ function formatDate(value?: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString('ru-RU');
+}
+
+function formatDuration(totalSeconds: number) {
+  const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const rest = seconds % 60;
+  return [hours, minutes, rest].map((part) => String(part).padStart(2, '0')).join(':');
 }
 
 function fullName(draft: Record<string, any>) {
@@ -278,6 +294,10 @@ export default function NewEmployeesPage() {
   const documents = draft.documents || {};
   const medical = draft.medical || {};
   const bank = draft.bank || {};
+  const orientationTraining = draft.orientationTraining || {};
+  const legal = draft.legal || {};
+  const orientationSeconds = orientationMaterialLabels.map((_, index) => Number(orientationTraining.slideSeconds?.[index]) || 0);
+  const orientationTotalSeconds = orientationSeconds.reduce((sum, seconds) => sum + seconds, 0);
 
   if (settingsMode && isSuperAdmin) {
     return (
@@ -475,6 +495,57 @@ export default function NewEmployeesPage() {
                     <p>Halyk PDF: <FileLink files={bank.halykRequisites} /></p>
                     <p>Видео 1: {draft.safety?.introReviewed ? 'просмотрено' : 'нет'}</p>
                     <p>Видео 2: {draft.safety?.hospitalSafetyReviewed ? 'просмотрено' : 'нет'}</p>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 lg:col-span-2">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-900">Программа введения в должность</h3>
+                      <p className="mt-1 text-sm text-slate-500">Фактическое время активного просмотра материалов.</p>
+                    </div>
+                    <span className="rounded-lg bg-white px-3 py-2 font-mono text-sm font-semibold text-blue-900 shadow-sm">Всего {formatDuration(orientationTotalSeconds)}</span>
+                  </div>
+                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                    {orientationMaterialLabels.map((label, index) => (
+                      <div key={label} className="rounded-lg border border-blue-100 bg-white p-3 text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-medium text-slate-800">{index + 1}. {label}</p>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${orientationTraining.viewedSlides?.[index] ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                            {orientationTraining.viewedSlides?.[index] ? 'Изучено' : 'Не завершено'}
+                          </span>
+                        </div>
+                        <p className="mt-2 font-mono text-blue-900">{formatDuration(orientationSeconds[index])}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 rounded-lg border border-blue-100 bg-white p-3 text-sm text-slate-700">
+                    <p><span className="font-medium">Тест:</span> {orientationTraining.quizPassed ? 'пройден' : 'не пройден'} · {Number(orientationTraining.quizScore) || 0}/5 · попыток {Number(orientationTraining.quizAttempts) || 0}</p>
+                    <p className="mt-1 text-xs text-slate-400">Завершен: {formatDate(orientationTraining.quizCompletedAt)}</p>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4 lg:col-span-2">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-semibold text-slate-900">Согласие на обработку персональных данных</h3>
+                      <p className="mt-1 text-sm text-slate-500">Положение, согласие и собственноручная подпись сотрудника.</p>
+                    </div>
+                    <span className="rounded-lg bg-white px-3 py-2 font-mono text-sm font-semibold text-teal-900 shadow-sm">Чтение {formatDuration(Number(legal.secondsSpent) || 0)}</span>
+                  </div>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-teal-100 bg-white p-3 text-sm text-slate-700">
+                      <p>Согласие: <span className="font-medium">{legal.accepted ? 'получено' : 'не получено'}</span></p>
+                      <p className="mt-1">Дата согласия: {formatDate(legal.acceptedAt)}</p>
+                      <p className="mt-1">Дата подписи: {formatDate(legal.signatureCapturedAt)}</p>
+                      <a href="/onboarding/privacy-policy.html" target="_blank" rel="noreferrer" className="mt-3 inline-block font-medium text-primary-600 hover:underline">Открыть положение</a>
+                    </div>
+                    <div className="rounded-lg border border-teal-100 bg-white p-3">
+                      <p className="mb-2 text-xs uppercase text-slate-400">Подпись сотрудника</p>
+                      {String(legal.signatureDataUrl || '').startsWith('data:image/png;base64,') ? (
+                        <img src={legal.signatureDataUrl} alt="Собственноручная подпись сотрудника" className="h-28 w-full object-contain" />
+                      ) : (
+                        <div className="flex h-28 items-center justify-center text-sm text-slate-400">Подпись не поставлена</div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

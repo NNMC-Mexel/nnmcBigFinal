@@ -7,6 +7,14 @@ const EMPLOYEE_CARD_UID = 'api::employee-card.employee-card' as any;
 const USER_UID = 'plugin::users-permissions.user' as any;
 const INVITATION_DAYS = 3;
 const MAX_ATTEMPTS = 3;
+const ORIENTATION_SLIDE_COUNT = 4;
+const ORIENTATION_QUIZ_ANSWERS: Record<string, string> = {
+  mission: 'B',
+  'employment-stage': 'C',
+  'employee-duty': 'A',
+  danger: 'B',
+  value: 'B',
+};
 
 const DOCUMENT_REQUIREMENT_KEYS = [
   'identityPhoto',
@@ -182,7 +190,25 @@ function validateSubmissionDraft(draft: any, settings: OnboardingSettings): stri
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const today = new Date().toISOString().slice(0, 10);
 
+  if (draft?.intro?.reviewed !== true) errors.push('Не подтвержден просмотр приветственного видео');
+  const training = draft?.orientationTraining || {};
+  const viewedSlides = Array.isArray(training.viewedSlides) ? training.viewedSlides : [];
+  const slideSeconds = Array.isArray(training.slideSeconds) ? training.slideSeconds : [];
+  if (Array.from({ length: ORIENTATION_SLIDE_COUNT }).some((_, index) => viewedSlides[index] !== true || Number(slideSeconds[index]) <= 0)) {
+    errors.push('Не просмотрены все материалы программы введения в должность');
+  }
+  const quizAnswers = training.quizAnswers || {};
+  if (Object.entries(ORIENTATION_QUIZ_ANSWERS).some(([question, answer]) => cleanString(quizAnswers[question]) !== answer)) {
+    errors.push('Не пройден тест по программе введения в должность');
+  }
+  if (training.quizPassed !== true || Number(training.quizScore) !== Object.keys(ORIENTATION_QUIZ_ANSWERS).length) {
+    errors.push('Результат теста по программе введения в должность не подтвержден');
+  }
   if (draft?.legal?.accepted !== true) errors.push('Не подтверждено согласие на обработку персональных данных');
+  const legalSignature = cleanString(draft?.legal?.signatureDataUrl);
+  if (!/^data:image\/png;base64,[a-zA-Z0-9+/=]+$/.test(legalSignature) || legalSignature.length > 500_000) {
+    errors.push('Не сохранена собственноручная подпись под согласием');
+  }
   if (settings.documentRequirements.identityPhoto && !hasUploadedFiles(identity.photo)) errors.push('Не загружена фотография 3x4');
   for (const [key, label] of [['lastName', 'фамилия'], ['firstName', 'имя']] as const) {
     const value = cleanString(identity[key]);
