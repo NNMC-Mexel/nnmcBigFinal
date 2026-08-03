@@ -129,7 +129,14 @@ function publicUrl(token: string): string {
 }
 
 function whatsappUrl(phone: string, token: string): string {
-  const message = encodeURIComponent(`Здравствуйте! Для оформления в АО "ННМЦ" заполните анкету нового сотрудника: ${publicUrl(token)}`);
+  const message = encodeURIComponent([
+    'Здравствуйте!',
+    '',
+    'Для оформления в АО "ННМЦ" заполните анкету нового сотрудника.',
+    '',
+    'Открыть анкету:',
+    publicUrl(token),
+  ].join('\n'));
   return `https://wa.me/${normalizePhone(phone)}?text=${message}`;
 }
 

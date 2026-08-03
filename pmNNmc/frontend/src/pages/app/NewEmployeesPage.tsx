@@ -423,9 +423,19 @@ export default function NewEmployeesPage() {
                     <span className={`rounded-full px-3 py-1 text-sm font-medium ${statusClass[selected.status]}`}>{statusLabels[selected.status]}</span>
                   </div>
                   <p className="mt-1 text-sm text-slate-500">ИИН {selected.iin} · попыток осталось {selected.attemptsLeft ?? 0}</p>
+                  {selected.publicUrl && (
+                    <a
+                      href={selected.publicUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 block break-all text-sm font-medium text-primary-600 underline decoration-primary-300 underline-offset-2 hover:text-primary-800"
+                    >
+                      {selected.publicUrl}
+                    </a>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="secondary" size="sm" onClick={() => void copy(selected.publicUrl)} icon={<Copy className="h-4 w-4" />}>Ссылка</Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => void copy(selected.publicUrl)} icon={<Copy className="h-4 w-4" />}>Копировать</Button>
                   {selected.whatsappUrl && (
                     <a href={selected.whatsappUrl} target="_blank" rel="noreferrer" className="btn btn-secondary text-sm px-3 py-1.5">
                       <ExternalLink className="h-4 w-4" /> WhatsApp
