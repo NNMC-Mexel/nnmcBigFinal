@@ -1335,7 +1335,13 @@ export default function NewEmployeeOnboardingPage() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[280px_1fr] lg:px-6">
+      <main
+        className={`mx-auto grid gap-6 px-4 py-6 lg:px-6 ${
+          verified && ['orientation', 'orientation-quiz'].includes(activeStep.key)
+            ? 'max-w-[1600px] lg:grid-cols-[240px_minmax(0,1fr)]'
+            : 'max-w-6xl lg:grid-cols-[280px_1fr]'
+        }`}
+      >
         <aside className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm backdrop-blur">
           <p className="text-xs font-semibold uppercase text-slate-400">Прогресс</p>
           <div className="mt-3 h-2 rounded-full bg-slate-100">
