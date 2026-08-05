@@ -34,6 +34,10 @@ export interface Department {
   canViewKpiMedical?: boolean;
   canViewKpiEngineering?: boolean;
   canViewKpiTimesheet?: boolean;
+  canAccessBpmRequests?: boolean;
+  canManageBpmRegistry?: boolean;
+  canManageArtTimesheet?: boolean;
+  canAccessProjectCalculations?: boolean;
   canAccessConf?: boolean;
   canAccessJournal?: boolean;
   canAccessSigndoc?: boolean;

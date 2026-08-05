@@ -45,6 +45,7 @@ const ConferenceRoomsPage = lazy(() => import('./pages/app/ConferenceRoomsPage')
 const JournalPage = lazy(() => import('./pages/app/JournalPage'));
 const SignDocPage = lazy(() => import('./pages/app/SignDocPage'));
 const ProtocolsPage = lazy(() => import('./pages/app/ProtocolsPage'));
+const ProjectCalculationsPage = lazy(() => import('./pages/app/ProjectCalculationsPage'));
 
 // Lazy public pages
 const PublicSurveyPage = lazy(() => import('./pages/public/PublicSurveyPage'));
@@ -182,6 +183,8 @@ function App() {
     canAccessSigndoc,
     canViewEmployeeDirectory,
     canApproveNewEmployees,
+    canAccessBpmRequests,
+    canManageArtTimesheet,
   } = useUserRole();
 
   useEffect(() => {
@@ -273,8 +276,18 @@ function App() {
           }
         />
         <Route path="employees" element={<Navigate to="/app/bpm/employees" replace />} />
-        <Route path="bpm-requests" element={withSuspense(<BpmMyRequestsPage />)} />
-        <Route path="art-timesheet" element={withSuspense(<ArtTimesheetPage />)} />
+        <Route
+          path="bpm-requests"
+          element={
+            <FeatureRoute allow={canAccessBpmRequests}>{withSuspense(<BpmMyRequestsPage />)}</FeatureRoute>
+          }
+        />
+        <Route
+          path="art-timesheet"
+          element={
+            <FeatureRoute allow={canManageArtTimesheet}>{withSuspense(<ArtTimesheetPage />)}</FeatureRoute>
+          }
+        />
         <Route
           path="onboarding/new-employees"
           element={
@@ -351,6 +364,9 @@ function App() {
         <Route path="journal" element={<FeatureRoute allow={canAccessJournal}>{withSuspense(<JournalPage />)}</FeatureRoute>} />
         <Route path="signdoc/*" element={<FeatureRoute allow={canAccessSigndoc}>{withSuspense(<SignDocPage />)}</FeatureRoute>} />
         <Route path="protocols/*" element={withSuspense(<ProtocolsPage />)} />
+        <Route path="project-calculations" element={withSuspense(<ProjectCalculationsPage />)} />
+        <Route path="project-calculations/new" element={withSuspense(<ProjectCalculationsPage />)} />
+        <Route path="project-calculations/:id" element={withSuspense(<ProjectCalculationsPage />)} />
       </Route>
 
       {/* Logged out page — not protected, cleans up tokens on mount */}

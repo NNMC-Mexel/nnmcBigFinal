@@ -36,6 +36,7 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Modal from '../../components/ui/Modal';
 import Loader from '../../components/ui/Loader';
+import ProjectCalculationSettingsPanel from '../../components/admin/ProjectCalculationSettingsPanel';
 
 // Permission flag keys on Department
 const PERMISSION_FLAGS = [
@@ -48,6 +49,10 @@ const PERMISSION_FLAGS = [
   { key: 'canViewKpiMedical', label: 'KPI Мед' },
   { key: 'canViewKpiEngineering', label: 'KPI Инж' },
   { key: 'canViewKpiTimesheet', label: 'KPI Табель' },
+  { key: 'canAccessBpmRequests', label: 'BPM: мои заявки' },
+  { key: 'canManageBpmRegistry', label: 'BPM: реестр' },
+  { key: 'canManageArtTimesheet', label: 'BPM: АРТ Табель' },
+  { key: 'canAccessProjectCalculations', label: 'Расчёт проектов' },
   { key: 'canAccessConf', label: 'Конф-залы' },
   { key: 'canAccessJournal', label: 'Журнал' },
   { key: 'canAccessSigndoc', label: 'Документы' },
@@ -61,7 +66,7 @@ const PERMISSION_FLAGS = [
 ] as const;
 
 type PermissionKey = typeof PERMISSION_FLAGS[number]['key'];
-type Tab = 'departments' | 'permissions' | 'helpdesk' | 'users' | 'deleted';
+type Tab = 'departments' | 'permissions' | 'helpdesk' | 'project-calculations' | 'users' | 'deleted';
 const STANDARD_INITIAL_PASSWORD = 'Aa123123!';
 
 export default function AdminPanelPage() {
@@ -661,6 +666,7 @@ export default function AdminPanelPage() {
     { key: 'departments', label: 'Отделы' },
     { key: 'permissions', label: 'Матрица прав' },
     { key: 'helpdesk', label: 'Helpdesk' },
+    { key: 'project-calculations', label: 'Расчёт проектов' },
     { key: 'users', label: 'Пользователи' },
     { key: 'deleted', label: 'Удалённые проекты' },
   ];
@@ -722,6 +728,8 @@ export default function AdminPanelPage() {
       </div>
 
       {/* ─── Tab: Departments ──────────────────────────────── */}
+      {activeTab === 'project-calculations' && <ProjectCalculationSettingsPanel />}
+
       {activeTab === 'departments' && (
         <div className="space-y-4">
           <div className="flex justify-end">

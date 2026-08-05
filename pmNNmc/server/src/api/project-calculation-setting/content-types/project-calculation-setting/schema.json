@@ -1,0 +1,33 @@
+{
+  "kind": "collectionType",
+  "collectionName": "project_calculation_settings",
+  "info": {
+    "singularName": "project-calculation-setting",
+    "pluralName": "project-calculation-settings",
+    "displayName": "Project calculation settings",
+    "description": "Закрытые настройки модуля расчёта проектов"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "key": { "type": "string", "required": true, "unique": true, "default": "default", "private": true },
+    "reviewerEmail": { "type": "email", "required": true, "default": "aigul.b@nnmc.kz" },
+    "margin": { "type": "decimal", "required": true, "default": 0.3 },
+    "actualFormula": {
+      "type": "text",
+      "required": true,
+      "default": "(market - actual) * margin / employeeCount",
+      "private": true
+    },
+    "aiFormula": {
+      "type": "text",
+      "required": true,
+      "default": "(market - ai) * margin / employeeCount",
+      "private": true
+    },
+    "departmentSettings": { "type": "json" },
+    "userAccessRules": { "type": "json" }
+  }
+}

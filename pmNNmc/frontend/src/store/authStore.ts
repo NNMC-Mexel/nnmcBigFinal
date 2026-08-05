@@ -208,6 +208,14 @@ export const useUserRole = () => {
   const canViewKpiMedical = deptFlag(dept?.canViewKpiMedical);
   const canViewKpiEngineering = deptFlag(dept?.canViewKpiEngineering);
   const canViewKpiTimesheet = deptFlag(dept?.canViewKpiTimesheet);
+  // Employee-facing BPM stays enabled for existing departments until an
+  // administrator explicitly disables it in the permission matrix.
+  const canAccessBpmRequests = isSuperAdmin || (Boolean(user) && dept?.canAccessBpmRequests !== false);
+  const canManageBpmRegistry =
+    isSuperAdmin || departmentKey === 'HR' || departmentKey === 'ACCOUNTING' || dept?.canManageBpmRegistry === true;
+  const canManageArtTimesheet =
+    isSuperAdmin || departmentKey === 'HR' || canViewKpiTimesheet || dept?.canManageArtTimesheet === true;
+  const canAccessProjectCalculations = deptFlag(dept?.canAccessProjectCalculations);
   const canAccessConf = deptFlag(dept?.canAccessConf);
   const canAccessJournal = deptFlag(dept?.canAccessJournal);
   const canAccessSigndoc = deptFlag(dept?.canAccessSigndoc);
@@ -217,8 +225,7 @@ export const useUserRole = () => {
   const canManageProjectAssignments = deptFlag(dept?.canManageProjectAssignments);
   const canManageTickets = deptFlag(dept?.canManageTickets);
   const canViewActivityLog = deptFlag(dept?.canViewActivityLog);
-  const canViewEmployeeDirectory =
-    isSuperAdmin || departmentKey === 'HR' || departmentKey === 'ACCOUNTING';
+  const canViewEmployeeDirectory = canManageBpmRegistry;
   const canSyncEmployeeDirectory =
     isSuperAdmin || departmentKey === 'HR';
   const canApproveNewEmployees =
@@ -279,6 +286,10 @@ export const useUserRole = () => {
     canViewKpiMedical,
     canViewKpiEngineering,
     canViewKpiTimesheet,
+    canAccessBpmRequests,
+    canManageBpmRegistry,
+    canManageArtTimesheet,
+    canAccessProjectCalculations,
     canViewProjects,
     canAccessConf,
     canAccessJournal,

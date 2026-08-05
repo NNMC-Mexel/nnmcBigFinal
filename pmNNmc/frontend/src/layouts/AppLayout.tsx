@@ -26,6 +26,7 @@ import {
     Users,
     Workflow,
     UserPlus,
+    CircleDollarSign,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuthStore, useUserRole } from "../store/authStore";
@@ -34,12 +35,14 @@ import NotificationsBell from "../components/NotificationsBell";
 import FeedbackWidget from "../components/FeedbackWidget";
 import { getMediaUrl } from "../utils/media";
 import { notificationsApi } from "../api/notifications";
+import { projectCalculationsApi } from "../api/projectCalculations";
 
 export default function AppLayout() {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [canAccessProjectCalculations, setCanAccessProjectCalculations] = useState(false);
     const { user } = useAuthStore();
     const {
         isSuperAdmin,
@@ -58,6 +61,8 @@ export default function AppLayout() {
         canViewActivityLog,
         canViewEmployeeDirectory,
         canApproveNewEmployees,
+        canAccessBpmRequests,
+        canManageArtTimesheet,
         departmentKey,
     } = useUserRole();
 
@@ -98,6 +103,15 @@ export default function AppLayout() {
         }
     }, [location.pathname, location.search]);
 
+    useEffect(() => {
+        if (!user?.id) return;
+        let active = true;
+        projectCalculationsApi.getContext()
+            .then((context) => { if (active) setCanAccessProjectCalculations(context.canAccess); })
+            .catch(() => { if (active) setCanAccessProjectCalculations(false); });
+        return () => { active = false; };
+    }, [user?.id]);
+
     // No longer needed — services use department flags directly
 
     // News feed — always visible to all authenticated users
@@ -125,6 +139,7 @@ export default function AppLayout() {
             : null,
         canViewBoard ? { to: "/app/board", icon: Kanban, label: t("nav.board"), iconColor: "text-violet-500", activeBg: "bg-violet-50", activeText: "text-violet-700" } : null,
         canViewTable ? { to: "/app/table", icon: Table, label: t("nav.table"), iconColor: "text-cyan-500", activeBg: "bg-cyan-50", activeText: "text-cyan-700" } : null,
+        canAccessProjectCalculations ? { to: "/app/project-calculations", icon: CircleDollarSign, label: "Расчёт проектов", iconColor: "text-emerald-600", activeBg: "bg-emerald-50", activeText: "text-emerald-700" } : null,
     ].filter(Boolean) as Array<{ to: string; icon: typeof LayoutDashboard; label: string; iconColor: string; activeBg: string; activeText: string }>;
 
     const isHelpdeskWorker =
@@ -204,16 +219,16 @@ export default function AppLayout() {
     const navItems = [...projectNavItems, ...helpdeskNavItems];
 
     const bpmNavItems = [
-        {
+        ...(canAccessBpmRequests ? [{
             to: "/app/bpm-requests",
             icon: Workflow,
             label: "BPM",
-        },
-        {
+        }] : []),
+        ...(canManageArtTimesheet ? [{
             to: "/app/art-timesheet",
             icon: CalendarRange,
             label: "АРТ Табель",
-        },
+        }] : []),
         ...(canViewEmployeeDirectory ? [{
             to: "/app/bpm",
             icon: Users,

@@ -1,0 +1,83 @@
+{
+  "kind": "collectionType",
+  "collectionName": "project_calculations",
+  "info": {
+    "singularName": "project-calculation",
+    "pluralName": "project-calculations",
+    "displayName": "Project calculation",
+    "description": "Расчёт стоимости и эффективности проектов"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "requestNumber": { "type": "string", "required": true, "unique": true },
+    "numberDate": { "type": "string", "required": true },
+    "sequenceNumber": { "type": "integer", "required": true },
+    "version": { "type": "integer", "default": 1 },
+    "status": {
+      "type": "enumeration",
+      "enum": ["DRAFT", "SUBMITTED", "IN_REVIEW", "RETURNED", "APPROVED", "REJECTED"],
+      "default": "DRAFT",
+      "required": true
+    },
+    "title": { "type": "string", "required": true },
+    "description": { "type": "text" },
+    "customer": { "type": "string" },
+    "startDate": { "type": "date" },
+    "endDate": { "type": "date" },
+    "creator": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "department": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::department.department"
+    },
+    "teamMembers": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "plugin::users-permissions.user"
+    },
+    "teamSnapshot": { "type": "json" },
+    "hourlyRate": { "type": "decimal", "default": 0 },
+    "actualHours": { "type": "decimal", "default": 0 },
+    "actualExtraCosts": { "type": "json" },
+    "actualTotal": { "type": "decimal", "default": 0 },
+    "aiHours": { "type": "decimal", "default": 0 },
+    "aiExtraCosts": { "type": "json" },
+    "aiTotal": { "type": "decimal", "default": 0 },
+    "marketAmount": { "type": "decimal", "default": 0 },
+    "actualEfficiencyPerEmployee": { "type": "decimal", "default": 0 },
+    "aiEfficiencyPerEmployee": { "type": "decimal", "default": 0 },
+    "aiReportFiles": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": ["files"]
+    },
+    "marketFiles": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": ["files"]
+    },
+    "reviewComment": { "type": "text" },
+    "reviewer": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "plugin::users-permissions.user"
+    },
+    "submittedAt": { "type": "datetime" },
+    "reviewedAt": { "type": "datetime" },
+    "approvedAt": { "type": "datetime" },
+    "rejectedAt": { "type": "datetime" },
+    "autosavedAt": { "type": "datetime" },
+    "history": { "type": "json" },
+    "versionHistory": { "type": "json" },
+    "formulaSnapshot": { "type": "json", "private": true }
+  }
+}

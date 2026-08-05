@@ -294,6 +294,13 @@ async function setupPermissions(strapi: any) {
       'find', 'findOne', 'findMany', 'create', 'update', 'delete',
       'publish', 'usersByDepartment',
     ],
+    // Project cost calculations. Row-level access, workflow transitions and
+    // hidden formulas are enforced by the custom controller.
+    'api::project-calculation.project-calculation': [
+      'context', 'findMany', 'findOne', 'create', 'update', 'submit',
+      'startReview', 'returnForRevision', 'approve', 'reject', 'reopen',
+      'getSettings', 'updateSettings',
+    ],
     'api::activity-log.activity-log': ['find', 'findOne'],
     'api::audit-event.audit-event': ['find', 'findOne'],
     'api::document.document': ['find', 'findOne', 'create', 'update', 'delete'],
