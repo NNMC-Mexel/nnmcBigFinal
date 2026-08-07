@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+
+# A new push to the same branch cancels the previous run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      # Never stop the other packages because one failed — we want the full picture.
+      fail-fast: false
+      matrix:
+        package: [server, server-bpm, frontend]
+    defaults:
+      run:
+        working-directory: pmNNmc/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 matches NIXPACKS_NODE_VERSION on Coolify.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: pmNNmc/${{ matrix.package }}/package-lock.json
+
+      - run: npm ci
+
+      - run: npm test
+
+  build-frontend:
+    name: build frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pmNNmc/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: pmNNmc/frontend/package-lock.json
+
+      - run: npm ci
+
+      # `npm run build` is `tsc -b && vite build`, so this typechecks the frontend too.
+      - run: npm run build
+
+  typecheck:
+    name: typecheck (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # These three are clean at `strict: false` today, so the gate starts green.
+        # server-signdoc / server-priemnaya / server-conf are not verified yet —
+        # add them once they have been checked locally.
+        package: [server, server-bpm, server-kpi]
+    defaults:
+      run:
+        working-directory: pmNNmc/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: pmNNmc/${{ matrix.package }}/package-lock.json
+
+      - run: npm ci
+
+      - run: npx tsc --noEmit -p tsconfig.json
+
+  audit:
+    name: npm audit (informational)
+    runs-on: ubuntu-latest
+    # Advisories land without any change on our side, so this must never
+    # block a deploy — it reports, the test jobs gate.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [server, server-bpm, server-kpi, server-conf, server-signdoc, server-priemnaya, frontend]
+    defaults:
+      run:
+        working-directory: pmNNmc/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm audit --audit-level=high
