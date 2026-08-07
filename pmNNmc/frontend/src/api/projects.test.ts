@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildProjectsQuery } from './projects';
+import { buildProjectsQuery } from './projects.query';
 
 test('buildProjectsQuery defaults to excluding deleted', () => {
   const query = buildProjectsQuery();
